@@ -6,7 +6,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules', 'coverage', 'src/app/public/service-worker.js', 'src/imports/**'] },
+  { ignores: ['dist', 'node_modules', 'coverage', 'public/service-worker.js', 'src/imports/**', '**/*.timestamp-*.mjs', 'playwright-report', 'test-results'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

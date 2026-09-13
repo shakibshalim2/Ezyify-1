@@ -10,5 +10,5 @@ test('add a product to cart from product detail and see it in cart', async ({ pa
   await page.getByRole('button', { name: /add to cart/i }).first().click();
   await page.goto('/cart');
   await expect(page.getByRole('heading', { name: /cart/i })).toBeVisible();
-  await expect(page.getByText(/checkout/i).first()).toBeVisible();
+  await expect(page.locator('a[href="/checkout"]:visible').first()).toBeVisible();
 });

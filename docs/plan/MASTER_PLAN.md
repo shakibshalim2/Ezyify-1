@@ -101,9 +101,11 @@ Source: `docs/audit/DESIGN_ISSUES_BY_SEVERITY.md`, `docs/research/EZYIFY_DESIGN_
 Ordered by audit score: Home hero + feed cards → Loops viewer transitions & action rail → Stories progress/gestures → Product detail (gallery zoom, sticky CTA) → Cart (swipe‑to‑remove, seller grouping) → Shop/Categories → Search → Profile (cover gradient, stats) → Messages (typing indicator, bubbles) → Live (player chrome) → Wallet/Orders/Checkout → Seller & Creator dashboards → Settings/Help/Legal. Each screen: hierarchy, card variant, empty/loading/error state, motion, a11y labels.
 
 ### Phase 3 — Monorepo + shared core
-- ☐ Move web to `apps/web`; create `packages/core`, `packages/tokens`, `packages/config`; Turborepo pipelines
-- ☐ API client with zod‑validated responses, auth interceptor, retry, offline queue
-- ☐ Replace MSW mocks with real client (MSW retained for tests/storybook)
+- ☑ Move web to `apps/web`; create `packages/core`, `packages/tokens`, `packages/config`; Turborepo pipelines
+- ☑ API client with zod‑validated responses, auth interceptor (silent refresh), bounded retry/backoff, timeout
+- ☑ `@ezyify/tokens`: `tokens.json` → generated `tokens.css` (web) + `nativeTheme()` (RN); web imports the generated CSS
+- ☑ `@ezyify/core` runtime (auth + guest‑cart stores, endpoint map, react‑query client) mounted in `App.tsx`
+- ☐ Migrate screens from local mock data to `useApi()` + MSW handlers that satisfy the core schemas (continues alongside backend work)
 
 ### Phase 4 — Mobile app (Expo, standalone signed builds)
 - 4.1 ☐ `apps/mobile` via `create-expo-app` (SDK 52, TypeScript, Expo Router), NativeWind, Reanimated, Moti, Lottie, expo-image/video, SecureStore
@@ -185,3 +187,4 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 | 2026‑09‑13 | Design review pass: token cleanup, safe storage reads, a11y/deprecation fixes | f98145f |
 | 2026‑09‑13 | Playwright smoke suite (mobile + desktop) wired into CI | 882371d |
 | 2026‑09‑13 | Phase 2f: Post detail, Storefront, Profile edit/followers, Deals, Categories, Wishlist, Dashboard, Help, Error pages | f77d82c |
+| 2026‑09‑13 | Phase 3: monorepo (`apps/web`, `packages/{core,tokens,config}`), Turborepo, typed zod API client + stores, CI on turbo | (this commit) |

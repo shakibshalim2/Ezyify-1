@@ -1,6 +1,9 @@
 import React, { lazy, Suspense, useEffect, useState, memo } from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from 'react-router';
 import { AuthProvider } from './contexts/AuthContext';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { EzyifyContext } from '@ezyify/core';
+import { createWebRuntime } from './runtime';
 import { Toaster } from './components/ui/sonner';
 import { PageTransition } from './components/primitives/PageTransition';
 import { SplashScreen, shouldShowSplash } from './features/splash/SplashScreen';
@@ -234,6 +237,8 @@ function FirstRunGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+const runtime = createWebRuntime();
+
 export default function App() {
   const [splash, setSplash] = useState(() => shouldShowSplash());
 
@@ -283,6 +288,8 @@ export default function App() {
 
   return (
     <ErrorBoundary>
+      <EzyifyContext.Provider value={runtime}>
+      <QueryClientProvider client={runtime.queryClient}>
       <BrowserRouter>
         <ThemeProvider>
           {splash && <SplashScreen onDone={() => setSplash(false)} />}
@@ -428,6 +435,8 @@ export default function App() {
           </AuthProvider>
         </ThemeProvider>
       </BrowserRouter>
+      </QueryClientProvider>
+      </EzyifyContext.Provider>
     </ErrorBoundary>
   );
 }

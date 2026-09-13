@@ -1,8 +1,10 @@
 dist
+build
+.turbo
 node_modules
 coverage
 pnpm-lock.yaml
-src/imports
-src/app/docs
+apps/web/src/imports
+apps/web/src/app/docs
 docs
 *.md

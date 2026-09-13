@@ -5,4 +5,5 @@
 @import '@fontsource-variable/plus-jakarta-sans';
 @import './default_theme.css';
 @import './globals.css';
+@import '@ezyify/tokens/css';
 @import './tokens.css';

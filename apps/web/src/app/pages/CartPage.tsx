@@ -357,16 +357,9 @@ export default function CartPage() {
                 <span className="text-accent-brand">${total.toFixed(2)}</span>
               </div>
 
-              <Link to="/checkout" className="block">
-                <Button
-                  variant="gradient"
-                  size="xl"
-                  fullWidth
-                  className="shadow-brand"
-                >
-                  Checkout
-                </Button>
-              </Link>
+              <Button asChild variant="gradient" size="xl" fullWidth className="shadow-brand">
+                <Link to="/checkout">Checkout</Link>
+              </Button>
             </Card>
             </div>
           </div>

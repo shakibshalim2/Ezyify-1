@@ -2,7 +2,8 @@
    EZYIFY DESIGN TOKENS — brand source of truth
    Imported last so it overrides the generated theme in globals.css.
    Palette is derived from the logo: Ezyify Blue #0F66C7 + Signal Orange #FF6F22.
-   Mirrored for React Native in packages/tokens (Phase 3).
+   Palette + semantic colours/radii/motion come from @ezyify/tokens (dist/tokens.css, generated
+   from packages/tokens/tokens.json). This file keeps web-only extras: gradients, fonts, @theme.
    ================================================================ */
 
 :root {

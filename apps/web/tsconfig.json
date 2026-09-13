@@ -1,0 +1,11 @@
+{
+  "extends": "@ezyify/config/tsconfig.react.json",
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/app/*"] }
+  },
+  "include": ["src", "e2e", "vite.config.ts", "vitest.config.ts", "playwright.config.ts", "eslint.config.js"]
+}

@@ -1,4 +1,6 @@
-/** Small typed wrapper over localStorage that never throws (private mode, SSR, quota). */
+/** Web storage helper — thin sync facade over the shared core keys so existing callers keep working. */
+import { STORAGE_KEYS as CORE_KEYS } from '@ezyify/core/stores';
+
 export const storage = {
   get<T>(key: string, fallback: T): T {
     try {
@@ -25,8 +27,6 @@ export const storage = {
 };
 
 export const STORAGE_KEYS = {
-  onboardingSeen: 'ezyify.onboarding.seen',
-  splashShownAt: 'ezyify.splash.shownAt',
-  theme: 'ezyify-theme',
+  ...CORE_KEYS,
   user: 'ezyify_user',
 } as const;
