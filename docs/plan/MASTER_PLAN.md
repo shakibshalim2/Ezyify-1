@@ -97,7 +97,7 @@ Source: `docs/audit/DESIGN_ISSUES_BY_SEVERITY.md`, `docs/research/EZYIFY_DESIGN_
 
 1.7 **Illustrations & imagery** ☐ — unDraw SVGs recolored to brand (onboarding ×3, empty states ×6: feed, cart, wishlist, orders, messages, notifications, search‑no‑results, offline, error), Lottie: success check, loading loop, confetti (LottieFiles free license). Product/avatar placeholders switched to a deterministic image service with local fallback. Attributions in `ATTRIBUTIONS.md`.
 
-### Phase 2 — Main app design pass (P1 design)
+### Phase 2 — Main app design pass (P1 design) — ✅ complete (PR #1, PR #2)
 Ordered by audit score: Home hero + feed cards → Loops viewer transitions & action rail → Stories progress/gestures → Product detail (gallery zoom, sticky CTA) → Cart (swipe‑to‑remove, seller grouping) → Shop/Categories → Search → Profile (cover gradient, stats) → Messages (typing indicator, bubbles) → Live (player chrome) → Wallet/Orders/Checkout → Seller & Creator dashboards → Settings/Help/Legal. Each screen: hierarchy, card variant, empty/loading/error state, motion, a11y labels.
 
 ### Phase 3 — Monorepo + shared core
@@ -177,4 +177,11 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 | 2026‑09‑13 | Phase 1: brand tokens, primitives, splash, onboarding, auth redesign + 14 unit tests | b3ab500 |
 | 2026‑09‑13 | Phase 1 remainder: setup steps re‑skin, BottomNav, Card/Skeleton/EmptyState, page transitions | 32067e6 |
 | 2026‑09‑13 | Phase 2a: Design guide; Cart, Checkout, Product detail, Shop, Explore redesigned; Home tokens | 17018ce |
-| 2026‑09‑13 | Phase 2b: Home hero, Loops, Stories, Profile, Search, Messages, Notifications redesigned | (step 5) |
+| 2026‑09‑13 | Phase 2b: Home hero, Loops, Stories, Profile, Search, Messages, Notifications redesigned | 72fcb9a (PR #1 merged) |
+| 2026‑09‑13 | Dev‑only gating of 24 internal launch/QA dashboards + console banners (`routes/devRoutes.tsx`) | a5c9476 |
+| 2026‑09‑13 | Phase 2c: Live viewer, Live Shopping hub, Upload composer (3 steps), Settings + sub‑pages | 48cebc4 |
+| 2026‑09‑13 | Phase 2d: Wallet, Orders, Order tracking/success, refunds, returns, disputes, negotiation | 80feb71 |
+| 2026‑09‑13 | Phase 2e: Seller Hub shell, all seller pages, creator pages | ff3f12f |
+| 2026‑09‑13 | Design review pass: token cleanup, safe storage reads, a11y/deprecation fixes | f98145f |
+| 2026‑09‑13 | Playwright smoke suite (mobile + desktop) wired into CI | 882371d |
+| 2026‑09‑13 | Phase 2f: Post detail, Storefront, Profile edit/followers, Deals, Categories, Wishlist, Dashboard, Help, Error pages | f77d82c |
