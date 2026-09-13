@@ -1,330 +1,205 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { Zap, TrendingUp, Tag, Clock, Star, Heart, ShoppingCart, Check } from 'lucide-react';
-import { products } from '../data/products';
-import { SEO } from '../components/SEO';
+import { motion, useReducedMotion } from 'motion/react';
+import { Check, Clock3, Heart, ShoppingCart, Star, Tag, TrendingUp, Zap } from 'lucide-react';
 import { toast } from 'sonner';
-import { Skeleton } from '../components/ui/skeleton';
+import { SEO } from '../components/SEO';
+import { ImageWithFallback } from '../components/figma/ImageWithFallback';
+import { Button } from '../components/primitives/Button';
+import { Card } from '../components/primitives/Card';
+import { EmptyState } from '../components/primitives/EmptyState';
+import { Skeleton } from '../components/primitives/Skeleton';
+import { products } from '../data/products';
+import { fadeUp, staggerContainer } from '../lib/motion';
 
-// ── Section header reused across Flash, Daily, Best Sellers ──────────────────
-function SectionHeader({
-  icon: Icon,
-  iconBg,
-  iconColor,
-  title,
-  subtitle,
-  badge,
-}: {
-  icon: React.ElementType;
-  iconBg: string;
-  iconColor: string;
-  title: string;
-  subtitle: string;
-  badge?: React.ReactNode;
-}) {
+function DealSkeleton() {
   return (
-    <div className="flex items-center gap-3 mb-5 p-4 rounded-2xl border border-border bg-card">
-      <div className={`p-2.5 rounded-xl ${iconBg}`}>
-        <Icon className={`w-5 h-5 ${iconColor}`} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <h2 className="font-bold text-foreground">{title}</h2>
-        <p className="text-xs text-muted-foreground">{subtitle}</p>
-      </div>
-      {badge}
-    </div>
-  );
-}
-
-// ── Product card — defined outside page to avoid remount on every render ──────
-interface DealCardProps {
-  product: any;
-  isLiked: boolean;
-  inCart: boolean;
-  onToggleLike: (e: React.MouseEvent, id: string) => void;
-  onAddToCart: (e: React.MouseEvent, id: string) => void;
-}
-
-function DealCard({ product, isLiked, inCart, onToggleLike, onAddToCart }: DealCardProps) {
-  const discount = product.originalPrice
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-    : 0;
-
-  return (
-    <Link
-      to={`/product/${product.id}`}
-      className="group bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:-translate-y-0.5 hover:border-border-strong transition-all duration-200"
-    >
-      <div className="relative aspect-square overflow-hidden bg-muted">
-        {discount > 0 && (
-          <div className="absolute top-2 left-2 bg-error text-error-foreground text-[11px] font-bold px-2 py-0.5 rounded-full z-10">
-            -{discount}%
-          </div>
-        )}
-        <img
-          src={product.image}
-          alt={product.name}
-          loading="lazy"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
-        />
-        <div className="absolute top-2 right-2 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-          <button
-            onClick={(e) => onToggleLike(e, product.id)}
-            aria-label={isLiked ? 'Remove from wishlist' : 'Add to wishlist'}
-            className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-md border transition-all active:scale-90 ${
-              isLiked ? 'bg-like text-white border-transparent' : 'bg-card border-border hover:bg-like/5'
-            }`}
-          >
-            <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-current' : ''}`} />
-          </button>
-          <button
-            onClick={(e) => onAddToCart(e, product.id)}
-            aria-label={inCart ? 'In cart' : 'Add to cart'}
-            className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-md border transition-all active:scale-90 ${
-              inCart ? 'bg-primary text-primary-foreground border-transparent' : 'bg-card border-border hover:bg-primary/5'
-            }`}
-          >
-            {inCart ? <Check className="w-3.5 h-3.5" /> : <ShoppingCart className="w-3.5 h-3.5 text-muted-foreground" />}
-          </button>
-        </div>
-      </div>
-
-      <div className="p-3">
-        <p className="text-[11px] text-muted-foreground truncate mb-0.5">{product.seller.name}</p>
-        <h3 className="font-medium text-foreground mb-2 line-clamp-2 text-sm leading-snug">{product.name}</h3>
-
-        <div className="flex items-center gap-1.5 mb-2">
-          <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
-          <span className="text-xs font-medium text-foreground">{product.rating}</span>
-          <span className="text-xs text-muted-foreground">({product.reviews.toLocaleString()})</span>
-        </div>
-
-        <div className="flex items-baseline gap-1.5">
-          <span className="font-bold text-foreground">${product.price}</span>
-          {product.originalPrice && (
-            <span className="text-xs text-muted-foreground line-through">${product.originalPrice}</span>
-          )}
-        </div>
-        {product.originalPrice && (
-          <p className="text-xs text-success font-semibold mt-0.5">
-            Save ${(product.originalPrice - product.price).toFixed(2)}
-          </p>
-        )}
-      </div>
-    </Link>
-  );
-}
-
-// ── Skeleton grid ─────────────────────────────────────────────────────────────
-function DealsSkeleton({ cols = 6, count = 6 }: { cols?: number; count?: number }) {
-  return (
-    <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-${cols} gap-4`}>
-      {Array.from({ length: count }).map((_, i) => (
-        <Skeleton key={i} className="h-64 rounded-2xl" />
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <Skeleton key={i} className="aspect-[.72] rounded-card" />
       ))}
     </div>
   );
 }
-
-// ── Page ──────────────────────────────────────────────────────────────────────
-function useCountdown(targetSeconds: number) {
-  const [remaining, setRemaining] = useState(targetSeconds);
-  useEffect(() => {
-    const tick = setInterval(() => setRemaining(s => Math.max(0, s - 1)), 1000);
-    return () => clearInterval(tick);
-  }, []);
-  const h = Math.floor(remaining / 3600).toString().padStart(2, '0');
-  const m = Math.floor((remaining % 3600) / 60).toString().padStart(2, '0');
-  const s = (remaining % 60).toString().padStart(2, '0');
-  return `${h}:${m}:${s}`;
+function DealCard({
+  product,
+  liked,
+  cart,
+  onLike,
+  onCart,
+}: {
+  product: any;
+  liked: boolean;
+  cart: boolean;
+  onLike: () => void;
+  onCart: () => void;
+}) {
+  const discount = product.originalPrice
+    ? Math.round((1 - product.price / product.originalPrice) * 100)
+    : 0;
+  return (
+    <Card padding="none" interactive className="group overflow-hidden">
+      <Link to={`/product/${product.id}`}>
+        <div className="relative aspect-square bg-muted">
+          <ImageWithFallback
+            src={product.image}
+            alt={product.name}
+            loading="lazy"
+            className="size-full object-cover transition-transform group-hover:scale-105"
+          />
+          {discount > 0 && (
+            <span className="absolute left-2 top-2 rounded-full bg-error px-2 py-1 text-[11px] font-bold text-error-foreground">
+              -{discount}%
+            </span>
+          )}
+          <div className="absolute right-2 top-2 flex flex-col gap-2">
+            <Button
+              aria-label="Toggle wishlist"
+              variant="secondary"
+              size="icon-sm"
+              onClick={(event) => {
+                event.preventDefault();
+                onLike();
+              }}
+              className={liked ? 'text-error' : ''}
+            >
+              <Heart className={liked ? 'fill-error' : ''} />
+            </Button>
+            <Button
+              aria-label="Add item to cart"
+              variant={cart ? 'primary' : 'secondary'}
+              size="icon-sm"
+              onClick={(event) => {
+                event.preventDefault();
+                onCart();
+              }}
+            >
+              {cart ? <Check /> : <ShoppingCart />}
+            </Button>
+          </div>
+        </div>
+        <div className="space-y-1.5 p-3">
+          <p className="truncate text-xs text-foreground-secondary">{product.seller.name}</p>
+          <h3 className="line-clamp-2 text-sm font-semibold">{product.name}</h3>
+          <div className="flex items-center gap-1 text-xs">
+            <Star className="size-3 fill-warning text-warning" />
+            {product.rating}
+          </div>
+          <p className="font-display text-lg font-bold tabular-nums text-accent-brand">
+            ${product.price}{' '}
+            {product.originalPrice && (
+              <span className="ml-1 text-xs font-normal text-foreground-tertiary line-through">
+                ${product.originalPrice}
+              </span>
+            )}
+          </p>
+        </div>
+      </Link>
+    </Card>
+  );
 }
-
 export default function DealsPage() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [flashDeals, setFlashDeals] = useState<any[]>([]);
-  const [dailyDeals, setDailyDeals] = useState<any[]>([]);
-  const [bestSellers, setBestSellers] = useState<any[]>([]);
-  const [likedProducts, setLikedProducts] = useState<Set<string>>(new Set());
-  const [cartItems, setCartItems] = useState<Set<string>>(new Set());
-  const flashCountdown = useCountdown(23 * 3600 + 45 * 60 + 12);
-
+  const reduce = useReducedMotion();
+  const [loading, setLoading] = useState(true);
+  const [liked, setLiked] = useState<Set<string>>(new Set());
+  const [cart, setCart] = useState<Set<string>>(new Set());
+  const deals = useMemo(() => products.filter((product) => product.originalPrice).slice(0, 12), []);
   useEffect(() => {
-    const loadData = () => {
-      const savedWishlist = localStorage.getItem('ezyify_wishlist');
-      if (savedWishlist) {
-        try { setLikedProducts(new Set(JSON.parse(savedWishlist))); } catch { /* silent */ }
-      }
-      const savedCart = localStorage.getItem('ezyify_cart');
-      if (savedCart) {
-        try { setCartItems(new Set((JSON.parse(savedCart) as any[]).map(i => i.id))); } catch { /* silent */ }
-      }
-
-      setFlashDeals(products.filter(p =>
-        p.originalPrice && (p.originalPrice - p.price) / p.originalPrice >= 0.3
-      ));
-      setDailyDeals(products.filter(p =>
-        p.originalPrice &&
-        (p.originalPrice - p.price) / p.originalPrice >= 0.2 &&
-        (p.originalPrice - p.price) / p.originalPrice < 0.3
-      ));
-      setBestSellers(
-        [...products].filter(p => p.sold && p.sold > 500).sort((a, b) => (b.sold || 0) - (a.sold || 0)).slice(0, 12)
-      );
-      setIsLoading(false);
-    };
-
-    if ('requestIdleCallback' in window) {
-      const handle = requestIdleCallback(loadData, { timeout: 100 });
-      return () => cancelIdleCallback(handle);
-    } else {
-      const timer = setTimeout(loadData, 16);
-      return () => clearTimeout(timer);
-    }
+    const timer = window.setTimeout(() => setLoading(false), 110);
+    return () => clearTimeout(timer);
   }, []);
-
-  const toggleLike = useCallback((e: React.MouseEvent, productId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const wishlist = (() => { try { return JSON.parse(localStorage.getItem('ezyify_wishlist') || '[]'); } catch { return []; } })();
-    if (wishlist.includes(productId)) {
-      const next = wishlist.filter((id: string) => id !== productId);
-      localStorage.setItem('ezyify_wishlist', JSON.stringify(next));
-      setLikedProducts(new Set(next));
-      toast.success('Removed from wishlist');
-    } else {
-      wishlist.push(productId);
-      localStorage.setItem('ezyify_wishlist', JSON.stringify(wishlist));
-      setLikedProducts(new Set(wishlist));
-      toast.success('Added to wishlist');
-    }
-  }, []);
-
-  const addToCart = useCallback((e: React.MouseEvent, productId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const cart = (() => { try { return JSON.parse(localStorage.getItem('ezyify_cart') || '[]'); } catch { return []; } })();
-    const existing = cart.find((i: any) => i.id === productId);
-    if (existing) {
-      existing.quantity += 1;
-      toast.success('Quantity updated in cart');
-    } else {
-      cart.push({ id: productId, quantity: 1 });
-      toast.success('Added to cart');
-    }
-    localStorage.setItem('ezyify_cart', JSON.stringify(cart));
-    setCartItems(new Set(cart.map((i: any) => i.id)));
-    window.dispatchEvent(new Event('cartUpdated'));
-  }, []);
-
+  const add = (id: string) => {
+    setCart((current) => new Set(current).add(id));
+    toast.success('Added to cart');
+  };
   return (
     <div className="min-h-screen bg-background">
       <SEO
-        title="Deals & Offers — Best Discounts"
-        description="Discover amazing deals, flash sales, and discounts on Ezyify. Save big on your favorite products from verified sellers."
-        keywords="deals, offers, discounts, flash sales, shopping deals"
+        title="Deals — Ezyify"
+        description="Discover limited-time deals and best-selling products."
       />
-
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-        {/* Page header */}
-        <div className="mb-8">
-          <Link to="/shop" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm font-medium mb-4 transition-colors">
-            ← Back to Shop
-          </Link>
-          <h1 className="font-semibold text-foreground mb-1">Deals & Offers</h1>
-          <p className="text-sm text-muted-foreground">Limited-time offers and exclusive discounts — save up to 50%</p>
-        </div>
-
-        {/* Flash Deals */}
-        <div className="mb-12">
-          <SectionHeader
-            icon={Zap}
-            iconBg="bg-error/10"
-            iconColor="text-error"
-            title="Flash Deals"
-            subtitle="30%+ off — Limited time only!"
-            badge={
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-error/8 border border-error/20 rounded-xl shrink-0">
-                <Clock className="w-3.5 h-3.5 text-error" />
-                <span className="text-xs font-semibold text-error">Ends in {flashCountdown}</span>
-              </div>
-            }
-          />
-          {isLoading ? (
-            <DealsSkeleton cols={6} count={6} />
-          ) : flashDeals.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-              {flashDeals.map(p => (
+      <motion.main
+        variants={staggerContainer(reduce ? 0 : 0.05)}
+        initial="hidden"
+        animate="visible"
+        className="mx-auto max-w-7xl space-y-8 px-4 py-6 lg:px-6 lg:py-8"
+      >
+        <motion.header
+          variants={fadeUp}
+          className="overflow-hidden rounded-sheet bg-brand-gradient p-6 text-white sm:p-8"
+        >
+          <div className="max-w-xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-background/15 px-3 py-1 text-xs font-semibold">
+              <Zap className="size-4" />
+              Limited time offers
+            </div>
+            <h1 className="font-display text-3xl font-bold">Deals worth sharing</h1>
+            <p className="mt-2 text-sm text-white/85">
+              Curated prices on products creators and shoppers love.
+            </p>
+            <div className="mt-5 inline-flex items-center gap-2 rounded-xl bg-background/15 px-3 py-2 text-sm font-semibold">
+              <Clock3 className="size-4" />
+              New flash drops daily
+            </div>
+          </div>
+        </motion.header>
+        <motion.section variants={fadeUp} className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-display text-xl font-semibold">Flash deals</h2>
+              <p className="text-sm text-foreground-secondary">Save more while stock lasts.</p>
+            </div>
+            <Tag className="size-6 text-accent-brand" />
+          </div>
+          {loading ? (
+            <DealSkeleton />
+          ) : deals.length ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {deals.map((product) => (
                 <DealCard
-                  key={p.id}
-                  product={p}
-                  isLiked={likedProducts.has(p.id)}
-                  inCart={cartItems.has(p.id)}
-                  onToggleLike={toggleLike}
-                  onAddToCart={addToCart}
+                  key={product.id}
+                  product={product}
+                  liked={liked.has(product.id)}
+                  cart={cart.has(product.id)}
+                  onLike={() =>
+                    setLiked((current) => {
+                      const next = new Set(current);
+                      next.has(product.id) ? next.delete(product.id) : next.add(product.id);
+                      return next;
+                    })
+                  }
+                  onCart={() => add(product.id)}
                 />
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground py-8 text-center">No flash deals right now — check back soon!</p>
+            <EmptyState
+              kind="orders"
+              title="No deals just yet"
+              description="New offers land every day. Browse the shop instead."
+              action={
+                <Button asChild>
+                  <Link to="/shop">Browse shop</Link>
+                </Button>
+              }
+            />
           )}
-        </div>
-
-        {/* Daily Deals */}
-        <div className="mb-12">
-          <SectionHeader
-            icon={Tag}
-            iconBg="bg-primary/10"
-            iconColor="text-primary"
-            title="Daily Deals"
-            subtitle="Today's special offers — 20–30% off"
-          />
-          {isLoading ? (
-            <DealsSkeleton cols={5} count={5} />
-          ) : dailyDeals.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {dailyDeals.map(p => (
-                <DealCard
-                  key={p.id}
-                  product={p}
-                  isLiked={likedProducts.has(p.id)}
-                  inCart={cartItems.has(p.id)}
-                  onToggleLike={toggleLike}
-                  onAddToCart={addToCart}
-                />
-              ))}
+        </motion.section>
+        <motion.section variants={fadeUp}>
+          <Card variant="featured" className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <TrendingUp className="size-8 text-primary" />
+            <div className="flex-1">
+              <h2 className="font-display text-lg font-semibold">Watchlist price alerts</h2>
+              <p className="text-sm text-foreground-secondary">
+                Save an item and we will let you know when its price drops.
+              </p>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground py-8 text-center">No daily deals today — check back tomorrow!</p>
-          )}
-        </div>
-
-        {/* Best Sellers */}
-        <div>
-          <SectionHeader
-            icon={TrendingUp}
-            iconBg="bg-success/10"
-            iconColor="text-success"
-            title="Best Sellers"
-            subtitle="Most popular products with great prices"
-          />
-          {isLoading ? (
-            <DealsSkeleton cols={4} count={8} />
-          ) : bestSellers.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {bestSellers.map(p => (
-                <DealCard
-                  key={p.id}
-                  product={p}
-                  isLiked={likedProducts.has(p.id)}
-                  inCart={cartItems.has(p.id)}
-                  onToggleLike={toggleLike}
-                  onAddToCart={addToCart}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+            <Button asChild variant="outline">
+              <Link to="/wishlist">View wishlist</Link>
+            </Button>
+          </Card>
+        </motion.section>
+      </motion.main>
     </div>
   );
 }

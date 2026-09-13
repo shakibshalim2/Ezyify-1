@@ -16,7 +16,7 @@ function WishlistSkeleton() {
       <div className="max-w-screen-xl mx-auto px-4 pb-6">
         <Skeleton className="h-8 w-48 mb-6" />
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
             <div key={i} className="bg-card border border-border rounded-2xl overflow-hidden">
               <Skeleton className="aspect-square" />
               <div className="p-4 space-y-2">
@@ -43,7 +43,7 @@ export default function WishlistPage() {
     const loadWishlistData = () => {
       const savedWishlist = localStorage.getItem('ezyify_wishlist');
       let loadedWishlistIds: string[] = [];
-      
+
       if (savedWishlist) {
         try {
           loadedWishlistIds = JSON.parse(savedWishlist);
@@ -54,7 +54,7 @@ export default function WishlistPage() {
 
       const savedCart = localStorage.getItem('ezyify_cart');
       let cartItemIds: string[] = [];
-      
+
       if (savedCart) {
         try {
           const cart = JSON.parse(savedCart);
@@ -79,10 +79,10 @@ export default function WishlistPage() {
   }, []);
 
   // Compute wishlist products from IDs
-  const wishlistProducts = products.filter(p => wishlistIds.includes(p.id));
+  const wishlistProducts = products.filter((p) => wishlistIds.includes(p.id));
 
   const handleRemoveFromWishlist = (productId: string) => {
-    const newWishlist = wishlistIds.filter(id => id !== productId);
+    const newWishlist = wishlistIds.filter((id) => id !== productId);
     setWishlistIds(newWishlist);
     localStorage.setItem('ezyify_wishlist', JSON.stringify(newWishlist));
     toast.success('Removed from wishlist');
@@ -97,11 +97,11 @@ export default function WishlistPage() {
   const handleAddToCart = (e: MouseEvent, productId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const savedCart = localStorage.getItem('ezyify_cart');
     const cart = savedCart ? JSON.parse(savedCart) : [];
     const existingItem = cart.find((item: any) => item.id === productId);
-    
+
     if (existingItem) {
       existingItem.quantity += 1;
       toast.success('Quantity updated in cart');
@@ -109,9 +109,9 @@ export default function WishlistPage() {
       cart.push({ id: productId, quantity: 1 });
       toast.success('Added to cart');
     }
-    
+
     localStorage.setItem('ezyify_cart', JSON.stringify(cart));
-    setCartItems(prev => new Set([...prev, productId]));
+    setCartItems((prev) => new Set([...prev, productId]));
     // Dispatch custom event to update Navigation cart count
     window.dispatchEvent(new Event('cartUpdated'));
   };
@@ -119,16 +119,16 @@ export default function WishlistPage() {
   const handleAddAllToCart = () => {
     const savedCart = localStorage.getItem('ezyify_cart');
     const cart = savedCart ? JSON.parse(savedCart) : [];
-    
+
     let addedCount = 0;
-    wishlistIds.forEach(id => {
+    wishlistIds.forEach((id) => {
       const existingItem = cart.find((item: any) => item.id === id);
       if (!existingItem) {
         cart.push({ id, quantity: 1 });
         addedCount++;
       }
     });
-    
+
     if (addedCount > 0) {
       localStorage.setItem('ezyify_cart', JSON.stringify(cart));
       const ids = cart.map((item: any) => item.id);
@@ -160,9 +160,12 @@ export default function WishlistPage() {
         title="My Wishlist - Ezyify"
         description="View and manage your saved products on Ezyify"
       />
-      
+
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
-        <Link to="/shop" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition-colors">
+        <Link
+          to="/shop"
+          className="inline-flex items-center gap-2 text-foreground-secondary hover:text-foreground mb-4 transition-colors"
+        >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Shop</span>
         </Link>
@@ -172,9 +175,7 @@ export default function WishlistPage() {
             <h1 className="font-semibold text-foreground">
               My Wishlist ({wishlistProducts.length})
             </h1>
-            <p className="text-muted-foreground mt-1">
-              Save your favorite products for later
-            </p>
+            <p className="text-foreground-secondary mt-1">Save your favorite products for later</p>
           </div>
 
           {wishlistProducts.length > 0 && (
@@ -202,7 +203,7 @@ export default function WishlistPage() {
           <EmptyWishlist />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {wishlistProducts.map(product => (
+            {wishlistProducts.map((product) => (
               <ProductCard
                 key={product.id}
                 product={product}
