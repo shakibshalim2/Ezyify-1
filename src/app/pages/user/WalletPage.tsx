@@ -1,16 +1,15 @@
+import React, { useState, useEffect } from 'react';
+import { motion, useReducedMotion, AnimatePresence } from 'motion/react';
+import { Eye, EyeOff, Plus, ArrowUpRight, ArrowDownLeft, Copy, Zap } from 'lucide-react';
 import { SEO } from '../../components/SEO';
-import { useState, useEffect } from 'react';
-import { Wallet, ArrowUpRight, ArrowDownLeft, Plus, CreditCard, DollarSign, Eye, EyeOff, Minus, Send, Repeat2, Clock, CheckCircle2, Link as LinkIcon } from 'lucide-react';
+import { Button } from '../../components/primitives/Button';
+import { Card } from '../../components/primitives/Card';
+import { Skeleton } from '../../components/primitives/Skeleton';
+import { Field } from '../../components/primitives/Field';
 import { toast } from 'sonner';
-import { ReferralService, type Commission, type ReferralEarningsSummary } from '../../services/referral';
-import { Button } from '../../components/ui/button';
-import { Card, CardContent } from '../../components/ui/card';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { Badge } from '../../components/ui/badge';
+import { ReferralService, type ReferralEarningsSummary } from '../../services/referral';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
-import { Skeleton } from '../../components/ui/skeleton';
+import { fadeUp, staggerContainer, DURATION, EASE_EMPHASIZED } from '../../lib/motion';
 
 interface Transaction {
   id: string;
@@ -61,477 +60,335 @@ const mockTransactions: Transaction[] = [
   }
 ];
 
+function WalletSkeleton() {
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-2xl px-4 py-6 pb-28 space-y-6">
+        <Skeleton className="h-10 w-40" />
+        <Skeleton className="h-48 w-full rounded-card" />
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => (
+            <Card key={i}>
+              <div className="p-4 space-y-2">
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function WalletPage() {
+  const reduce = useReducedMotion();
   const [isLoading, setIsLoading] = useState(true);
   const [showBalance, setShowBalance] = useState(true);
   const [addMoneyAmount, setAddMoneyAmount] = useState('');
-  const [activeModal, setActiveModal] = useState('');
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [withdrawDest, setWithdrawDest] = useState('');
-  const [transferTo, setTransferTo] = useState('');
-  const [transferAmount, setTransferAmount] = useState('');
-  const [requestFrom, setRequestFrom] = useState('');
-  const [requestAmount, setRequestAmount] = useState('');
+  const [addMoneyOpen, setAddMoneyOpen] = useState(false);
+  const [selectedAmountChip, setSelectedAmountChip] = useState<number | null>(null);
   const [walletData, setWalletData] = useState({
-    balance: 0,
-    pendingBalance: 0,
-    availableBalance: 0,
-    totalEarnings: 0,
-    totalSpent: 0
+    balance: 124.50,
+    pendingBalance: 45.30,
+    availableBalance: 79.20,
+    totalEarnings: 32.50,
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [referralEarnings, setReferralEarnings] = useState<ReferralEarningsSummary | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'in' | 'out' | 'pending'>('all');
 
-  // Load wallet data progressively
   useEffect(() => {
     const loadWalletData = () => {
-      // Load balance data
-      const balance = 124.50;
-      const pendingBalance = 45.30;
-      const availableBalance = balance - pendingBalance;
-      const totalEarnings = 32.50;
-      const totalSpent = 158.00;
-      
-      setWalletData({
-        balance,
-        pendingBalance,
-        availableBalance,
-        totalEarnings,
-        totalSpent
-      });
-      
-      // Load transactions
       setTransactions(mockTransactions);
-
-      // Load referral earnings
       setReferralEarnings(ReferralService.getEarningsSummary());
-
       setIsLoading(false);
     };
 
-    // Progressive loading: Use requestIdleCallback for non-critical work
     if ('requestIdleCallback' in window) {
       const handle = requestIdleCallback(() => loadWalletData(), { timeout: 100 });
       return () => cancelIdleCallback(handle);
     } else {
-      const timer = setTimeout(loadWalletData, 0);
+      const timer = setTimeout(loadWalletData, 16);
       return () => clearTimeout(timer);
     }
   }, []);
 
-  const getTransactionIcon = (category: Transaction['category']) => {
-    switch (category) {
-      case 'purchase':
-        return <ArrowUpRight className="w-4 h-4 text-error" />;
-      case 'refund':
-      case 'commission':
-      case 'topup':
-        return <ArrowDownLeft className="w-4 h-4 text-success" />;
-      case 'cashout':
-        return <ArrowUpRight className="w-4 h-4 text-info" />;
+  const getTransactionIcon = (category: Transaction['category'], type: Transaction['type']) => {
+    if (type === 'credit') {
+      return <ArrowDownLeft className="size-5" />;
+    }
+    return <ArrowUpRight className="size-5" />;
+  };
+
+  const getTransactionColor = (category: Transaction['category'], type: Transaction['type']) => {
+    if (type === 'credit') return 'bg-success-subtle text-success';
+    return 'bg-primary-subtle text-primary';
+  };
+
+  const filteredTransactions = transactions.filter(t => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'in') return t.type === 'credit';
+    if (activeFilter === 'out') return t.type === 'debit';
+    if (activeFilter === 'pending') return t.status === 'pending';
+    return true;
+  });
+
+  const groupedByDay = filteredTransactions.reduce((acc, t) => {
+    const day = new Date(t.timestamp).toLocaleDateString();
+    if (!acc[day]) acc[day] = [];
+    acc[day].push(t);
+    return acc;
+  }, {} as Record<string, Transaction[]>);
+
+  const handleAddFunds = () => {
+    const amount = selectedAmountChip || parseFloat(addMoneyAmount);
+    if (amount > 0) {
+      toast.success(`$${amount.toFixed(2)} added to wallet`);
+      setAddMoneyOpen(false);
+      setAddMoneyAmount('');
+      setSelectedAmountChip(null);
+    } else {
+      toast.error('Please enter a valid amount');
     }
   };
+
+  if (isLoading) {
+    return <WalletSkeleton />;
+  }
+
+  const quickActionChips = [
+    { label: 'Add funds', icon: Plus, action: () => setAddMoneyOpen(true) },
+    { label: 'Send', icon: ArrowUpRight, action: () => toast.info('Send feature coming soon') },
+    { label: 'Withdraw', icon: ArrowDownLeft, action: () => toast.info('Withdraw feature coming soon') },
+    { label: 'Cash out', icon: Zap, action: () => toast.info('Cash out feature coming soon') }
+  ];
+
+  const amountChips = [10, 25, 50, 100];
 
   return (
     <div className="min-h-screen bg-background">
       <SEO title="My Wallet — Ezyify" description="Manage your Ezyify wallet balance, transactions, and payouts." />
-      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+
+      <motion.div
+        variants={staggerContainer(reduce ? 0 : 0.05, 0)}
+        initial="hidden"
+        animate="visible"
+        className="mx-auto max-w-2xl px-4 py-6 pb-28 space-y-6"
+      >
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="font-semibold text-foreground">My Wallet</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage your balance and transactions</p>
-        </div>
+        <motion.div variants={fadeUp} className="space-y-1">
+          <h1 className="font-display text-2xl font-semibold text-foreground">My Wallet</h1>
+          <p className="text-sm text-foreground-secondary">Manage your balance and transactions</p>
+        </motion.div>
 
-        {/* Balance Card */}
-        <div className="rounded-3xl p-7 mb-6 text-white shadow-xl" style={{ background: 'var(--brand-gradient)' }}>
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <p className="text-white/80">Available Balance</p>
-                <button
-                  onClick={() => setShowBalance(b => !b)}
-                  aria-label={showBalance ? 'Hide balance' : 'Show balance'}
-                  className="p-1 rounded-full hover:bg-white/10 transition-colors"
-                >
-                  {showBalance ? <EyeOff className="w-4 h-4 text-white/60" /> : <Eye className="w-4 h-4 text-white/60" />}
-                </button>
-              </div>
-              {isLoading ? (
-                <>
-                  <Skeleton className="h-10 w-32 mb-2 bg-white/20" />
-                  <Skeleton className="h-4 w-24 bg-white/20" />
-                </>
-              ) : (
-                <>
-                  <p className="text-4xl font-bold">{showBalance ? `$${walletData.availableBalance.toFixed(2)}` : '••••••'}</p>
-                  <p className="text-white/70 text-sm mt-2">Pending: {showBalance ? `$${walletData.pendingBalance.toFixed(2)}` : '••••'}</p>
-                </>
-              )}
-            </div>
-            <Wallet className="w-16 h-16 text-white/30" />
-          </div>
-          
-          <div className="grid grid-cols-3 gap-4">
-            <button
-              onClick={() => setActiveModal('add')}
-              className="bg-white/15 hover:bg-white/25 backdrop-blur-sm rounded-2xl p-3 transition-all"
-            >
-              <Plus className="w-6 h-6 mx-auto mb-1" />
-              <p className="text-sm">Add Money</p>
-            </button>
-            <button
-              onClick={() => setActiveModal('withdraw')}
-              className="bg-white/15 hover:bg-white/25 backdrop-blur-sm rounded-2xl p-3 transition-all"
-            >
-              <Minus className="w-6 h-6 mx-auto mb-1" />
-              <p className="text-sm">Withdraw</p>
-            </button>
-            <button
-              onClick={() => setActiveModal('transfer')}
-              className="bg-white/15 hover:bg-white/25 backdrop-blur-sm rounded-2xl p-3 transition-all"
-            >
-              <Send className="w-6 h-6 mx-auto mb-1" />
-              <p className="text-sm">Transfer</p>
-            </button>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Button variant="outline" className="h-auto p-4 flex-col gap-2" onClick={() => setActiveModal('add')}>
-            <Plus className="w-5 h-5" />
-            <span className="text-sm">Add Money</span>
-          </Button>
-          <Button variant="outline" className="h-auto p-4 flex-col gap-2" onClick={() => setActiveModal('transfer')}>
-            <ArrowUpRight className="w-5 h-5" />
-            <span className="text-sm">Send Money</span>
-          </Button>
-          <Button variant="outline" className="h-auto p-4 flex-col gap-2" onClick={() => setActiveModal('request')}>
-            <ArrowDownLeft className="w-5 h-5" />
-            <span className="text-sm">Request Money</span>
-          </Button>
-          <Button variant="outline" className="h-auto p-4 flex-col gap-2" onClick={() => setActiveModal('withdraw')}>
-            <CreditCard className="w-5 h-5" />
-            <span className="text-sm">Cash Out</span>
-          </Button>
-        </div>
-
-        {/* Referral Earnings */}
-        <Card className="mb-8">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                  <Repeat2 className="w-4 h-4 text-emerald-600" />
-                </div>
-                <div>
-                  <h2 className="leading-tight">Referral Earnings</h2>
-                  <p className="text-xs text-muted-foreground">From product reposts &amp; shares</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Summary tiles */}
-            <div className="grid grid-cols-3 gap-3 mb-5">
-              {[
-                { label: 'Pending', value: referralEarnings?.pendingAmount ?? 0, icon: Clock, color: 'text-warning', bg: 'bg-warning/10' },
-                { label: 'Confirmed', value: referralEarnings?.confirmedAmount ?? 0, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-500/10' },
-                { label: 'Paid Out', value: referralEarnings?.paidAmount ?? 0, icon: DollarSign, color: 'text-primary', bg: 'bg-primary/10' },
-              ].map(({ label, value, icon: Icon, color, bg }) => (
-                <div key={label} className={`${bg} rounded-2xl p-3 text-center`}>
-                  <Icon className={`w-4 h-4 ${color} mx-auto mb-1`} />
-                  <p className={`font-bold ${color}`}>${value.toFixed(2)}</p>
-                  <p className="text-[11px] text-muted-foreground">{label}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Stats row */}
-            <div className="flex items-center gap-4 mb-5 px-1 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <LinkIcon className="w-3.5 h-3.5 shrink-0" />
-                {referralEarnings?.totalClicks ?? 0} clicks
-              </span>
-              <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
-              <span>{referralEarnings?.totalSales ?? 0} referred sales</span>
-            </div>
-
-            {/* Recent commissions */}
-            {(referralEarnings?.commissions ?? []).length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Recent Activity</p>
-                {(referralEarnings!.commissions).slice(0, 4).map((c: Commission) => {
-                  const statusColor = c.status === 'confirmed' ? 'text-emerald-600 bg-emerald-500/10'
-                    : c.status === 'paid' ? 'text-primary bg-primary/10'
-                    : c.status === 'pending' ? 'text-warning bg-warning/10'
-                    : 'text-muted-foreground bg-muted';
-                  return (
-                    <div key={c.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/40 border border-border/40">
-                      {c.productImage && (
-                        <img loading="lazy" src={c.productImage} alt={c.productName} className="w-9 h-9 rounded-xl object-cover shrink-0" />
+        {/* Balance Card Hero */}
+        <motion.div variants={fadeUp}>
+          <Card
+            variant="featured"
+            className="bg-brand-gradient text-white overflow-hidden relative"
+          >
+            <div className="p-6 space-y-6">
+              {/* Balance Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-white/70 text-sm font-medium">Available Balance</span>
+                    <button
+                      onClick={() => setShowBalance(!showBalance)}
+                      aria-label={showBalance ? 'Hide balance' : 'Show balance'}
+                      className="p-1 rounded-full hover:bg-white/10 transition-colors"
+                    >
+                      {showBalance ? (
+                        <EyeOff className="size-4 text-white/60" />
+                      ) : (
+                        <Eye className="size-4 text-white/60" />
                       )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-medium text-foreground truncate">{c.productName ?? `Product #${c.productId}`}</p>
-                        <p className="text-[11px] text-muted-foreground capitalize">{c.source} · Order #{c.orderId.slice(-6)}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-[13px] font-bold text-foreground">+${c.commissionAmount.toFixed(2)}</p>
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full capitalize ${statusColor}`}>
-                          {c.status}
-                        </span>
-                      </div>
-                    </div>
+                    </button>
+                  </div>
+                </div>
+                <p className="font-display text-4xl font-bold tabular-nums">
+                  {showBalance ? `$${walletData.availableBalance.toFixed(2)}` : '••••••'}
+                </p>
+                <p className="text-white/70 text-sm">
+                  Pending: {showBalance ? `$${walletData.pendingBalance.toFixed(2)}` : '••••'}
+                </p>
+              </div>
+
+              {/* Quick Actions Row */}
+              <div className="grid grid-cols-4 gap-2">
+                {quickActionChips.map((chip) => {
+                  const Icon = chip.icon;
+                  return (
+                    <button
+                      key={chip.label}
+                      onClick={chip.action}
+                      className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white/10 hover:bg-white/15 transition-colors"
+                      aria-label={chip.label}
+                    >
+                      <Icon className="size-5" />
+                      <span className="text-xs font-medium text-center">{chip.label}</span>
+                    </button>
                   );
                 })}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          </Card>
+        </motion.div>
 
-        {/* Wallet Action Dialogs */}
-        <Dialog open={activeModal === 'add'} onOpenChange={open => !open && setActiveModal('')}>
+        {/* Affiliate Earnings Section */}
+        {referralEarnings && referralEarnings.paidAmount > 0 && (
+          <motion.div variants={fadeUp}>
+            <Card variant="elevated">
+              <div className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-display font-semibold text-foreground">Affiliate Earnings</h3>
+                  <span className="text-sm text-primary font-medium">+${referralEarnings.paidAmount.toFixed(2)}</span>
+                </div>
+                <p className="text-xs text-foreground-secondary">
+                  From {referralEarnings.totalSales} successful sales
+                </p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => toast.info('Affiliate details coming soon')}
+                  fullWidth
+                >
+                  View Details
+                </Button>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Transaction Filter Chips */}
+        <motion.div variants={fadeUp} className="flex gap-2 overflow-x-auto pb-2">
+          {(['all', 'in', 'out', 'pending'] as const).map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setActiveFilter(filter)}
+              className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-all ${
+                activeFilter === filter
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card border border-border text-foreground hover:bg-card-hover'
+              }`}
+            >
+              {filter === 'all' ? 'All' : filter === 'in' ? 'In' : filter === 'out' ? 'Out' : 'Pending'}
+            </button>
+          ))}
+        </motion.div>
+
+        {/* Transactions List */}
+        {filteredTransactions.length === 0 ? (
+          <motion.div variants={fadeUp}>
+            <Card variant="ghost" className="text-center py-12">
+              <p className="text-foreground-secondary">No transactions found</p>
+            </Card>
+          </motion.div>
+        ) : (
+          <motion.div variants={staggerContainer(reduce ? 0 : 0.04)} className="space-y-3">
+            {Object.entries(groupedByDay).map(([day, dayTransactions]) => (
+              <motion.div key={day} variants={fadeUp}>
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-foreground-secondary px-2">{day}</p>
+                  <div className="space-y-2">
+                    {dayTransactions.map((transaction) => (
+                      <Card key={transaction.id} variant="ghost">
+                        <div className="p-3 flex items-center gap-3">
+                          <div className={`size-10 rounded-full flex items-center justify-center flex-shrink-0 ${getTransactionColor(transaction.category, transaction.type)}`}>
+                            {getTransactionIcon(transaction.category, transaction.type)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {transaction.description}
+                            </p>
+                            <p className="text-xs text-foreground-secondary">
+                              {transaction.timestamp}
+                            </p>
+                          </div>
+                          <p className={`text-sm font-display font-semibold tabular-nums flex-shrink-0 ${
+                            transaction.type === 'credit' ? 'text-success' : 'text-foreground'
+                          }`}>
+                            {transaction.type === 'credit' ? '+' : '-'}${transaction.amount.toFixed(2)}
+                          </p>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </motion.div>
+
+      {/* Add Funds Dialog */}
+      <AnimatePresence>
+        <Dialog open={addMoneyOpen} onOpenChange={setAddMoneyOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Money</DialogTitle>
+              <DialogTitle className="font-display">Add Funds</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="add-amount">Amount ($)</Label>
-                <Input id="add-amount" type="number" min="1" placeholder="0.00" value={addMoneyAmount} onChange={e => setAddMoneyAmount(e.target.value)} />
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                {[10, 25, 50, 100].map(amt => (
-                  <Button key={amt} variant="outline" size="sm" onClick={() => setAddMoneyAmount(String(amt))}>${amt}</Button>
-                ))}
-              </div>
-              <Button className="w-full" disabled={!addMoneyAmount || Number(addMoneyAmount) <= 0} onClick={() => {
-                toast.success(`$${Number(addMoneyAmount).toFixed(2)} added to your wallet`);
-                setAddMoneyAmount('');
-                setActiveModal('');
-              }}>Add Funds</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            <div className="space-y-4">
+              <Field
+                label="Amount"
+                type="number"
+                placeholder="0.00"
+                value={addMoneyAmount}
+                onChange={(e) => {
+                  setAddMoneyAmount(e.target.value);
+                  setSelectedAmountChip(null);
+                }}
+                prefix="$"
+              />
 
-        <Dialog open={activeModal === 'withdraw'} onOpenChange={open => { if (!open) { setActiveModal(''); setWithdrawAmount(''); setWithdrawDest(''); } }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Withdraw / Cash Out</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <p className="text-sm text-muted-foreground">Available: ${walletData.availableBalance.toFixed(2)}</p>
-              <div className="space-y-1.5">
-                <Label htmlFor="withdraw-amount">Amount ($)</Label>
-                <Input id="withdraw-amount" type="number" min="1" max={walletData.availableBalance} placeholder="0.00"
-                  value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="withdraw-dest">Bank / Payout Account</Label>
-                <Input id="withdraw-dest" placeholder="Account ending in ••••"
-                  value={withdrawDest} onChange={e => setWithdrawDest(e.target.value)} />
-              </div>
-              <Button className="w-full"
-                disabled={!withdrawAmount || Number(withdrawAmount) <= 0 || Number(withdrawAmount) > walletData.availableBalance || !withdrawDest.trim()}
-                onClick={() => { toast.success(`Withdrawal of $${Number(withdrawAmount).toFixed(2)} requested`); setWithdrawAmount(''); setWithdrawDest(''); setActiveModal(''); }}>
-                Request Withdrawal
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={activeModal === 'transfer'} onOpenChange={open => { if (!open) { setActiveModal(''); setTransferTo(''); setTransferAmount(''); } }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Send Money</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="transfer-to">Recipient username or email</Label>
-                <Input id="transfer-to" placeholder="@username or email"
-                  value={transferTo} onChange={e => setTransferTo(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="transfer-amount">Amount ($)</Label>
-                <Input id="transfer-amount" type="number" min="1" placeholder="0.00"
-                  value={transferAmount} onChange={e => setTransferAmount(e.target.value)} />
-              </div>
-              <Button className="w-full"
-                disabled={!transferTo.trim() || !transferAmount || Number(transferAmount) <= 0}
-                onClick={() => { toast.success(`$${Number(transferAmount).toFixed(2)} sent to ${transferTo}`); setTransferTo(''); setTransferAmount(''); setActiveModal(''); }}>
-                Send
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={activeModal === 'request'} onOpenChange={open => { if (!open) { setActiveModal(''); setRequestFrom(''); setRequestAmount(''); } }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Request Money</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="request-from">Request from (username or email)</Label>
-                <Input id="request-from" placeholder="@username or email"
-                  value={requestFrom} onChange={e => setRequestFrom(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="request-amount">Amount ($)</Label>
-                <Input id="request-amount" type="number" min="1" placeholder="0.00"
-                  value={requestAmount} onChange={e => setRequestAmount(e.target.value)} />
-              </div>
-              <Button className="w-full"
-                disabled={!requestFrom.trim() || !requestAmount || Number(requestAmount) <= 0}
-                onClick={() => { toast.success(`Payment request sent to ${requestFrom}`); setRequestFrom(''); setRequestAmount(''); setActiveModal(''); }}>
-                Send Request
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Transactions */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2>Transaction History</h2>
-              <Button variant="ghost" size="sm" onClick={() => toast.info('Full transaction history coming soon')}>View All</Button>
-            </div>
-
-            <Tabs defaultValue="all">
-              <TabsList className="mb-4">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="credit">Credits</TabsTrigger>
-                <TabsTrigger value="debit">Debits</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="all" className="space-y-3">
-                {isLoading ? (
-                  Array.from({ length: 4 }).map((_, index) => (
-                    <div key={index} className="flex items-center gap-3.5 p-3.5 bg-muted rounded-2xl border border-border/50">
-                      <Skeleton className="w-10 h-10 rounded-full flex-shrink-0" />
-                      <div className="flex-1">
-                        <Skeleton className="h-5 w-3/4 mb-2" />
-                        <Skeleton className="h-4 w-1/2" />
-                      </div>
-                      <div className="text-right">
-                        <Skeleton className="h-5 w-16 mb-1" />
-                        <Skeleton className="h-5 w-16" />
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  transactions.map((transaction) => (
-                    <div
-                      key={transaction.id}
-                      className="flex items-center gap-3.5 p-3.5 bg-muted rounded-2xl border border-border/50 hover:bg-muted/80 transition-colors"
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-foreground-secondary">Quick amounts</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {amountChips.map((amount) => (
+                    <button
+                      key={amount}
+                      onClick={() => {
+                        setSelectedAmountChip(amount);
+                        setAddMoneyAmount('');
+                      }}
+                      className={`p-2 rounded-lg border font-medium text-sm transition-all ${
+                        selectedAmountChip === amount
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-card border-border hover:border-primary'
+                      }`}
                     >
-                      <div className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center flex-shrink-0">
-                        {getTransactionIcon(transaction.category)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground">{transaction.description}</p>
-                        <p className="text-sm text-muted-foreground">{transaction.timestamp}</p>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p
-                          className={`font-medium ${
-                            transaction.type === 'credit' ? 'text-success' : 'text-error'
-                          }`}
-                        >
-                          {transaction.type === 'credit' ? '+' : '-'}$
-                          {transaction.amount.toLocaleString()}
-                        </p>
-                        <Badge
-                          variant={
-                            transaction.status === 'completed'
-                              ? 'default'
-                              : transaction.status === 'pending'
-                              ? 'secondary'
-                              : 'destructive'
-                          }
-                          className="text-xs"
-                        >
-                          {transaction.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </TabsContent>
+                      ${amount}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-              <TabsContent value="credit" className="space-y-3">
-                {isLoading ? (
-                  Array.from({ length: 3 }).map((_, index) => (
-                    <div key={index} className="flex items-center gap-3.5 p-3.5 bg-muted rounded-2xl border border-border/50">
-                      <Skeleton className="w-10 h-10 rounded-full" />
-                      <div className="flex-1">
-                        <Skeleton className="h-5 w-3/4 mb-2" />
-                        <Skeleton className="h-4 w-1/2" />
-                      </div>
-                      <Skeleton className="h-5 w-16" />
-                    </div>
-                  ))
-                ) : (
-                  transactions
-                    .filter((t) => t.type === 'credit')
-                    .map((transaction) => (
-                      <div
-                        key={transaction.id}
-                        className="flex items-center gap-3.5 p-3.5 bg-muted rounded-2xl border border-border/50"
-                      >
-                        <div className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center">
-                          {getTransactionIcon(transaction.category)}
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-foreground">{transaction.description}</p>
-                          <p className="text-sm text-muted-foreground">{transaction.timestamp}</p>
-                        </div>
-                        <p className="font-medium text-success">
-                          +${transaction.amount.toLocaleString()}
-                        </p>
-                      </div>
-                    ))
-                )}
-              </TabsContent>
-
-              <TabsContent value="debit" className="space-y-3">
-                {isLoading ? (
-                  Array.from({ length: 1 }).map((_, index) => (
-                    <div key={index} className="flex items-center gap-3.5 p-3.5 bg-muted rounded-2xl border border-border/50">
-                      <Skeleton className="w-10 h-10 rounded-full" />
-                      <div className="flex-1">
-                        <Skeleton className="h-5 w-3/4 mb-2" />
-                        <Skeleton className="h-4 w-1/2" />
-                      </div>
-                      <Skeleton className="h-5 w-16" />
-                    </div>
-                  ))
-                ) : (
-                  transactions
-                    .filter((t) => t.type === 'debit')
-                    .map((transaction) => (
-                      <div
-                        key={transaction.id}
-                        className="flex items-center gap-3.5 p-3.5 bg-muted rounded-2xl border border-border/50"
-                      >
-                        <div className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center">
-                          {getTransactionIcon(transaction.category)}
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-foreground">{transaction.description}</p>
-                          <p className="text-sm text-muted-foreground">{transaction.timestamp}</p>
-                        </div>
-                        <p className="font-medium text-error">
-                          -${transaction.amount.toLocaleString()}
-                        </p>
-                      </div>
-                    ))
-                )}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      </div>
+              <div className="pt-2 space-y-2">
+                <Button
+                  variant="gradient"
+                  fullWidth
+                  onClick={handleAddFunds}
+                  className="shadow-brand"
+                >
+                  Add Funds
+                </Button>
+                <Button
+                  variant="outline"
+                  fullWidth
+                  onClick={() => {
+                    setAddMoneyOpen(false);
+                    setAddMoneyAmount('');
+                    setSelectedAmountChip(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </AnimatePresence>
     </div>
   );
 }

@@ -155,17 +155,15 @@ export const EscrowProtectionBanner = memo(function EscrowProtectionBanner({
   if (variant === 'tracking') {
     return (
       <>
-        <Card className="bg-warning/5 border-yellow-200 dark:border-yellow-800 p-4 mb-6">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center flex-shrink-0">
+        <Card className="bg-warning-subtle border-warning/30 p-4 mb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-warning/15 flex items-center justify-center flex-shrink-0">
                 <Clock className="w-5 h-5 text-warning" />
               </div>
-              <div className="flex-1">
-                <h4 className="font-semibold text-warning mb-1">
-                  Escrow Protection Active
-                </h4>
-                <p className="text-sm text-warning">
+              <div className="flex-1 min-w-0">
+                <h4 className="font-display font-semibold text-foreground leading-tight">Escrow protection active</h4>
+                <p className="text-sm text-foreground-secondary mt-0.5">
                   {amount
                     ? `$${amount.toFixed(2)} held safely until you confirm delivery`
                     : 'Payment held safely until you confirm delivery'}
@@ -173,25 +171,21 @@ export const EscrowProtectionBanner = memo(function EscrowProtectionBanner({
               </div>
             </div>
             {daysRemaining !== undefined && (
-              <div className="text-right">
-                <p className="text-xs text-warning">Auto-release in:</p>
-                <p className="text-2xl font-bold text-warning">
+              <div className="text-right shrink-0">
+                <p className="text-[11px] text-foreground-secondary">Auto‑release in</p>
+                <p className="font-display text-xl font-bold tabular-nums text-warning">
                   {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
                 </p>
               </div>
             )}
           </div>
-          <div className="mt-3 pt-3 border-t border-yellow-200 dark:border-yellow-800">
-            <div className="flex items-start gap-2 text-sm text-warning">
-              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <p>
-                <strong>Important:</strong> Confirm delivery to release payment to seller. If you don't confirm within {daysRemaining || 7} days, payment will be automatically released.
-              </p>
-            </div>
-          </div>
+          <p className="mt-3 pt-3 border-t border-warning/20 text-sm text-foreground-secondary flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-warning" />
+            <span>Confirm delivery to release payment to the seller. Unconfirmed orders auto‑release after {daysRemaining || 7} days.</span>
+          </p>
           <button
             onClick={() => setShowDetails(true)}
-            className="text-xs text-warning underline mt-2 hover:text-warning dark:hover:text-yellow-100"
+            className="text-xs font-medium text-primary underline-offset-4 hover:underline mt-2"
           >
             Learn about escrow protection
           </button>

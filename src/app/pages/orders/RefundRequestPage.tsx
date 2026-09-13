@@ -1,15 +1,15 @@
-import { SEO } from '../../components/SEO';
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import { useSearchParams, Link, useNavigate } from 'react-router';
-import { ArrowLeft, Upload, CheckCircle2, AlertCircle, Shield } from 'lucide-react';
-import { toast } from 'sonner';
-import { Button } from '../../components/ui/button';
-import { Card, CardContent } from '../../components/ui/card';
+import { ArrowLeft, Upload, CheckCircle, AlertCircle, Shield } from 'lucide-react';
+import { SEO } from '../../components/SEO';
+import { Button } from '../../components/primitives/Button';
+import { Card } from '../../components/primitives/Card';
+import { Field } from '../../components/primitives/Field';
 import { Textarea } from '../../components/ui/textarea';
-import { Label } from '../../components/ui/label';
-import { RadioGroup, RadioGroupItem } from '../../components/ui/radio-group';
-import { Alert, AlertDescription } from '../../components/ui/alert';
-import { Checkbox } from '../../components/ui/checkbox';
+import { ImageWithFallback } from '../../components/figma/ImageWithFallback';
+import { toast } from 'sonner';
+import { fadeUp, staggerContainer } from '../../lib/motion';
 
 const refundReasons = [
   { id: 'defective', label: 'Defective or damaged product' },
@@ -21,20 +21,35 @@ const refundReasons = [
 ];
 
 export default function RefundRequestPage() {
+  const reduce = useReducedMotion();
   const [searchParams] = useSearchParams();
-  const orderId = searchParams.get('orderId') || undefined;
+  const orderId = searchParams.get('orderId') || 'ORD-12345';
   const navigate = useNavigate();
+  const [step, setStep] = useState<'select-items' | 'reason' | 'evidence' | 'review'>(
+    'select-items'
+  );
   const [selectedReason, setSelectedReason] = useState('');
   const [description, setDescription] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const mockOrder = {
-    id: orderId || 'ORD-12345',
-    product: {
-      name: 'Premium Wireless Headphones',
-      image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300',
-      price: 4500
-    },
+    id: orderId,
+    items: [
+      {
+        id: '1',
+        name: 'Premium Wireless Headphones',
+        image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200',
+        price: 79.99,
+        quantity: 1
+      },
+      {
+        id: '2',
+        name: 'Phone Case',
+        image: 'https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?w=200',
+        price: 15.99,
+        quantity: 2
+      }
+    ],
     orderDate: '2026-01-08',
     deliveredDate: '2026-01-10',
     refundEligible: true,
@@ -43,197 +58,305 @@ export default function RefundRequestPage() {
 
   const handleSubmitRefund = () => {
     if (!selectedReason || !description || !agreedToTerms) {
-      toast.error('Please select a reason, describe the issue, and accept the terms');
+      toast.error('Please complete all required fields');
       return;
     }
-    // Generate refund ID and navigate to status page
-    const refundId = `REF-2026-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+    const refundId = `REF-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     navigate(`/orders/refund-status/${refundId}`);
   };
 
   return (
     <div className="min-h-screen bg-background">
       <SEO title="Request Refund — Ezyify" description="Submit a refund request for your Ezyify order." />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+
+      <motion.div
+        variants={staggerContainer(reduce ? 0 : 0.05, 0)}
+        initial="hidden"
+        animate="visible"
+        className="mx-auto max-w-2xl px-4 py-6 pb-28 space-y-6"
+      >
         {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <Link to={orderId ? `/order/${orderId}` : '/orders'}>
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="font-semibold text-foreground">Request Refund</h1>
-            <p className="text-muted-foreground">Order #{mockOrder.id}</p>
+        <motion.div variants={fadeUp} className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Back"
+            asChild
+          >
+            <Link to={orderId ? `/user/order-tracking/${orderId}` : '/user/orders'}>
+              <ArrowLeft className="size-5" />
+            </Link>
+          </Button>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-display text-xl font-semibold text-foreground">Request Refund</h1>
+            <p className="text-xs text-foreground-secondary">Order #{mockOrder.id}</p>
           </div>
-        </div>
+        </motion.div>
+
+        {/* Progress Stepper */}
+        <motion.div variants={fadeUp} className="flex gap-2">
+          {(['select-items', 'reason', 'evidence', 'review'] as const).map((s, idx) => (
+            <div key={s} className="flex items-center gap-2">
+              <div
+                className={`size-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
+                  ['select-items', 'reason', 'evidence', 'review'].indexOf(step) >= idx
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card border border-border text-foreground'
+                }`}
+              >
+                {['select-items', 'reason', 'evidence', 'review'].indexOf(step) > idx ? (
+                  <CheckCircle className="size-5" />
+                ) : (
+                  idx + 1
+                )}
+              </div>
+              {idx < 3 && <div className="h-0.5 w-8 bg-border" />}
+            </div>
+          ))}
+        </motion.div>
 
         {/* Eligibility Alert */}
         {mockOrder.refundEligible ? (
-          <Alert className="mb-6 border-primary/30 bg-primary/10">
-            <CheckCircle2 className="w-4 h-4 text-primary" />
-            <AlertDescription className="text-foreground">
-              This order is eligible for refund. Request before {mockOrder.refundDeadline}
-            </AlertDescription>
-          </Alert>
+          <motion.div variants={fadeUp}>
+            <Card variant="ghost" className="bg-success-subtle border border-success/20 p-4">
+              <div className="flex gap-3">
+                <CheckCircle className="size-5 text-success flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-success">This order is eligible for refund</p>
+                  <p className="text-xs text-success/70">Request before {mockOrder.refundDeadline}</p>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
         ) : (
-          <Alert variant="destructive" className="mb-6">
-            <AlertCircle className="w-4 h-4" />
-            <AlertDescription>
-              This order is not eligible for refund. Refund period has expired.
-            </AlertDescription>
-          </Alert>
+          <motion.div variants={fadeUp}>
+            <Card variant="ghost" className="bg-error-subtle border border-error/20 p-4">
+              <div className="flex gap-3">
+                <AlertCircle className="size-5 text-error flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-error">Refund period expired</p>
+                  <p className="text-xs text-error/70">This order is no longer eligible for refund</p>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
         )}
 
         {/* Escrow Protection Notice */}
-        <Alert className="mb-6 border-primary/30 bg-primary/10">
-          <Shield className="w-4 h-4 text-primary" />
-          <AlertDescription className="text-foreground">
-            <strong>Buyer Protection Active:</strong> Your payment is held securely in escrow. Submitting a refund request will freeze the escrow until the issue is resolved. Funds will not be released to the seller during this period.
-          </AlertDescription>
-        </Alert>
-
-        {/* Product Info */}
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <h2 className="mb-4">Order Details</h2>
-            <div className="flex items-start gap-4">
-              <img
-                      loading="lazy"
-                src={mockOrder.product.image}
-                alt={mockOrder.product.name}
-                className="w-20 h-20 rounded-xl object-cover"
-              />
-              <div className="flex-1">
-                <p className="font-medium mb-1">{mockOrder.product.name}</p>
-                <p className="text-sm text-muted-foreground mb-2">${mockOrder.product.price.toLocaleString()}</p>
-                <div className="flex gap-4 text-xs text-muted-foreground">
-                  <span>Ordered: {mockOrder.orderDate}</span>
-                  <span>Delivered: {mockOrder.deliveredDate}</span>
-                </div>
+        <motion.div variants={fadeUp}>
+          <Card variant="ghost" className="bg-info-subtle border border-info/20 p-4">
+            <div className="flex gap-3">
+              <Shield className="size-5 text-info flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-info">Buyer Protection Active</p>
+                <p className="text-xs text-info/70">
+                  Your payment is held securely in escrow. Submitting a refund request will freeze the escrow until resolved.
+                </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </Card>
+        </motion.div>
 
-        {/* Refund Form */}
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <h2 className="mb-6">Refund Information</h2>
-
-            <div className="space-y-6">
-              {/* Reason Selection */}
-              <div>
-                <Label className="mb-3 block">Reason for Refund *</Label>
-                <RadioGroup value={selectedReason} onValueChange={setSelectedReason}>
-                  <div className="space-y-2">
-                    {refundReasons.map((reason) => (
-                      <div key={reason.id} className="flex items-center space-x-3 p-3 border border-border rounded-xl hover:bg-muted">
-                        <RadioGroupItem value={reason.id} id={reason.id} />
-                        <Label htmlFor={reason.id} className="flex-1 cursor-pointer">
-                          {reason.label}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </RadioGroup>
+        {/* Step Content */}
+        {step === 'select-items' && (
+          <motion.div variants={fadeUp} className="space-y-4">
+            <h3 className="font-display font-semibold text-foreground">Select Items to Refund</h3>
+            <Card>
+              <div className="p-4 space-y-3">
+                {mockOrder.items.map((item) => (
+                  <label
+                    key={item.id}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-card-hover cursor-pointer transition-colors border border-border"
+                  >
+                    <input
+                      type="checkbox"
+                      defaultChecked
+                      className="size-4 rounded"
+                    />
+                    <ImageWithFallback
+                      src={item.image}
+                      alt={item.name}
+                      loading="lazy"
+                      className="size-12 rounded-lg object-cover bg-card flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
+                      <p className="text-xs text-foreground-secondary">
+                        Qty: {item.quantity} • ${(item.price * item.quantity).toFixed(2)}
+                      </p>
+                    </div>
+                  </label>
+                ))}
               </div>
+            </Card>
+            <Button
+              variant="gradient"
+              fullWidth
+              onClick={() => setStep('reason')}
+              className="shadow-brand"
+            >
+              Continue
+            </Button>
+          </motion.div>
+        )}
 
-              {/* Description */}
-              <div>
-                <Label htmlFor="description">Detailed Description *</Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Please describe the issue in detail..."
-                  rows={6}
-                  className="mt-2"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {description.length}/500 characters
-                </p>
+        {step === 'reason' && (
+          <motion.div variants={fadeUp} className="space-y-4">
+            <h3 className="font-display font-semibold text-foreground">What's the issue?</h3>
+            <Card>
+              <div className="p-4 space-y-2">
+                {refundReasons.map((reason) => (
+                  <label
+                    key={reason.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
+                      selectedReason === reason.id
+                        ? 'border-primary bg-primary-subtle'
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="reason"
+                      value={reason.id}
+                      checked={selectedReason === reason.id}
+                      onChange={(e) => setSelectedReason(e.target.value)}
+                      className="size-4"
+                    />
+                    <span className="text-sm font-medium text-foreground">{reason.label}</span>
+                  </label>
+                ))}
               </div>
+            </Card>
 
-              {/* Photo Upload */}
-              <div>
-                <Label>Upload Photos (Optional)</Label>
-                <div className="mt-2 border-2 border-dashed border-border rounded-2xl p-6 text-center hover:bg-muted cursor-pointer">
-                  <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground mb-1">Click to upload photos</p>
-                  <p className="text-xs text-muted-foreground">PNG, JPG up to 5MB each (Max 5 photos)</p>
-                </div>
-              </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Describe the issue</label>
+              <Textarea
+                placeholder="Please provide detailed information..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={5}
+              />
+            </div>
 
-              {/* Refund Method */}
-              <div className="bg-primary/10 p-4 rounded-xl">
-                <h3 className="text-sm font-medium mb-2">Refund Processing</h3>
-                <p className="text-sm text-muted-foreground">
-                  After approval, refund will be credited to your Ezyify Wallet within 3-5 business days.
-                  You can then withdraw to your bank account or use it for future purchases.
-                </p>
-              </div>
-
-              {/* Terms Agreement */}
-              <div className="flex items-start gap-3 p-4 border border-border rounded-xl">
-                <Checkbox
-                  id="terms"
-                  checked={agreedToTerms}
-                  onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
-                />
-                <Label htmlFor="terms" className="text-sm cursor-pointer">
-                  I confirm that all information provided is accurate and I understand that false claims
-                  may result in account suspension. I agree to the{' '}
-                  <Link to="/terms" className="text-primary hover:underline">
-                    refund policy terms
-                  </Link>
-                  .
-                </Label>
-              </div>
-
-              {/* Submit Button */}
+            <div className="flex gap-2">
               <Button
-                className="w-full"
-                onClick={handleSubmitRefund}
-                disabled={!selectedReason || !description || !agreedToTerms || !mockOrder.refundEligible}
+                variant="outline"
+                fullWidth
+                onClick={() => setStep('select-items')}
               >
-                Submit Refund Request
+                Back
+              </Button>
+              <Button
+                variant="gradient"
+                fullWidth
+                disabled={!selectedReason || !description}
+                onClick={() => setStep('evidence')}
+                className="shadow-brand"
+              >
+                Continue
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </motion.div>
+        )}
 
-        {/* Refund Policy Info */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="mb-4">Refund Policy</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                <span>Refund requests must be submitted within 7 days of delivery</span>
-              </li>
-              <li className="flex gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                <span>Products must be in original condition (unless defective)</span>
-              </li>
-              <li className="flex gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                <span>Refunds are processed within 3-5 business days after approval</span>
-              </li>
-              <li className="flex gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                <span>Amount will be credited to your Ezyify Wallet</span>
-              </li>
-              <li className="flex gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                <span>For questions, contact our{' '}
-                  <Link to="/help" className="text-primary hover:underline">support team</Link>
-                </span>
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
+        {step === 'evidence' && (
+          <motion.div variants={fadeUp} className="space-y-4">
+            <h3 className="font-display font-semibold text-foreground">Add Evidence (Optional)</h3>
+            <Card variant="ghost" className="border-2 border-dashed border-border p-6 text-center space-y-2">
+              <Upload className="size-8 text-primary-subtle mx-auto" />
+              <p className="text-sm font-medium text-foreground">Upload photos or videos</p>
+              <p className="text-xs text-foreground-secondary">
+                PNG, JPG, or MP4 up to 10MB each
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => toast.info('File upload coming soon')}
+              >
+                Choose Files
+              </Button>
+            </Card>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                fullWidth
+                onClick={() => setStep('reason')}
+              >
+                Back
+              </Button>
+              <Button
+                variant="gradient"
+                fullWidth
+                onClick={() => setStep('review')}
+                className="shadow-brand"
+              >
+                Continue
+              </Button>
+            </div>
+          </motion.div>
+        )}
+
+        {step === 'review' && (
+          <motion.div variants={fadeUp} className="space-y-4">
+            <h3 className="font-display font-semibold text-foreground">Review & Submit</h3>
+
+            <Card>
+              <div className="p-4 space-y-4">
+                <div className="border-b border-border pb-4">
+                  <p className="text-xs font-semibold text-foreground-secondary mb-2">REASON</p>
+                  <p className="text-sm text-foreground">
+                    {refundReasons.find(r => r.id === selectedReason)?.label}
+                  </p>
+                </div>
+
+                <div className="border-b border-border pb-4">
+                  <p className="text-xs font-semibold text-foreground-secondary mb-2">DETAILS</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{description}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-foreground-secondary mb-2">REFUND AMOUNT</p>
+                  <p className="text-2xl font-display font-bold text-accent-brand">
+                    ${mockOrder.items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-card transition-colors cursor-pointer">
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="size-4 mt-1 flex-shrink-0"
+              />
+              <span className="text-xs text-foreground-secondary">
+                I confirm that all information is accurate and agree to the refund policy. False claims may result in account suspension.
+              </span>
+            </label>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                fullWidth
+                onClick={() => setStep('reason')}
+              >
+                Back
+              </Button>
+              <Button
+                variant="gradient"
+                fullWidth
+                disabled={!agreedToTerms}
+                onClick={handleSubmitRefund}
+                className="shadow-brand"
+              >
+                Submit Request
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
     </div>
   );
 }

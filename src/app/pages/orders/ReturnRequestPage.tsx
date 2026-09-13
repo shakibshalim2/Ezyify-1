@@ -1,283 +1,153 @@
+import React, { useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
+import { useSearchParams, Link, useNavigate } from 'react-router';
+import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { SEO } from '../../components/SEO';
-import { toast } from 'sonner';
-import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router';
-import { ArrowLeft, Upload, CheckCircle2, AlertCircle, Package, Truck } from 'lucide-react';
-import { Button } from '../../components/ui/button';
-import { Card, CardContent } from '../../components/ui/card';
+import { Button } from '../../components/primitives/Button';
+import { Card } from '../../components/primitives/Card';
+import { Field } from '../../components/primitives/Field';
 import { Textarea } from '../../components/ui/textarea';
-import { Label } from '../../components/ui/label';
-import { RadioGroup, RadioGroupItem } from '../../components/ui/radio-group';
-import { Alert, AlertDescription } from '../../components/ui/alert';
-import { Checkbox } from '../../components/ui/checkbox';
-
-const returnReasons = [
-  { id: 'wrong-item', label: 'Wrong item received' },
-  { id: 'defective', label: 'Defective or damaged' },
-  { id: 'size', label: 'Size/fit issue' },
-  { id: 'quality', label: 'Quality not as expected' },
-  { id: 'changed-mind', label: 'Changed my mind' },
-  { id: 'other', label: 'Other reason' }
-];
+import { toast } from 'sonner';
+import { fadeUp, staggerContainer } from '../../lib/motion';
 
 export default function ReturnRequestPage() {
-  const { orderId } = useParams();
+  const reduce = useReducedMotion();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [selectedReason, setSelectedReason] = useState('');
-  const [description, setDescription] = useState('');
-  const [returnMethod, setReturnMethod] = useState('pickup');
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [step, setStep] = useState<'info' | 'review'>('info');
+  const [reason, setReason] = useState('');
+  const [address, setAddress] = useState('');
+  const [agreed, setAgreed] = useState(false);
 
-  const orderDetails = {
-    orderId: 'ORD-2024-1234',
-    orderDate: '2026-01-10',
-    deliveryDate: '2026-01-15',
-    product: {
-      id: '1',
-      name: 'Premium Wireless Headphones',
-      image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300',
-      price: 45.00,
-      quantity: 1
-    },
-    returnEligible: true,
-    returnDeadline: '2026-01-24',
-    address: '123 Main Street, New York, NY 10001, USA'
-  };
-
-  const handleSubmitReturn = () => {
-    if (!selectedReason || !description || !agreedToTerms) {
+  const handleSubmit = () => {
+    if (!reason || !address || !agreed) {
+      toast.error('Please complete all fields');
       return;
     }
-    toast.success('Return request submitted successfully. We will review it within 24–48 hours.');
-    navigate(`/orders/${orderId}`);
+    const returnId = `RET-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    toast.success('Return request submitted');
+    navigate(`/user/orders`);
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <SEO title="Request Return — Ezyify" description="Submit a return request for your Ezyify order." />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <Link to={`/orders/${orderId}`}>
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="font-semibold text-foreground">Return Request</h1>
-            <p className="text-muted-foreground">Order #{orderDetails.orderId}</p>
-          </div>
-        </div>
+      <SEO title="Request Return — Ezyify" description="Submit a return request for your order." />
 
-        {/* Eligibility Alert */}
-        {orderDetails.returnEligible ? (
-          <Alert className="mb-6 border-primary/30 bg-primary/10">
-            <CheckCircle2 className="w-4 h-4 text-primary" />
-            <AlertDescription className="text-foreground">
-              This order is eligible for return. Request before {orderDetails.returnDeadline}
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <Alert variant="destructive" className="mb-6">
-            <AlertCircle className="w-4 h-4" />
-            <AlertDescription>
-              This order is not eligible for return. Return period has expired.
-            </AlertDescription>
-          </Alert>
+      <motion.div
+        variants={staggerContainer(reduce ? 0 : 0.05, 0)}
+        initial="hidden"
+        animate="visible"
+        className="mx-auto max-w-2xl px-4 py-6 pb-28 space-y-6"
+      >
+        <motion.div variants={fadeUp} className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" aria-label="Back" asChild>
+            <Link to="/user/orders">
+              <ArrowLeft className="size-5" />
+            </Link>
+          </Button>
+          <h1 className="font-display text-xl font-semibold text-foreground">Request Return</h1>
+        </motion.div>
+
+        <motion.div variants={fadeUp} className="flex gap-2">
+          {(['info', 'review'] as const).map((s, idx) => (
+            <div key={s} className="flex items-center gap-2">
+              <div
+                className={`size-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
+                  ['info', 'review'].indexOf(step) >= idx
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card border border-border'
+                }`}
+              >
+                {['info', 'review'].indexOf(step) > idx ? <CheckCircle className="size-5" /> : idx + 1}
+              </div>
+              {idx < 1 && <div className="h-0.5 w-8 bg-border" />}
+            </div>
+          ))}
+        </motion.div>
+
+        {step === 'info' && (
+          <motion.div variants={fadeUp} className="space-y-4">
+            <h3 className="font-display font-semibold text-foreground">Return Details</h3>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Reason for Return</label>
+              <Textarea
+                placeholder="Why are you returning this item?"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={4}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Return Address</label>
+              <Textarea
+                placeholder="Where should we send the return label?"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                rows={4}
+              />
+            </div>
+
+            <Button
+              variant="gradient"
+              fullWidth
+              disabled={!reason || !address}
+              onClick={() => setStep('review')}
+              className="shadow-brand"
+            >
+              Continue
+            </Button>
+          </motion.div>
         )}
 
-        {/* Product Info */}
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <h2 className="mb-4">Product to Return</h2>
-            <div className="flex items-start gap-4">
-              <img
-                      loading="lazy"
-                src={orderDetails.product.image}
-                alt={orderDetails.product.name}
-                className="w-20 h-20 rounded-xl object-cover"
+        {step === 'review' && (
+          <motion.div variants={fadeUp} className="space-y-4">
+            <h3 className="font-display font-semibold text-foreground">Review & Submit</h3>
+
+            <Card>
+              <div className="p-4 space-y-4">
+                <div>
+                  <p className="text-xs font-semibold text-foreground-secondary mb-2">REASON</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{reason}</p>
+                </div>
+
+                <div className="border-t border-border pt-4">
+                  <p className="text-xs font-semibold text-foreground-secondary mb-2">RETURN ADDRESS</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{address}</p>
+                </div>
+              </div>
+            </Card>
+
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-card cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="size-4 mt-1 flex-shrink-0"
               />
-              <div className="flex-1">
-                <p className="font-medium mb-1">{orderDetails.product.name}</p>
-                <p className="text-sm text-muted-foreground mb-2">
-                  ${orderDetails.product.price.toLocaleString()} × {orderDetails.product.quantity}
-                </p>
-                <div className="flex gap-4 text-xs text-muted-foreground">
-                  <span>Ordered: {orderDetails.orderDate}</span>
-                  <span>Delivered: {orderDetails.deliveryDate}</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              <span className="text-xs text-foreground-secondary">
+                I agree to return the item in original condition and accept the return policy terms.
+              </span>
+            </label>
 
-        {/* Return Form */}
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <h2 className="mb-6">Return Details</h2>
-
-            <div className="space-y-6">
-              {/* Reason Selection */}
-              <div>
-                <Label className="mb-3 block">Reason for Return *</Label>
-                <RadioGroup value={selectedReason} onValueChange={setSelectedReason}>
-                  <div className="space-y-2">
-                    {returnReasons.map((reason) => (
-                      <div key={reason.id} className="flex items-center space-x-3 p-3 border border-border rounded-xl hover:bg-muted">
-                        <RadioGroupItem value={reason.id} id={reason.id} />
-                        <Label htmlFor={reason.id} className="flex-1 cursor-pointer">
-                          {reason.label}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </RadioGroup>
-              </div>
-
-              {/* Description */}
-              <div>
-                <Label htmlFor="description">Additional Details *</Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Please provide more details about why you're returning this item..."
-                  rows={5}
-                  className="mt-2"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {description.length}/500 characters
-                </p>
-              </div>
-
-              {/* Photo Upload */}
-              <div>
-                <Label>Upload Product Photos (Recommended)</Label>
-                <div className="mt-2 border-2 border-dashed border-border rounded-2xl p-6 text-center hover:bg-muted cursor-pointer">
-                  <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground mb-1">Click to upload photos of the product</p>
-                  <p className="text-xs text-muted-foreground">PNG, JPG up to 5MB each (Max 5 photos)</p>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Photos help us process your return faster
-                </p>
-              </div>
-
-              {/* Return Method */}
-              <div>
-                <Label className="mb-3 block">Return Method</Label>
-                <RadioGroup value={returnMethod} onValueChange={setReturnMethod}>
-                  <div className="space-y-3">
-                    <div className="flex items-start space-x-3 p-4 border border-border rounded-xl hover:bg-muted">
-                      <RadioGroupItem value="pickup" id="pickup" className="mt-1" />
-                      <Label htmlFor="pickup" className="flex-1 cursor-pointer">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Truck className="w-5 h-5 text-primary" />
-                          <span className="font-medium">Free Pickup</span>
-                          <Badge className="bg-primary/20 text-primary text-xs">Recommended</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          We'll pick up the product from your address within 2-3 business days
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Address: {orderDetails.address}
-                        </p>
-                      </Label>
-                    </div>
-
-                    <div className="flex items-start space-x-3 p-4 border border-border rounded-xl hover:bg-muted">
-                      <RadioGroupItem value="drop-off" id="drop-off" className="mt-1" />
-                      <Label htmlFor="drop-off" className="flex-1 cursor-pointer">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Package className="w-5 h-5 text-primary" />
-                          <span className="font-medium">Drop-off Point</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          Drop off the product at your nearest Ezyify collection point
-                        </p>
-                        <button className="text-xs text-primary hover:underline mt-1">
-                          Find nearest drop-off point
-                        </button>
-                      </Label>
-                    </div>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              {/* Refund Information */}
-              <div className="bg-primary/10 p-4 rounded-xl">
-                <h3 className="text-sm font-medium mb-2">Refund Processing</h3>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li>• Product will be inspected upon receipt</li>
-                  <li>• Refund will be processed within 5-7 business days after inspection</li>
-                  <li>• Amount will be credited to your Ezyify Wallet</li>
-                </ul>
-              </div>
-
-              {/* Terms Agreement */}
-              <div className="flex items-start gap-3 p-4 border border-border rounded-xl">
-                <Checkbox
-                  id="terms"
-                  checked={agreedToTerms}
-                  onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
-                />
-                <Label htmlFor="terms" className="text-sm cursor-pointer">
-                  I confirm that the product is in original condition with all tags and packaging intact.
-                  I understand that damaged or used products may not be eligible for full refund. I agree to the{' '}
-                  <Link to="/terms" className="text-primary hover:underline">
-                    return policy terms
-                  </Link>
-                  .
-                </Label>
-              </div>
-
-              {/* Submit Button */}
+            <div className="flex gap-2">
+              <Button variant="outline" fullWidth onClick={() => setStep('info')}>
+                Back
+              </Button>
               <Button
-                className="w-full"
-                onClick={handleSubmitReturn}
-                disabled={!selectedReason || !description || !agreedToTerms || !orderDetails.returnEligible}
+                variant="gradient"
+                fullWidth
+                disabled={!agreed}
+                onClick={handleSubmit}
+                className="shadow-brand"
               >
-                Submit Return Request
+                Submit Return
               </Button>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Return Policy Info */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="mb-4">Return Policy</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                <span>Returns accepted within 14 days of delivery</span>
-              </li>
-              <li className="flex gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                <span>Products must be unused and in original packaging</span>
-              </li>
-              <li className="flex gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                <span>Free pickup service available for all returns</span>
-              </li>
-              <li className="flex gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                <span>Refunds processed within 5-7 business days after inspection</span>
-              </li>
-              <li className="flex gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                <span>Need help?{' '}
-                  <Link to="/help" className="text-primary hover:underline">Contact support</Link>
-                </span>
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
+          </motion.div>
+        )}
+      </motion.div>
     </div>
   );
-}
-
-function Badge({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <span className={`inline-block px-2 py-0.5 rounded-full ${className}`}>{children}</span>;
 }

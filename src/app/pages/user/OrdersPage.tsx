@@ -1,61 +1,74 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import { Link, useNavigate } from 'react-router';
-import { Package, Truck, CheckCircle, XCircle, Clock, Shield } from 'lucide-react';
-import { Badge } from '../../components/ui/badge';
-import { Skeleton } from '../../components/ui/skeleton';
+import { Package, Truck, CheckCircle, Clock, AlertCircle, ArrowRight } from 'lucide-react';
 import { SEO } from '../../components/SEO';
+import { Button } from '../../components/primitives/Button';
+import { Card } from '../../components/primitives/Card';
+import { Skeleton } from '../../components/primitives/Skeleton';
 import { EmptyOrders } from '../../components/EmptyStates';
+import { EscrowProtectionBanner } from '../../components/EscrowProtectionBanner';
+import { ImageWithFallback } from '../../components/figma/ImageWithFallback';
 import { toast } from 'sonner';
+import { fadeUp, staggerContainer, DURATION, EASE_EMPHASIZED } from '../../lib/motion';
+
+interface OrderItem {
+  id: string;
+  name: string;
+  image: string;
+  price: number;
+  quantity: number;
+}
 
 interface Order {
   id: string;
   orderNumber: string;
-  items: {
-    id: string;
-    productId?: string;
-    name: string;
-    image: string;
-    price: number;
-    quantity: number;
-  }[];
+  items: OrderItem[];
   total: number;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  statusMessage: string;
+  status: 'to-pay' | 'to-ship' | 'to-receive' | 'completed' | 'cancelled';
   orderDate: string;
-  deliveryDate?: string;
-  trackingNumber?: string;
   seller: string;
+  sellerId: string;
   estimatedDelivery?: string;
+  trackingNumber?: string;
 }
 
-// SKELETON FOR INSTANT UI
+const statusConfig = {
+  'to-pay': { icon: Clock, label: 'To Pay', color: 'bg-warning-subtle text-warning' },
+  'to-ship': { icon: Package, label: 'To Ship', color: 'bg-info-subtle text-info' },
+  'to-receive': { icon: Truck, label: 'To Receive', color: 'bg-info-subtle text-info' },
+  'completed': { icon: CheckCircle, label: 'Completed', color: 'bg-success-subtle text-success' },
+  'cancelled': { icon: AlertCircle, label: 'Cancelled', color: 'bg-error-subtle text-error' }
+};
+
 function OrdersSkeleton() {
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto px-4 pb-6">
-        <Skeleton className="h-8 w-48 mb-6" />
+      <div className="mx-auto max-w-4xl px-4 py-6 pb-28 space-y-6">
+        <Skeleton className="h-10 w-40" />
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {[1, 2, 3, 4, 5].map(i => (
+            <Skeleton key={i} className="h-9 w-20 rounded-full flex-shrink-0" />
+          ))}
+        </div>
         <div className="space-y-4">
           {[1, 2, 3].map(i => (
-            <div key={i} className="bg-card border border-border rounded-2xl p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="space-y-2 flex-1">
-                  <Skeleton className="h-5 w-32" />
-                  <Skeleton className="h-4 w-48" />
+            <Card key={i} className="p-4">
+              <div className="space-y-4">
+                <Skeleton className="h-6 w-32" />
+                <div className="flex gap-4">
+                  <Skeleton className="size-20 rounded-card flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-2/3" />
+                  </div>
                 </div>
-                <Skeleton className="h-8 w-24" />
-              </div>
-              <div className="flex gap-4">
-                <Skeleton className="w-20 h-20 rounded-xl" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-2/3" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-10 flex-1" />
+                  <Skeleton className="h-10 flex-1" />
                 </div>
               </div>
-              <div className="flex gap-3 mt-4">
-                <Skeleton className="h-10 flex-1" />
-                <Skeleton className="h-10 flex-1" />
-              </div>
-            </div>
+            </Card>
           ))}
         </div>
       </div>
@@ -63,25 +76,13 @@ function OrdersSkeleton() {
   );
 }
 
-const statusConfig = {
-  pending: { icon: Clock, color: 'text-warning', bgColor: 'bg-warning/10' },
-  processing: { icon: Package, color: 'text-primary', bgColor: 'bg-primary/10' },
-  shipped: { icon: Truck, color: 'text-info', bgColor: 'bg-info/10' },
-  delivered: { icon: CheckCircle, color: 'text-success', bgColor: 'bg-success/10' },
-  cancelled: { icon: XCircle, color: 'text-error', bgColor: 'bg-error/10' },
-};
-
 export default function OrdersPage() {
-  // ✅ CRITICAL: ALL useState HOOKS MUST BE AT TOP - BEFORE ANY EARLY RETURNS
-  // This ensures consistent hook order on every render (React Rules of Hooks)
-  const [activeTab, setActiveTab] = useState('all');
-  const [cancelledOrders, setCancelledOrders] = useState<Set<string>>(new Set());
-  const [pageData, setPageData] = useState<{
-    orders: Order[];
-  } | null>(null);
+  const reduce = useReducedMotion();
   const navigate = useNavigate();
+  const [activeFilter, setActiveFilter] = useState<'all' | 'to-pay' | 'to-ship' | 'to-receive' | 'completed' | 'cancelled'>('all');
+  const [isLoading, setIsLoading] = useState(true);
+  const [orders, setOrders] = useState<Order[]>([]);
 
-  // ✅ All useEffect hooks after useState
   useEffect(() => {
     const loadOrdersData = () => {
       const mockOrders: Order[] = [
@@ -91,7 +92,6 @@ export default function OrdersPage() {
           items: [
             {
               id: '1',
-              productId: 'prod-001',
               name: 'Premium Wireless Headphones',
               image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200',
               price: 45.00,
@@ -99,12 +99,12 @@ export default function OrdersPage() {
             }
           ],
           total: 54.99,
-          status: 'shipped',
-          statusMessage: 'Your order is on the way',
+          status: 'to-receive',
           orderDate: 'Jan 2, 2024',
-          deliveryDate: 'Jan 6, 2024',
-          trackingNumber: 'TRK987654321',
-          seller: 'TechHub Store'
+          seller: 'TechHub Store',
+          sellerId: 'seller-1',
+          estimatedDelivery: 'Jan 6, 2024',
+          trackingNumber: 'TRK987654321'
         },
         {
           id: '2',
@@ -112,7 +112,6 @@ export default function OrdersPage() {
           items: [
             {
               id: '2',
-              productId: 'prod-002',
               name: 'Smart Watch Pro',
               image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200',
               price: 120.00,
@@ -120,7 +119,6 @@ export default function OrdersPage() {
             },
             {
               id: '3',
-              productId: 'prod-003',
               name: 'Wireless Earbuds',
               image: 'https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=200',
               price: 25.00,
@@ -128,11 +126,10 @@ export default function OrdersPage() {
             }
           ],
           total: 154.99,
-          status: 'delivered',
-          statusMessage: 'Delivered on Dec 28',
+          status: 'completed',
           orderDate: 'Dec 24, 2023',
-          deliveryDate: 'Dec 28, 2023',
-          seller: 'GadgetHub'
+          seller: 'GadgetHub',
+          sellerId: 'seller-2'
         },
         {
           id: '3',
@@ -147,14 +144,15 @@ export default function OrdersPage() {
             }
           ],
           total: 27.99,
-          status: 'processing',
-          statusMessage: 'Your order is being prepared',
+          status: 'to-pay',
           orderDate: 'Jan 4, 2024',
-          seller: 'OfficeEssentials'
+          seller: 'OfficeEssentials',
+          sellerId: 'seller-3'
         }
       ];
 
-      setPageData({ orders: mockOrders });
+      setOrders(mockOrders);
+      setIsLoading(false);
     };
 
     if ('requestIdleCallback' in window) {
@@ -166,192 +164,222 @@ export default function OrdersPage() {
     }
   }, []);
 
-  if (!pageData) {
+  const statusCounts = {
+    all: orders.length,
+    'to-pay': orders.filter(o => o.status === 'to-pay').length,
+    'to-ship': orders.filter(o => o.status === 'to-ship').length,
+    'to-receive': orders.filter(o => o.status === 'to-receive').length,
+    completed: orders.filter(o => o.status === 'completed').length,
+    cancelled: orders.filter(o => o.status === 'cancelled').length,
+  };
+
+  const filteredOrders = activeFilter === 'all'
+    ? orders
+    : orders.filter(o => o.status === activeFilter);
+
+  if (isLoading) {
     return <OrdersSkeleton />;
   }
 
-  const { orders } = pageData;
-
-  const filteredOrders = activeTab === 'all' 
-    ? orders 
-    : orders.filter(order => order.status === activeTab);
-
-  const getStatusColor = (status: Order['status']) => {
-    const config = statusConfig[status];
-    return `${config.bgColor} ${config.color}`;
-  };
-
-  const getStatusProgress = (status: Order['status']) => {
-    switch (status) {
-      case 'pending':
-        return 25;
-      case 'processing':
-        return 50;
-      case 'shipped':
-        return 75;
-      case 'delivered':
-        return 100;
-      case 'cancelled':
-        return 0;
-    }
-  };
+  const filterTabs = [
+    { id: 'all', label: 'All' },
+    { id: 'to-pay', label: 'To pay' },
+    { id: 'to-ship', label: 'To ship' },
+    { id: 'to-receive', label: 'To receive' },
+    { id: 'completed', label: 'Completed' },
+    { id: 'cancelled', label: 'Cancelled' },
+  ] as const;
 
   return (
     <div className="min-h-screen bg-background">
       <SEO title="My Orders - Ezyify" description="Track and manage your orders" />
-      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="font-semibold text-foreground">My Orders</h1>
-          <p className="text-muted-foreground">Track and manage your orders</p>
-        </div>
 
-        {/* Tabs */}
-        <div className="mb-6">
-          <div className="flex gap-2 overflow-x-auto pb-2 border-b border-border">
-            {['all', 'pending', 'shipped', 'delivered', 'cancelled'].map((tab) => (
+      <div className="mx-auto max-w-4xl lg:grid lg:grid-cols-[1fr_320px] lg:gap-8 lg:px-6 lg:py-8">
+        <motion.div
+          variants={staggerContainer(reduce ? 0 : 0.05, 0)}
+          initial="hidden"
+          animate="visible"
+          className="px-4 py-6 pb-28 lg:p-0 space-y-6"
+        >
+          {/* Header */}
+          <motion.div variants={fadeUp} className="space-y-1">
+            <h1 className="font-display text-2xl font-semibold text-foreground">My Orders</h1>
+            <p className="text-sm text-foreground-secondary">Track and manage your orders</p>
+          </motion.div>
+
+          {/* Filter Chips */}
+          <motion.div variants={fadeUp} className="flex gap-2 overflow-x-auto pb-2">
+            {filterTabs.map((tab) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab as typeof activeTab)}
-                className={`px-4 py-3 min-h-[44px] font-medium whitespace-nowrap transition-colors ${
-                  activeTab === tab
-                    ? 'border-b-2 border-primary text-foreground -mb-[2px]'
-                    : 'text-muted-foreground hover:text-foreground'
+                key={tab.id}
+                onClick={() => setActiveFilter(tab.id as any)}
+                className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-all ${
+                  activeFilter === tab.id
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card border border-border text-foreground hover:bg-card-hover'
                 }`}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab.label}
+                {statusCounts[tab.id as keyof typeof statusCounts] > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center size-5 rounded-full text-xs font-semibold bg-foreground/10">
+                    {statusCounts[tab.id as keyof typeof statusCounts]}
+                  </span>
+                )}
               </button>
             ))}
-          </div>
-        </div>
+          </motion.div>
 
-        {/* Orders List */}
-        {filteredOrders.length === 0 ? (
-          <EmptyOrders />
-        ) : (
-          <div className="space-y-4">
-            {filteredOrders.map((order) => (
-              <div key={order.id} className="bg-card border border-border rounded-2xl overflow-hidden hover:shadow-md hover:border-border-strong transition-all duration-200">
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-bold text-foreground">Order #{order.id}</h3>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                          {order.status}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Placed on {order.orderDate}
-                      </p>
-                      {/* Payment Status - Escrow Indicator */}
-                      {order.status !== 'delivered' && order.status !== 'cancelled' && (
-                        <p className="text-xs text-primary mt-1 flex items-center gap-1">
-                          <Shield className="w-3 h-3" />
-                          Payment held in escrow
-                        </p>
-                      )}
-                      {order.status === 'delivered' && (
-                        <p className="text-xs text-success mt-1">
-                          Awaiting delivery confirmation
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
-                      <p className="text-xl font-bold text-foreground">${order.total.toFixed(2)}</p>
-                    </div>
-                  </div>
+          {/* Orders List */}
+          {filteredOrders.length === 0 ? (
+            <motion.div variants={fadeUp}>
+              <EmptyOrders />
+            </motion.div>
+          ) : (
+            <motion.div variants={staggerContainer(reduce ? 0 : 0.04)} className="space-y-4">
+              {filteredOrders.map((order) => {
+                const config = statusConfig[order.status];
+                const StatusIcon = config.icon;
 
-                  {/* Order Items */}
-                  <div className="space-y-3 mb-4">
-                    {order.items.map((item, idx) => (
-                      <div key={idx} className="flex gap-4">
-                        <img loading="lazy"
-                          src={item.image}
-                          alt={item.name}
-                          className="w-20 h-20 rounded-2xl object-cover bg-muted"
-                        />
-                        <div className="flex-1">
-                          <h4 className="font-medium mb-1 text-foreground">{item.name}</h4>
-                          <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
-                          <p className="text-sm font-bold text-foreground">${item.price}</p>
+                return (
+                  <motion.div key={order.id} variants={fadeUp}>
+                    <Card variant="elevated" interactive>
+                      <div className="p-4 space-y-4">
+                        {/* Order Header */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-display font-semibold text-foreground">
+                                {order.orderNumber}
+                              </p>
+                              <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+                                <StatusIcon className="size-3.5" />
+                                {config.label}
+                              </div>
+                            </div>
+                            <p className="text-xs text-foreground-secondary">{order.seller} • {order.orderDate}</p>
+                          </div>
+                          <p className="font-display font-bold text-lg tabular-nums text-foreground flex-shrink-0">
+                            ${order.total.toFixed(2)}
+                          </p>
+                        </div>
+
+                        {/* Items Preview */}
+                        <div className="space-y-2">
+                          {order.items.slice(0, 2).map((item) => (
+                            <div key={item.id} className="flex gap-3">
+                              <ImageWithFallback
+                                src={item.image}
+                                alt={item.name}
+                                loading="lazy"
+                                className="size-16 rounded-lg object-cover flex-shrink-0 bg-card"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
+                                <p className="text-xs text-foreground-secondary">
+                                  Qty: {item.quantity} • ${item.price.toFixed(2)}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                          {order.items.length > 2 && (
+                            <p className="text-xs text-foreground-secondary px-1">
+                              +{order.items.length - 2} more item{order.items.length - 2 > 1 ? 's' : ''}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="grid grid-cols-2 gap-2 pt-2">
+                          {order.status === 'to-receive' && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => navigate(`/user/order-tracking/${order.id}`)}
+                              >
+                                Track Order
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => navigate(`/orders/refund-request?orderId=${order.id}`)}
+                              >
+                                Request Refund
+                              </Button>
+                            </>
+                          )}
+                          {order.status === 'completed' && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toast.info('Review feature coming soon')}
+                              >
+                                Review
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => toast.info('Buy again feature coming soon')}
+                              >
+                                Buy Again
+                              </Button>
+                            </>
+                          )}
+                          {order.status === 'to-pay' && (
+                            <>
+                              <Button
+                                variant="gradient"
+                                size="sm"
+                                fullWidth
+                                className="col-span-2"
+                                onClick={() => navigate(`/user/order-tracking/${order.id}`)}
+                              >
+                                Complete Payment
+                              </Button>
+                            </>
+                          )}
+                          {order.status === 'to-ship' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              fullWidth
+                              className="col-span-2"
+                              onClick={() => navigate(`/user/order-tracking/${order.id}`)}
+                            >
+                              View Details
+                            </Button>
+                          )}
+                          {order.status === 'cancelled' && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              fullWidth
+                              className="col-span-2"
+                              onClick={() => toast.info('Shop similar items')}
+                            >
+                              Shop Similar
+                            </Button>
+                          )}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </Card>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          )}
+        </motion.div>
 
-                  {/* Order Status & Actions */}
-                  <div className="pt-4 border-t border-border">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        {order.status === 'shipped' && (
-                          <p className="text-sm text-muted-foreground">{order.statusMessage}</p>
-                        )}
-                        {order.estimatedDelivery && (
-                          <p className="text-sm text-muted-foreground">
-                            Estimated delivery: {order.estimatedDelivery}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-2 justify-end">
-                        {order.trackingNumber && (
-                          <div className="text-right mr-4">
-                            <p className="text-sm text-muted-foreground">Tracking Number</p>
-                            <p className="text-sm font-mono font-medium text-foreground">{order.trackingNumber}</p>
-                          </div>
-                        )}
-                        <Link to={`/order/${order.id}`}>
-                          <button className="px-4 py-3 bg-card border border-border rounded-xl hover:bg-muted transition-colors text-foreground">
-                            View Details
-                          </button>
-                        </Link>
-                        {order.status === 'pending' && !cancelledOrders.has(order.id) && (
-                          <button
-                            className="px-4 py-3 bg-destructive text-destructive-foreground rounded-xl hover:bg-destructive/90 transition-colors"
-                            onClick={() => {
-                              if (window.confirm(`Cancel order #${order.id}? This cannot be undone.`)) {
-                                setCancelledOrders(prev => new Set([...prev, order.id]));
-                                toast.success(`Order #${order.id} has been cancelled`);
-                              }
-                            }}
-                          >
-                            Cancel Order
-                          </button>
-                        )}
-                        {cancelledOrders.has(order.id) && (
-                          <span className="px-4 py-2 bg-muted text-muted-foreground rounded-xl text-sm">Cancelled</span>
-                        )}
-                        {order.status === 'delivered' && (
-                          <>
-                            <Link to={`/order/${order.id}`}>
-                              <button className="px-4 py-3 bg-success text-white rounded-xl hover:bg-success/90 transition-colors flex items-center gap-2">
-                                <CheckCircle className="w-4 h-4" />
-                                Confirm Delivery
-                              </button>
-                            </Link>
-                            <Link to={`/orders/refund-request?orderId=${order.id}`}>
-                              <button className="px-3 py-3 border border-error/30 text-error rounded-xl hover:bg-error/5 transition-colors flex items-center gap-2 text-sm">
-                                Request Refund
-                              </button>
-                            </Link>
-                            <button
-                              className="px-4 py-3 text-white rounded-xl shadow-brand hover:shadow-brand-lg transition-all"
-                              style={{ background: "var(--brand-gradient)" }}
-                              onClick={() => navigate(`/product/${order.items[0]?.productId || order.items[0]?.id}?review=true`)}
-                            >
-                              Leave Review
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+        {/* Desktop: Sticky Escrow Protection Banner */}
+        <div className="hidden lg:block">
+          <div className="sticky top-24">
+            <EscrowProtectionBanner
+              amount={filteredOrders.reduce((sum, o) => sum + o.total, 0)}
+              variant="cart"
+            />
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

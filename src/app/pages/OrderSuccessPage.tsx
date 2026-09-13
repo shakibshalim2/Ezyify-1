@@ -1,181 +1,230 @@
+import React, { useState, useEffect } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
+import { useSearchParams, Link } from 'react-router';
+import { CheckCircle, Home, ArrowRight, Share2 } from 'lucide-react';
 import { SEO } from '../components/SEO';
-import { Link, useSearchParams } from 'react-router';
-import { CheckCircle, Package, Clock, ArrowRight, Home, FileText, Share2 } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Separator } from '../components/ui/separator';
-import { Skeleton } from '../components/ui/skeleton';
-import { useState, useEffect } from 'react';
+import { Button } from '../components/primitives/Button';
+import { Card } from '../components/primitives/Card';
+import { Skeleton } from '../components/primitives/Skeleton';
+import { fadeUp, staggerContainer, DURATION } from '../lib/motion';
+
+function OrderSuccessSkeleton() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-6">
+      <div className="max-w-md w-full space-y-6">
+        <div className="text-center space-y-4">
+          <Skeleton className="size-20 rounded-full mx-auto" />
+          <Skeleton className="h-8 w-40 mx-auto" />
+          <Skeleton className="h-6 w-64 mx-auto" />
+        </div>
+
+        <Card>
+          <div className="p-6 space-y-3">
+            {[1, 2, 3].map(i => (
+              <Skeleton key={i} className="h-5 w-full" />
+            ))}
+          </div>
+        </Card>
+
+        <div className="space-y-3">
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function OrderSuccessPage() {
+  const reduce = useReducedMotion();
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [orderId, setOrderId] = useState('');
 
-  // Load order data progressively
   useEffect(() => {
     const loadOrderData = () => {
-      // Get orderId from URL or generate one
       const id = searchParams.get('orderId') || 'EZY' + Math.random().toString(36).substr(2, 9).toUpperCase();
       setOrderId(id);
       setIsLoading(false);
     };
 
-    // Progressive loading: Use requestIdleCallback for non-critical work
     if ('requestIdleCallback' in window) {
       requestIdleCallback(() => loadOrderData(), { timeout: 100 });
     } else {
-      setTimeout(loadOrderData, 0);
+      setTimeout(loadOrderData, 16);
     }
   }, [searchParams]);
 
-  return (<div className="min-h-screen bg-background pb-8 px-4">
-      <SEO title="Order Confirmed — Ezyify" description="Your order has been placed successfully on Ezyify. Track your delivery and manage your orders." />
-      <div className="max-w-2xl mx-auto">
-        {/* Success Icon */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl mb-5 shadow-brand"
-            style={{ background: 'var(--brand-gradient)' }}>
-            <CheckCircle className="w-10 h-10 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">Order Placed!</h1>
-          <p className="text-muted-foreground text-sm">
-            Thank you for shopping on Ezyify. Your order is confirmed.
-          </p>
-        </div>
+  if (isLoading) {
+    return <OrderSuccessSkeleton />;
+  }
 
-        {/* Order Details Card */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="w-5 h-5" />
-              Order Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading ? (
-              <>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Order ID</span>
-                  <Skeleton className="h-5 w-32" />
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: reduce ? 0 : 0.08,
+        delayChildren: 0.1,
+      },
+    },
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-6">
+      <SEO title="Order Confirmed — Ezyify" description="Your order has been placed successfully. Track your delivery and manage your orders." />
+
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="max-w-md w-full space-y-6"
+      >
+        {/* Success Icon with Animation */}
+        <motion.div
+          variants={fadeUp}
+          className="text-center"
+        >
+          <div className="inline-flex items-center justify-center size-20 rounded-full mb-5 bg-brand-gradient shadow-brand">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', delay: 0.2, stiffness: 100, damping: 10 }}
+            >
+              <CheckCircle className="size-10 text-white" />
+            </motion.div>
+          </div>
+
+          <motion.div variants={fadeUp} className="space-y-2">
+            <h1 className="font-display text-2xl font-semibold text-foreground">Order Placed!</h1>
+            <p className="text-sm text-foreground-secondary">
+              Thank you for shopping on Ezyify. Your order is confirmed.
+            </p>
+          </motion.div>
+        </motion.div>
+
+        {/* Order Summary Card */}
+        <motion.div variants={fadeUp}>
+          <Card variant="elevated">
+            <div className="p-6 space-y-4">
+              <h3 className="font-display font-semibold text-foreground">Order Details</h3>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-3 border-b border-border">
+                  <span className="text-sm text-foreground-secondary">Order ID</span>
+                  <code className="font-mono text-sm font-semibold text-foreground">{orderId}</code>
                 </div>
-                <Separator />
-                <div className="flex items-start gap-3 p-4 bg-primary/8 border border-primary/20 rounded-2xl">
-                  <Clock className="w-5 h-5 text-primary mt-0.5" />
+
+                <div className="flex items-start gap-3 p-3 bg-accent-brand-subtle rounded-lg">
+                  <div className="size-8 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="size-5 text-accent-brand" />
+                  </div>
                   <div className="flex-1">
-                    <Skeleton className="h-5 w-40 mb-2" />
-                    <Skeleton className="h-4 w-32" />
+                    <p className="text-sm font-medium text-accent-brand">Estimated Delivery</p>
+                    <p className="text-xs text-accent-brand/70">3-5 business days</p>
                   </div>
                 </div>
-              </>
-            ) : (
-              <>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Order ID</span>
-                  <span className="font-mono">{orderId}</span>
-                </div>
-                <Separator />
-                <div className="flex items-start gap-3 p-4 bg-primary/8 border border-primary/20 rounded-2xl">
-                  <Clock className="w-5 h-5 text-primary mt-0.5" />
-                  <div>
-                    <p className="font-medium text-foreground">Estimated Delivery</p>
-                    <p className="text-sm text-muted-foreground">3-5 business days</p>
+
+                <div className="flex items-start gap-3 p-3 bg-info-subtle rounded-lg">
+                  <div className="size-8 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="size-5 text-info" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-info">100% Buyer Protection</p>
+                    <p className="text-xs text-info/70">Your payment is held in escrow until delivery</p>
                   </div>
                 </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
 
         {/* What's Next */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>What's Next?</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {isLoading ? (
-              <>
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+        <motion.div variants={fadeUp}>
+          <Card variant="elevated">
+            <div className="p-6 space-y-4">
+              <h3 className="font-display font-semibold text-foreground">What's Next?</h3>
+
+              <div className="space-y-3">
+                {[
+                  {
+                    num: 1,
+                    title: 'Order Confirmation',
+                    desc: "We've sent a confirmation email with your order details"
+                  },
+                  {
+                    num: 2,
+                    title: 'Processing',
+                    desc: 'Your seller is preparing your order for shipment'
+                  },
+                  {
+                    num: 3,
+                    title: 'Delivery',
+                    desc: 'Track your order in real-time from your orders page'
+                  }
+                ].map((step) => (
+                  <div key={step.num} className="flex items-start gap-3">
+                    <div className="size-8 bg-primary-subtle rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold text-primary">
+                      {step.num}
+                    </div>
                     <div className="flex-1">
-                      <Skeleton className="h-5 w-32 mb-2" />
-                      <Skeleton className="h-4 w-full" />
+                      <p className="text-sm font-medium text-foreground">{step.title}</p>
+                      <p className="text-xs text-foreground-secondary">{step.desc}</p>
                     </div>
                   </div>
                 ))}
-              </>
-            ) : (
-              <>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-primary font-medium">1</span>
-                  </div>
-                  <div>
-                    <p className="font-medium">Order Confirmation</p>
-                    <p className="text-sm text-muted-foreground">We've sent a confirmation email with your order details</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-primary font-medium">2</span>
-                  </div>
-                  <div>
-                    <p className="font-medium">Processing</p>
-                    <p className="text-sm text-muted-foreground">Your seller is preparing your order for shipment</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-primary font-medium">3</span>
-                  </div>
-                  <div>
-                    <p className="font-medium">Delivery</p>
-                    <p className="text-sm text-muted-foreground">Track your order in real-time from your orders page</p>
-                  </div>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
 
         {/* Action Buttons */}
-        <div className="space-y-3">
-          <Link to="/orders" className="block">
-            <Button className="w-full" size="lg">
-              <FileText className="w-5 h-5 mr-2" />
-              View Order Details
-              <ArrowRight className="w-5 h-5 ml-2" />
-            </Button>
-          </Link>
-          
-          <Link to="/" className="block">
-            <Button variant="outline" className="w-full" size="lg">
-              <Home className="w-5 h-5 mr-2" />
-              Continue Shopping
-            </Button>
-          </Link>
-        </div>
+        <motion.div variants={fadeUp} className="space-y-3">
+          <Button
+            asChild
+            variant="gradient"
+            fullWidth
+            size="lg"
+            className="shadow-brand"
+            rightIcon={<ArrowRight className="size-4" />}
+          >
+            <Link to="/user/orders">View Order Details</Link>
+          </Button>
+
+          <Button
+            asChild
+            variant="outline"
+            fullWidth
+            size="lg"
+            leftIcon={<Home className="size-4" />}
+          >
+            <Link to="/">Continue Shopping</Link>
+          </Button>
+        </motion.div>
 
         {/* Social Sharing Suggestion */}
-        <div className="mt-8 p-5 bg-primary/5 border border-primary/15 rounded-2xl text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Share2 className="w-4 h-4 text-primary" />
-            <p className="text-sm font-medium text-foreground">Love what you bought? Share it!</p>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Tag products in your posts and earn affiliate commission on every sale
-          </p>
-          <Link
-            to="/upload"
-            className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-full text-xs font-semibold text-white transition-all hover:scale-[1.02]"
-            style={{ background: 'var(--brand-gradient)' }}
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            Share Your Purchase
-          </Link>
-        </div>
-      </div>
+        <motion.div variants={fadeUp}>
+          <Card variant="ghost" className="bg-primary-subtle border border-primary/20">
+            <div className="p-4 text-center space-y-3">
+              <div className="flex items-center justify-center gap-2">
+                <Share2 className="size-4 text-primary" />
+                <p className="text-sm font-medium text-primary">Love what you bought?</p>
+              </div>
+              <p className="text-xs text-foreground-secondary">
+                Share it in a Loop and earn affiliate commission on every sale
+              </p>
+              <Button
+                asChild
+                variant="secondary"
+                size="sm"
+                fullWidth
+              >
+                <Link to="/upload">Share Your Purchase</Link>
+              </Button>
+            </div>
+          </Card>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }
