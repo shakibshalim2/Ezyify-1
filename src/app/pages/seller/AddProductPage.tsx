@@ -1,15 +1,8 @@
-import { SEO } from '../../components/SEO';
 import { useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router';
-import { Save, X, Upload, Plus, Trash2 } from 'lucide-react';
-import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Input } from '../../components/ui/input';
-import { Textarea } from '../../components/ui/textarea';
-import { Label } from '../../components/ui/label';
-import { Switch } from '../../components/ui/switch';
-import { SellerLayout } from '../../components/SellerLayout';
+import { Save, Upload, Plus, X, Image as ImageIcon, Lightbulb } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -17,8 +10,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
+import { Switch } from '../../components/ui/switch';
+import { Button } from '../../components/primitives/Button';
+import { Card } from '../../components/primitives/Card';
+import { Field } from '../../components/primitives/Field';
+import { SellerLayout } from '../../components/SellerLayout';
+import { SEO, SEOConfigs } from '../../components/SEO';
+import { fadeUp, staggerContainer } from '../../lib/motion';
 
 export default function AddProductPage() {
+  const reduce = useReducedMotion();
   const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -26,7 +27,7 @@ export default function AddProductPage() {
     description: '',
     category: '',
     price: '',
-    originalPrice: '',
+    compareAtPrice: '',
     stock: '',
     sku: '',
     brand: '',
@@ -37,252 +38,251 @@ export default function AddProductPage() {
 
   const handleSave = () => {
     if (!formData.name.trim() || !formData.description.trim() || !formData.category || !formData.price) {
-      toast.error('Please fill in all required fields (name, description, category, price)');
+      toast.error('Please fill in all required fields');
       return;
     }
     setIsSaving(true);
     setTimeout(() => {
       setIsSaving(false);
+      toast.success('Product added successfully');
       navigate('/seller/products');
     }, 1500);
   };
 
   return (
     <SellerLayout>
-      <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 pb-4 sm:pb-6 md:pb-8">
-      <SEO title="Add Product — Ezyify Seller" description="Add a new product to your Ezyify store." />
+      <SEO {...SEOConfigs.addProduct} />
+      <motion.div
+        variants={staggerContainer(reduce ? 0 : 0.05)}
+        initial="hidden"
+        animate="visible"
+        className="max-w-4xl mx-auto space-y-6"
+      >
         {/* Header */}
-        <div className="mb-6 sm:mb-8">
-          <h1 className="mb-1 sm:mb-2 font-semibold">Add New Product</h1>
-          <p className="text-sm text-muted-foreground">List a new product for sale on your store</p>
-        </div>
+        <motion.div variants={fadeUp}>
+          <h1 className="font-display text-2xl font-semibold text-foreground">Add Product</h1>
+          <p className="text-sm text-foreground-secondary mt-1">List a new product for sale</p>
+        </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Media */}
+            <motion.div variants={fadeUp}>
+              <Card variant="default" padding="lg">
+                <h2 className="font-display font-semibold text-lg mb-4 text-foreground">Product Media</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div
+                      key={i}
+                      className="aspect-square border-2 border-dashed border-border rounded-card flex items-center justify-center hover:bg-background-elevated transition-colors cursor-pointer"
+                    >
+                      <div className="text-center">
+                        <Upload className="size-5 text-foreground-tertiary mx-auto mb-2" />
+                        <p className="text-xs text-foreground-secondary">{i === 1 ? 'Main' : `Alt ${i}`}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="aspect-square border-2 border-dashed border-primary/50 rounded-card flex items-center justify-center hover:bg-primary-subtle transition-colors cursor-pointer">
+                    <Plus className="size-5 text-primary" />
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+
             {/* Basic Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Basic Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Product Name *</Label>
-                  <Input
-                    id="name"
+            <motion.div variants={fadeUp}>
+              <Card variant="default" padding="lg">
+                <h2 className="font-display font-semibold text-lg mb-4 text-foreground">Basic Information</h2>
+                <div className="space-y-4">
+                  <Field
+                    label="Product Name"
+                    required
                     placeholder="e.g. Premium Wireless Headphones"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
-                </div>
 
-                <div>
-                  <Label htmlFor="description">Description *</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Describe your product, features, benefits..."
-                    rows={5}
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="category">Category *</Label>
-                    <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="electronics">Electronics</SelectItem>
-                        <SelectItem value="fashion">Fashion</SelectItem>
-                        <SelectItem value="home">Home & Living</SelectItem>
-                        <SelectItem value="beauty">Beauty & Personal Care</SelectItem>
-                        <SelectItem value="sports">Sports & Outdoors</SelectItem>
-                        <SelectItem value="books">Books & Media</SelectItem>
-                        <SelectItem value="toys">Toys & Games</SelectItem>
-                        <SelectItem value="health">Health & Wellness</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <label className="block text-sm font-semibold text-foreground mb-2">
+                      Description <span className="text-error">*</span>
+                    </label>
+                    <textarea
+                      placeholder="Describe features, benefits, specifications..."
+                      rows={5}
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="w-full px-4 py-3 bg-background-elevated border border-border rounded-xl font-medium resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
                   </div>
 
-                  <div>
-                    <Label htmlFor="brand">Brand</Label>
-                    <Input
-                      id="brand"
-                      placeholder="e.g. Nike, Apple, Generic"
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-foreground mb-2">
+                        Category <span className="text-error">*</span>
+                      </label>
+                      <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                        <SelectTrigger className="h-11">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="electronics">Electronics</SelectItem>
+                          <SelectItem value="fashion">Fashion</SelectItem>
+                          <SelectItem value="home">Home & Living</SelectItem>
+                          <SelectItem value="beauty">Beauty & Personal Care</SelectItem>
+                          <SelectItem value="sports">Sports & Outdoors</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <Field
+                      label="Brand"
+                      placeholder="e.g. Nike, Apple"
                       value={formData.brand}
                       onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
                     />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </Card>
+            </motion.div>
 
             {/* Pricing */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Pricing</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <motion.div variants={fadeUp}>
+              <Card variant="default" padding="lg">
+                <h2 className="font-display font-semibold text-lg mb-4 text-foreground">Pricing</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="price">Price ($) *</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      placeholder="0.00"
-                      value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    />
-                  </div>
+                  <Field
+                    label="Selling Price"
+                    required
+                    type="number"
+                    placeholder="0.00"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  />
 
-                  <div>
-                    <Label htmlFor="originalPrice">Original Price ($)</Label>
-                    <Input
-                      id="originalPrice"
-                      type="number"
-                      placeholder="0.00"
-                      value={formData.originalPrice}
-                      onChange={(e) => setFormData({ ...formData, originalPrice: e.target.value })}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Show discount badge if different
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Inventory */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Inventory</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="stock">Stock Quantity *</Label>
-                    <Input
-                      id="stock"
-                      type="number"
-                      placeholder="0"
-                      value={formData.stock}
-                      onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="sku">SKU (Stock Keeping Unit)</Label>
-                    <Input
-                      id="sku"
-                      placeholder="e.g. WH-2024-001"
-                      value={formData.sku}
-                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Product Images */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Product Images</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="border-2 border-dashed rounded-2xl p-8 text-center">
-                  <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Drag & drop images here, or click to browse
-                  </p>
-                  <p className="text-xs text-muted-foreground mb-4">
-                    Recommended: 1000x1000px, PNG or JPG, max 5MB
-                  </p>
-                  <Button variant="outline" size="sm">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Choose Files
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Product Status */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Product Status</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">In Stock</p>
-                    <p className="text-xs text-muted-foreground">
-                      Show as available for purchase
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.inStock}
-                    onCheckedChange={(checked) => setFormData({ ...formData, inStock: checked })}
+                  <Field
+                    label="Compare at Price"
+                    type="number"
+                    placeholder="0.00"
+                    hint="Leave empty to hide"
+                    value={formData.compareAtPrice}
+                    onChange={(e) => setFormData({ ...formData, compareAtPrice: e.target.value })}
                   />
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Free Shipping</p>
-                    <p className="text-xs text-muted-foreground">
-                      Offer free shipping
-                    </p>
+                {formData.compareAtPrice && formData.price && (
+                  <div className="mt-3 text-xs text-success bg-success-subtle px-3 py-2 rounded-lg">
+                    Saving ${(parseFloat(formData.compareAtPrice) - parseFloat(formData.price)).toFixed(2)}
                   </div>
-                  <Switch
-                    checked={formData.shipping}
-                    onCheckedChange={(checked) => setFormData({ ...formData, shipping: checked })}
+                )}
+              </Card>
+            </motion.div>
+
+            {/* Inventory & Variants */}
+            <motion.div variants={fadeUp}>
+              <Card variant="default" padding="lg">
+                <h2 className="font-display font-semibold text-lg mb-4 text-foreground">Inventory</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field
+                    label="Stock Quantity"
+                    required
+                    type="number"
+                    placeholder="0"
+                    value={formData.stock}
+                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                  />
+
+                  <Field
+                    label="SKU"
+                    placeholder="e.g. PROD-001"
+                    value={formData.sku}
+                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                   />
                 </div>
-              </CardContent>
-            </Card>
+              </Card>
+            </motion.div>
 
-            {/* Shipping Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Shipping Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="weight">Weight (kg)</Label>
-                  <Input
-                    id="weight"
+            {/* Shipping */}
+            <motion.div variants={fadeUp}>
+              <Card variant="default" padding="lg">
+                <h2 className="font-display font-semibold text-lg mb-4 text-foreground">Shipping</h2>
+                <div className="space-y-4">
+                  <Field
+                    label="Weight"
                     type="number"
                     step="0.1"
                     placeholder="0.0"
                     value={formData.weight}
                     onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                    hint="in kg"
                   />
                 </div>
-              </CardContent>
-            </Card>
+              </Card>
+            </motion.div>
+          </div>
 
-            {/* Quick Tips */}
-            <Card className="bg-primary/10 border-primary/30">
-              <CardHeader>
-                <CardTitle className="text-sm">💡 Quick Tips</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="text-xs text-muted-foreground space-y-2">
-                  <li>• Use clear, descriptive product names</li>
-                  <li>• Add high-quality product images</li>
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Status */}
+            <motion.div variants={fadeUp}>
+              <Card variant="elevated" padding="lg">
+                <h3 className="font-display font-semibold text-lg mb-4 text-foreground">Status</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-foreground">In Stock</p>
+                      <p className="text-xs text-foreground-secondary">Show as available</p>
+                    </div>
+                    <Switch
+                      checked={formData.inStock}
+                      onCheckedChange={(checked) => setFormData({ ...formData, inStock: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-foreground">Free Shipping</p>
+                      <p className="text-xs text-foreground-secondary">Offer free shipping</p>
+                    </div>
+                    <Switch
+                      checked={formData.shipping}
+                      onCheckedChange={(checked) => setFormData({ ...formData, shipping: checked })}
+                    />
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+
+            {/* Tips */}
+            <motion.div variants={fadeUp}>
+              <Card variant="featured" padding="lg">
+                <h3 className="font-display font-semibold text-sm text-foreground mb-3 flex items-center gap-1.5"><Lightbulb className="size-4 text-warning" /> Tips</h3>
+                <ul className="text-xs text-foreground-secondary space-y-2">
+                  <li>• Use clear, descriptive names</li>
+                  <li>• Add 3-5 high-quality images</li>
                   <li>• Write detailed descriptions</li>
                   <li>• Set competitive pricing</li>
-                  <li>• Keep stock levels updated</li>
+                  <li>• Keep stock updated</li>
                 </ul>
-              </CardContent>
-            </Card>
+              </Card>
+            </motion.div>
+
+            {/* Save Button */}
+            <motion.div variants={fadeUp} className="sticky bottom-0 lg:static">
+              <Button
+                variant="gradient"
+                size="lg"
+                fullWidth
+                loading={isSaving}
+                onClick={handleSave}
+                leftIcon={<Save className="size-5" />}
+                className="shadow-brand"
+              >
+                Save Product
+              </Button>
+            </motion.div>
           </div>
         </div>
-      </div>
+      </motion.div>
     </SellerLayout>
   );
 }

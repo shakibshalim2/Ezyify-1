@@ -401,6 +401,48 @@ export const SEOConfigs = {
     description: 'Manage your Ezyify wallet, add funds, and track your transactions.',
     keywords: 'wallet, balance, transactions, digital wallet',
   },
+  
+  dashboard: {
+    title: 'Seller Dashboard - Manage Your Store',
+    description: 'Manage your Ezyify seller store. Track sales, manage products, and grow your business.',
+    keywords: 'seller dashboard, store management, sales tracking, seller tools',
+  },
+  
+  products: {
+    title: 'Product Management - Manage Your Inventory',
+    description: 'Manage your product catalog, inventory, and listings on Ezyify.',
+    keywords: 'product management, inventory, catalog, product listing',
+  },
+  
+  addProduct: {
+    title: 'Add Product - List on Ezyify',
+    description: 'Add a new product to your Ezyify store and start selling.',
+    keywords: 'add product, product listing, sell online, ecommerce',
+  },
+  
+  logistics: {
+    title: 'Logistics & Shipping - Manage Deliveries',
+    description: 'Manage shipping, carriers, and delivery tracking for your Ezyify store.',
+    keywords: 'shipping, logistics, delivery, carrier management',
+  },
+  
+  customers: {
+    title: 'Customers - Manage Relationships',
+    description: 'View and manage your customer relationships on Ezyify.',
+    keywords: 'customer management, customer relationships, buyer engagement',
+  },
+  
+  reviews: {
+    title: 'Reviews - Customer Feedback',
+    description: 'Manage and respond to customer reviews for your Ezyify store.',
+    keywords: 'reviews, feedback, ratings, customer testimonials',
+  },
+  
+  support: {
+    title: 'Seller Support - Get Help',
+    description: 'Access seller support resources, FAQs, and contact options on Ezyify.',
+    keywords: 'seller support, help, resources, customer service',
+  },
 };
 
 // Helper function to generate JSON-LD structured data
