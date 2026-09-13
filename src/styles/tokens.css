@@ -250,3 +250,9 @@
 @utility tap-highlight-none {
   -webkit-tap-highlight-color: transparent;
 }
+
+@keyframes skeleton-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}

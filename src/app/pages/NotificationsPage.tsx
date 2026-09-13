@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router';
+import { EmptyNotifications } from '../components/EmptyStates';
 import { Heart, MessageCircle, ShoppingBag, UserPlus, Video, Package, TrendingUp, Bell, Repeat2 } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
 import { SEO, SEOConfigs } from '../components/SEO';
@@ -232,13 +233,7 @@ export default function NotificationsPage() {
           <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4">
             <div className="space-y-2">
               {filteredNotifications.length === 0 ? (
-                <div className="py-16 text-center">
-                  <div className="w-16 h-16 rounded-3xl bg-muted flex items-center justify-center mx-auto mb-4 shadow-inset">
-                    <Bell className="w-7 h-7 text-muted-foreground" />
-                  </div>
-                  <p className="font-medium text-foreground mb-1">All caught up</p>
-                  <p className="text-sm text-muted-foreground">No notifications in this category</p>
-                </div>
+                <EmptyNotifications compact />
               ) : (
                 filteredNotifications.map((notification) => (
                   <Link

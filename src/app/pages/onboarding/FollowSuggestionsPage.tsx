@@ -1,270 +1,176 @@
-import { SEO } from '../../components/SEO';
-import { VerifiedBadge } from '../../components/VerifiedBadge';
-import { UserPlus, ArrowRight, Sparkles, Check } from 'lucide-react';
-import { Button } from '../../components/ui/button';
-import { Card, CardContent } from '../../components/ui/card';
-import { Badge } from '../../components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
-import { Skeleton } from '../../components/ui/skeleton';
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { AnimatePresence, motion } from 'motion/react';
+import { ArrowRight, Check, Plus, Users } from 'lucide-react';
+import { SEO } from '../../components/SEO';
+import { Button } from '../../components/primitives/Button';
+import { VerifiedBadge } from '../../components/VerifiedBadge';
+import { ImageWithFallback } from '../../components/figma/ImageWithFallback';
+import { SetupLayout } from '../../features/onboarding/SetupLayout';
+import { cn } from '../../components/ui/utils';
+import { fadeUp, springSnappy } from '../../lib/motion';
+import { storage } from '../../lib/storage';
+import { INTERESTS_KEY } from './InterestsPage';
 
-// Skeleton Component
-function FollowSuggestionsSkeleton() {
-  return (
-    <div className="min-h-screen bg-muted/30 flex flex-col">
-      {/* Header Skeleton */}
-      <div className="p-6 text-center">
-        <Skeleton className="w-16 h-16 rounded-full mx-auto mb-4" />
-        <Skeleton className="h-9 w-64 mx-auto mb-2" />
-        <Skeleton className="h-5 w-80 mx-auto" />
-      </div>
-
-      {/* Progress Skeleton */}
-      <div className="px-6 mb-6">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex items-center justify-between mb-2">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-4 w-24" />
-          </div>
-          <Skeleton className="h-2 w-full rounded-full" />
-        </div>
-      </div>
-
-      {/* Creator List Skeleton */}
-      <div className="flex-1 px-6 pb-6 overflow-y-auto">
-        <div className="max-w-2xl mx-auto space-y-3">
-          {Array(8).fill(0).map((_, i) => (
-            <Card key={i} className="p-4">
-              <div className="flex items-center gap-4">
-                <Skeleton className="w-14 h-14 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-5 w-32" />
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-3 w-48" />
-                </div>
-                <Skeleton className="h-9 w-24" />
-              </div>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* Footer Skeleton */}
-      <div className="p-6 bg-card border-t">
-        <div className="max-w-2xl mx-auto flex gap-3">
-          <Skeleton className="h-11 flex-1" />
-          <Skeleton className="h-11 flex-1" />
-        </div>
-      </div>
-    </div>
-  );
+interface Creator {
+  id: string;
+  username: string;
+  name: string;
+  avatar: string;
+  tagline: string;
+  followers: string;
+  category: string;
+  interest: string;
+  verified: boolean;
 }
+
+const CREATORS: Creator[] = [
+  { id: '1', username: 'fashionista_maya', name: 'Maya Chen', avatar: 'https://images.unsplash.com/photo-1761247940942-a2a33f84df8f?w=200', tagline: 'Daily outfits & thrift finds', followers: '250K', category: 'Fashion', interest: 'fashion', verified: true },
+  { id: '2', username: 'tech_reviews_pro', name: 'Alex Kumar', avatar: 'https://images.unsplash.com/photo-1524538198441-241ff79d153b?w=200', tagline: 'Honest gadget reviews', followers: '180K', category: 'Tech', interest: 'tech', verified: true },
+  { id: '3', username: 'beautyby_sarah', name: 'Sarah Johnson', avatar: 'https://images.unsplash.com/photo-1698181842119-a5283dea1440?w=200', tagline: 'Skincare that actually works', followers: '320K', category: 'Beauty', interest: 'beauty', verified: true },
+  { id: '4', username: 'fitness_journey', name: 'Mike Thompson', avatar: 'https://images.unsplash.com/photo-1762757076979-cc016f6df284?w=200', tagline: 'Home workouts, zero excuses', followers: '150K', category: 'Fitness', interest: 'fitness', verified: false },
+  { id: '5', username: 'homestyle_guru', name: 'Emily White', avatar: 'https://images.unsplash.com/photo-1763479169474-728a7de108c3?w=200', tagline: 'Small‑space decor ideas', followers: '220K', category: 'Home', interest: 'home', verified: true },
+  { id: '6', username: 'foodie_adventures', name: 'Carlos Martinez', avatar: 'https://images.unsplash.com/photo-1550087560-0d40289f48ea?w=200', tagline: 'Street food around the world', followers: '190K', category: 'Food', interest: 'food', verified: false },
+  { id: '7', username: 'gaming_legends', name: 'Tyler Brooks', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200', tagline: 'Setups, gear & live plays', followers: '410K', category: 'Gaming', interest: 'gaming', verified: true },
+  { id: '8', username: 'wanderlust_nina', name: 'Nina Rahman', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200', tagline: 'Budget travel & packing tips', followers: '275K', category: 'Travel', interest: 'travel', verified: true },
+];
+
+export const FOLLOWS_KEY = 'ezyify.onboarding.follows';
 
 export default function FollowSuggestionsPage() {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
-  const [following, setFollowing] = useState<string[]>([]);
+  const interests = storage.get<string[]>(INTERESTS_KEY, []);
+  const [following, setFollowing] = useState<string[]>(() => storage.get<string[]>(FOLLOWS_KEY, []));
 
-  // Simulate progressive data loading
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, []);
+  // Creators matching the user's interests first, everyone else after.
+  const ordered = useMemo(
+    () =>
+      [...CREATORS].sort(
+        (a, b) => Number(interests.includes(b.interest)) - Number(interests.includes(a.interest)),
+      ),
+    [interests],
+  );
 
-  const suggestedUsers = [
-    {
-      id: '1',
-      username: 'fashionista_maya',
-      name: 'Maya Chen',
-      avatar: 'https://images.unsplash.com/photo-1761247940942-a2a33f84df8f?w=200',
-      bio: 'Fashion Creator | 250K followers',
-      category: 'Fashion',
-      verified: true
-    },
-    {
-      id: '2',
-      username: 'tech_reviews_pro',
-      name: 'Alex Kumar',
-      avatar: 'https://images.unsplash.com/photo-1524538198441-241ff79d153b?w=200',
-      bio: 'Tech Reviewer | 180K followers',
-      category: 'Tech',
-      verified: true
-    },
-    {
-      id: '3',
-      username: 'beautyby_sarah',
-      name: 'Sarah Johnson',
-      avatar: 'https://images.unsplash.com/photo-1698181842119-a5283dea1440?w=200',
-      bio: 'Beauty & Makeup | 320K followers',
-      category: 'Beauty',
-      verified: true
-    },
-    {
-      id: '4',
-      username: 'fitness_journey',
-      name: 'Mike Thompson',
-      avatar: 'https://images.unsplash.com/photo-1762757076979-cc016f6df284?w=200',
-      bio: 'Fitness Coach | 150K followers',
-      category: 'Fitness',
-      verified: false
-    },
-    {
-      id: '5',
-      username: 'homestyle_guru',
-      name: 'Emily White',
-      avatar: 'https://images.unsplash.com/photo-1763479169474-728a7de108c3?w=200',
-      bio: 'Home Decor Expert | 220K followers',
-      category: 'Home',
-      verified: true
-    },
-    {
-      id: '6',
-      username: 'foodie_adventures',
-      name: 'Carlos Martinez',
-      avatar: 'https://images.unsplash.com/photo-1550087560-0d40289f48ea?w=200',
-      bio: 'Food & Travel | 190K followers',
-      category: 'Food',
-      verified: false
-    },
-    {
-      id: '7',
-      username: 'gaming_legends',
-      name: 'Tyler Brooks',
-      avatar: 'https://images.unsplash.com/photo-1660634435122-70ae113b1a87?w=200',
-      bio: 'Gaming Streamer | 280K followers',
-      category: 'Gaming',
-      verified: true
-    },
-    {
-      id: '8',
-      username: 'pet_lovers_hub',
-      name: 'Jessica Lee',
-      avatar: 'https://images.unsplash.com/photo-1606231106463-ed4596c15292?w=200',
-      bio: 'Pet Care Tips | 160K followers',
-      category: 'Pets',
-      verified: false
-    }
-  ];
+  const toggle = (id: string) =>
+    setFollowing((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
 
-  // Show skeleton while loading
-  if (isLoading) {
-    return <FollowSuggestionsSkeleton />;
-  }
+  const followAll = () => setFollowing(ordered.map((c) => c.id));
 
-  const toggleFollow = (id: string) => {
-    if (following.includes(id)) {
-      setFollowing(following.filter(f => f !== id));
-    } else {
-      setFollowing([...following, id]);
-    }
-  };
-
-  const handleContinue = () => {
+  const next = () => {
+    storage.set(FOLLOWS_KEY, following);
     navigate('/onboarding/permissions');
   };
 
   return (
-    <div className="min-h-screen bg-muted/30 flex flex-col">
-      <SEO title="Follow Creators — Ezyify" description="Discover and follow creators on Ezyify to personalize your feed." />
-      {/* Header */}
-      <div className="p-6 text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4" style={{ background: 'var(--brand-gradient)' }}>
-          <Sparkles className="w-8 h-8 text-white" />
+    <SetupLayout
+      step="follow"
+      title="Follow a few creators"
+      subtitle="Your feed starts with people worth watching. Follow anyone you like — you can always unfollow later."
+      icon={<Users className="size-7" />}
+      backTo="/onboarding/interests"
+      onSkip={() => navigate('/onboarding/permissions')}
+      footer={
+        <div className="flex items-center gap-3">
+          <p className="flex-1 text-sm text-foreground-secondary" aria-live="polite">
+            {following.length === 0 ? 'Nobody followed yet' : `Following ${following.length}`}
+          </p>
+          <Button size="lg" variant="gradient" onClick={next} rightIcon={<ArrowRight className="size-5" />}>
+            {following.length ? 'Continue' : 'Skip for now'}
+          </Button>
         </div>
-        <h1 className="text-3xl font-bold mb-2">Follow Creators</h1>
-        <p className="text-muted-foreground max-w-md mx-auto">
-          Follow creators to personalize your feed. You can always unfollow later.
+      }
+    >
+      <SEO title="Follow creators — Ezyify" description="Follow creators to start your Ezyify feed." />
+
+      <motion.div variants={fadeUp} className="mb-4 flex items-center justify-between">
+        <p className="text-sm font-medium text-foreground-secondary">
+          {interests.length ? 'Picked for your interests' : 'Popular on Ezyify'}
         </p>
-      </div>
+        <button
+          type="button"
+          onClick={followAll}
+          disabled={following.length === ordered.length}
+          className="h-9 rounded-full px-3 text-sm font-semibold text-primary transition hover:bg-primary-subtle disabled:opacity-50"
+        >
+          Follow all
+        </button>
+      </motion.div>
 
-      {/* Progress */}
-      <div className="px-6 mb-6">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
-            <span>Step 2 of 3</span>
-            <span>{following.length} following</span>
-          </div>
-          <div className="w-full bg-muted rounded-full h-2">
-            <div className="h-2 rounded-full transition-all duration-300" style={{ background: 'var(--brand-gradient)', width: '66%' }}></div>
-          </div>
-        </div>
-      </div>
-
-      {/* Creators List */}
-      <div className="flex-1 px-6 pb-6 overflow-y-auto">
-        <div className="max-w-2xl mx-auto space-y-3">
-          {suggestedUsers.map((creator) => {
-            const isFollowing = following.includes(creator.id);
-            return (
+      <motion.ul variants={fadeUp} className="space-y-2.5" aria-label="Suggested creators">
+        {ordered.map((c) => {
+          const isFollowing = following.includes(c.id);
+          const matches = interests.includes(c.interest);
+          return (
+            <li key={c.id}>
               <div
-                key={creator.id}
-                className="p-4 bg-card rounded-xl border hover:shadow-md transition-shadow"
+                className={cn(
+                  'flex items-center gap-3 rounded-2xl border bg-background-elevated p-3 transition-colors',
+                  isFollowing ? 'border-primary/50' : 'border-border',
+                )}
               >
-                <div className="flex items-center gap-4">
-                  <Avatar className="w-14 h-14">
-                    <AvatarImage src={creator.avatar} />
-                    <AvatarFallback>{creator.name[0]}</AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold truncate">{creator.name}</h3>
-                      {creator.verified && <VerifiedBadge size="sm" />}
-                    </div>
-                    <p className="text-sm text-muted-foreground">@{creator.username}</p>
-                    <p className="text-xs text-muted-foreground">{creator.bio}</p>
-                  </div>
-
-                  <Button
-                    variant={isFollowing ? "outline" : "default"}
-                    size="default"
-                    onClick={() => toggleFollow(creator.id)}
-                    className="min-w-[100px] h-11"
-                  >
-                    {isFollowing ? (
-                      <>
-                        <Check className="w-4 h-4 mr-1" />
-                        Following
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="w-4 h-4 mr-1" />
-                        Follow
-                      </>
-                    )}
-                  </Button>
+                <div className="relative shrink-0">
+                  <ImageWithFallback
+                    src={c.avatar}
+                    alt=""
+                    className="size-14 rounded-full object-cover ring-2 ring-border"
+                    width={56}
+                    height={56}
+                  />
+                  {c.verified && (
+                    <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-background-elevated p-0.5">
+                      <VerifiedBadge size="sm" />
+                    </span>
+                  )}
                 </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold leading-tight">{c.name}</p>
+                  <p className="truncate text-sm text-foreground-secondary">{c.tagline}</p>
+                  <p className="mt-1 flex items-center gap-2 text-xs text-foreground-tertiary">
+                    <span className="tabular-nums">{c.followers} followers</span>
+                    <span
+                      className={cn(
+                        'rounded-full px-2 py-0.5 font-medium',
+                        matches ? 'bg-primary-subtle text-primary' : 'bg-muted text-foreground-secondary',
+                      )}
+                    >
+                      {c.category}
+                    </span>
+                  </p>
+                </div>
+                <motion.button
+                  type="button"
+                  aria-pressed={isFollowing}
+                  aria-label={isFollowing ? `Unfollow ${c.name}` : `Follow ${c.name}`}
+                  onClick={() => toggle(c.id)}
+                  whileTap={{ scale: 0.94 }}
+                  transition={springSnappy}
+                  className={cn(
+                    'inline-flex h-10 min-w-24 items-center justify-center gap-1.5 rounded-full px-4 text-sm font-semibold tap-highlight-none transition-colors',
+                    'outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                    isFollowing
+                      ? 'bg-muted text-foreground hover:bg-border'
+                      : 'bg-primary text-primary-foreground shadow-brand hover:bg-primary-hover',
+                  )}
+                >
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.span
+                      key={isFollowing ? 'on' : 'off'}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      transition={{ duration: 0.15 }}
+                      className="inline-flex items-center gap-1.5"
+                    >
+                      {isFollowing ? <Check className="size-4" strokeWidth={3} /> : <Plus className="size-4" strokeWidth={3} />}
+                      {isFollowing ? 'Following' : 'Follow'}
+                    </motion.span>
+                  </AnimatePresence>
+                </motion.button>
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="px-6 pt-6 bg-card border-t sticky bottom-0" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}>
-        <div className="max-w-2xl mx-auto flex gap-3">
-          <Button
-            variant="outline"
-            size="lg"
-            className="flex-1"
-            onClick={() => navigate(-1)}
-          >
-            Back
-          </Button>
-          <Button
-            size="lg"
-            className="flex-1"
-            onClick={handleContinue}
-            disabled={following.length < 1}
-          >
-            Continue
-            <ArrowRight className="w-5 h-5 ml-2" />
-          </Button>
-        </div>
-      </div>
-    </div>
+            </li>
+          );
+        })}
+      </motion.ul>
+    </SetupLayout>
   );
 }

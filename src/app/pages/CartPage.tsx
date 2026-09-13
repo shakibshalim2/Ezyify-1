@@ -5,6 +5,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import { products } from '../data/products';
 import { Trash2, Plus, Minus, ShoppingBag, Tag, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router';
+import { EmptyCart } from '../components/EmptyStates';
 import { SEO, SEOConfigs } from '../components/SEO';
 import { toast } from 'sonner';
 import { EscrowProtectionBanner } from '../components/EscrowProtectionBanner';
@@ -176,20 +177,7 @@ export default function CartPage() {
         </div>
 
         {cartItems.length === 0 ? (
-          <div className="bg-card border border-border rounded-3xl p-16 text-center">
-            <div className="w-20 h-20 rounded-3xl bg-muted flex items-center justify-center mx-auto mb-5 shadow-inset">
-              <ShoppingBag className="w-9 h-9 text-muted-foreground" />
-            </div>
-            <h2 className="font-semibold text-foreground mb-2">Your cart is empty</h2>
-            <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">Add some products to get started on your shopping journey.</p>
-            <Link
-              to="/shop"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold text-white shadow-brand hover:shadow-brand-lg transition-all hover:scale-[1.02]"
-              style={{ background: 'var(--brand-gradient)' }}
-            >
-              Start Shopping
-            </Link>
-          </div>
+          <EmptyCart />
         ) : (
           <>
             {/* Escrow Protection Banner */}

@@ -85,15 +85,15 @@ Source: `docs/audit/DESIGN_ISSUES_BY_SEVERITY.md`, `docs/research/EZYIFY_DESIGN_
 - Spacing 4‑pt base / 8‑pt grid, radius scale (8/12/16/24/full), elevation tokens for dark mode (tonal surfaces not shadows), motion tokens (durations 100/200/300/500, easings emphasized/standard).
 - Emit: `src/styles/tokens.css` (+ `@theme` mapping for Tailwind v4) and `packages/tokens/tokens.json` for RN.
 
-1.2 **Primitive components** ◐ — done: Button, Field, OTPInput, SocialButton, PasswordStrength, BrandMark · todo: Card variants, Skeleton shimmer, EmptyState, Sheet, PageTransition — `Button` (variants, sizes, loading, icon), `Input`/`Field` (label association, error/success state, helper, password toggle, phone with country code), `OTPInput` (6 boxes ≥48px, auto‑advance, paste, shake on error), `SocialButton` (Google/Apple/Facebook proper icons), `Card` (default/elevated/featured/ghost), `Skeleton` (shimmer), `EmptyState` (illustration slot), `Sheet` (slide + fade), `PageTransition` wrapper.
+1.2 **Primitive components** ☑ — Button, Field, OTPInput, SocialButton, PasswordStrength, BrandMark, Card (4 variants), Skeleton (shimmer), EmptyState (9 brand illustrations), PageTransition — `Button` (variants, sizes, loading, icon), `Input`/`Field` (label association, error/success state, helper, password toggle, phone with country code), `OTPInput` (6 boxes ≥48px, auto‑advance, paste, shake on error), `SocialButton` (Google/Apple/Facebook proper icons), `Card` (default/elevated/featured/ghost), `Skeleton` (shimmer), `EmptyState` (illustration slot), `Sheet` (slide + fade), `PageTransition` wrapper.
 
 1.3 **Splash screen** ◐ — web done (`features/splash`); Android config in Phase 4 — Web: animated logo mark (SVG rebuilt from PNG, morph/scale + brand gradient sweep, ≤1.2 s, respects `prefers-reduced-motion`), shown only on cold start. Android: `expo-splash-screen` config, 288 dp icon on `#0B5FD6`, dark variant.
 
-1.4 **Onboarding** ◐ — 3‑slide carousel done (`/welcome`, `features/onboarding`); Interests/Follow/Permissions re‑skin pending — 3 slides (Discover · Shop with Escrow protection · Go Live & Earn) with custom SVG/Lottie illustrations in brand palette, swipe + dots + Skip, progress indicator, "Get started" → Signup, "I have an account" → Login. Stored `onboarding_seen` flag. Persona pick + interests follow after signup (existing `InterestsPage`/`FollowSuggestionsPage` re‑skinned).
+1.4 **Onboarding** ☑ — 3‑slide carousel (`/welcome`) + post‑signup setup (Interests → Creators → Permissions) on shared `SetupLayout` with step progress and real browser permission prompts — 3 slides (Discover · Shop with Escrow protection · Go Live & Earn) with custom SVG/Lottie illustrations in brand palette, swipe + dots + Skip, progress indicator, "Get started" → Signup, "I have an account" → Login. Stored `onboarding_seen` flag. Persona pick + interests follow after signup (existing `InterestsPage`/`FollowSuggestionsPage` re‑skinned).
 
 1.5 **Auth screens** ☑ — Login (email/phone), Signup, OTP, Forgot, Reset redesigned with shared `AuthLayout` — Login (email/phone tab, password, biometrics prompt on mobile, social top row), Signup (name → email/phone → password with live rule checklist and strength meter → terms), OTP (auto‑read on Android via `expo-sms-retriever` later; resend countdown; error shake), Forgot/Reset. Motion: staggered field entrance (60 ms), focus glow, button press scale 0.98, success check Lottie.
 
-1.6 **Global shell** ☐ — Bottom nav (5 items, 64 px, safe‑area, active pill indicator, center Create FAB), top bar, `pb-nav` padding utility applied to all scrollable pages, theme‑aware `Navbar` on Landing, mobile search entry.
+1.6 **Global shell** ☑ — `BottomNav` (64 px + safe area, spring pill, raised Create), theme‑aware landing `Navbar`, `pb-nav` shell padding, route `PageTransition` — Bottom nav (5 items, 64 px, safe‑area, active pill indicator, center Create FAB), top bar, `pb-nav` padding utility applied to all scrollable pages, theme‑aware `Navbar` on Landing, mobile search entry.
 
 1.7 **Illustrations & imagery** ☐ — unDraw SVGs recolored to brand (onboarding ×3, empty states ×6: feed, cart, wishlist, orders, messages, notifications, search‑no‑results, offline, error), Lottie: success check, loading loop, confetti (LottieFiles free license). Product/avatar placeholders switched to a deterministic image service with local fallback. Attributions in `ATTRIBUTIONS.md`.
 
@@ -174,4 +174,5 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 |---|---|---|
 | 2026‑09‑13 | Research + audits + master plan | d8e1cf3 |
 | 2026‑09‑13 | Phase 0 tooling (tsconfig/eslint/vitest/CI), 312 TS errors fixed, dep cleanup | (step 2) |
-| 2026‑09‑13 | Phase 1: brand tokens, primitives, splash, onboarding, auth redesign + 14 unit tests | (step 2) |
+| 2026‑09‑13 | Phase 1: brand tokens, primitives, splash, onboarding, auth redesign + 14 unit tests | b3ab500 |
+| 2026‑09‑13 | Phase 1 remainder: setup steps re‑skin, BottomNav, Card/Skeleton/EmptyState, page transitions | (step 3) |

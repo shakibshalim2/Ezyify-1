@@ -2,6 +2,7 @@ import React, { lazy, Suspense, useEffect, useState, memo } from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from 'react-router';
 import { AuthProvider } from './contexts/AuthContext';
 import { Toaster } from './components/ui/sonner';
+import { PageTransition } from './components/primitives/PageTransition';
 import { SplashScreen, shouldShowSplash } from './features/splash/SplashScreen';
 import { hasSeenOnboarding } from './features/onboarding/OnboardingPage';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -231,13 +232,16 @@ function PageLoader() {
 }
 
 const WithNavigation = memo(function WithNavigation() {
+  const location = useLocation();
   return (
     <>
       <Navigation />
       <div className="min-h-screen bg-background">
         {/* pt: mobile = nav height (5.5rem) + device safe-area-inset-top; desktop = h-16 (64px) = pt-16 */}
-        <div className="pt-[calc(5.5rem+env(safe-area-inset-top,0px))] md:pt-16 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
-          <Outlet />
+        <div className="pt-[calc(5.75rem+var(--safe-top))] md:pt-[calc(3rem+var(--safe-top))] lg:pt-16 pb-nav lg:pb-0">
+          <PageTransition key={location.pathname}>
+            <Outlet />
+          </PageTransition>
         </div>
       </div>
     </>
@@ -322,6 +326,10 @@ export default function App() {
           <Suspense fallback={<RouteAwareLoader />}>
             <Routes>
               <Route path="/welcome" element={<OnboardingPage />} />
+              <Route path="/onboarding" element={<InterestsPage />} />
+              <Route path="/onboarding/interests" element={<InterestsPage />} />
+              <Route path="/onboarding/follow-suggestions" element={<FollowSuggestionsPage />} />
+              <Route path="/onboarding/permissions" element={<PermissionsPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -411,10 +419,6 @@ export default function App() {
                 <Route path="/settings/security" element={<SecuritySettingsPage />} />
                 <Route path="/settings/notifications" element={<NotificationSettingsPage />} />
                 <Route path="/settings/account-management" element={<AccountManagementPage />} />
-                <Route path="/onboarding" element={<InterestsPage />} />
-                <Route path="/onboarding/interests" element={<InterestsPage />} />
-                <Route path="/onboarding/follow-suggestions" element={<FollowSuggestionsPage />} />
-                <Route path="/onboarding/permissions" element={<PermissionsPage />} />
                 <Route path="/seller/kyc-verification" element={<KYCVerificationPage />} />
                 <Route path="/user/order-tracking" element={<OrderTrackingPage />} />
                 <Route path="/about" element={<AboutPage />} />

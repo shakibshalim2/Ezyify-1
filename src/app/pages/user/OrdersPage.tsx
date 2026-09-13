@@ -4,6 +4,7 @@ import { Package, Truck, CheckCircle, XCircle, Clock, Shield } from 'lucide-reac
 import { Badge } from '../../components/ui/badge';
 import { Skeleton } from '../../components/ui/skeleton';
 import { SEO } from '../../components/SEO';
+import { EmptyOrders } from '../../components/EmptyStates';
 import { toast } from 'sonner';
 
 interface Order {
@@ -226,16 +227,7 @@ export default function OrdersPage() {
 
         {/* Orders List */}
         {filteredOrders.length === 0 ? (
-          <div className="bg-card border border-border rounded-3xl p-12 text-center">
-            <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-xl font-bold mb-2 text-foreground">No Orders Found</h3>
-            <p className="text-muted-foreground mb-6">You haven't placed any orders yet</p>
-            <Link to="/shop">
-              <button className="px-6 py-3 rounded-2xl font-semibold text-sm text-white shadow-brand hover:shadow-brand-lg transition-all">
-                Start Shopping
-              </button>
-            </Link>
-          </div>
+          <EmptyOrders />
         ) : (
           <div className="space-y-4">
             {filteredOrders.map((order) => (
