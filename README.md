@@ -1,11 +1,17 @@
+# Ezyify
 
-  # Ezyify
+Social‑commerce super‑app — feed, Loops, live shopping, chat, escrow wallet — for **Web** and **Android (signed AAB/APK)**.
 
-  This is a code bundle for Ezyify. The original project is available at https://www.figma.com/design/dOborZ5XpyIihAxFs2o7SP/Ezyify.
+- 📋 Plan: [`docs/plan/MASTER_PLAN.md`](docs/plan/MASTER_PLAN.md)
+- 🤖 Android release (no Expo Go): [`docs/plan/ANDROID_RELEASE.md`](docs/plan/ANDROID_RELEASE.md)
+- 🎨 Design audits & research: [`docs/audit`](docs/audit), [`docs/research`](docs/research)
 
-  ## Running the code
+## Develop
 
-  Run `npm i` to install the dependencies.
+```bash
+pnpm install
+pnpm dev          # http://localhost:5173
+pnpm check        # typecheck + lint + test + build
+```
 
-  Run `npm run dev` to start the development server.
-  
+Node ≥ 20 (see `.nvmrc`), pnpm 10.

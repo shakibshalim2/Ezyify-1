@@ -263,7 +263,7 @@ export default function OrderTrackingPage() {
           </Card>
 
           {/* Delivery Confirmation Card */}
-          {orderDetails.status === 'delivered' && !deliveryConfirmed && (
+          {orderDetails.status === 'shipped' && !deliveryConfirmed && (
             <Card className="border-2 border-primary">
               <CardContent className="py-6">
                 <h3 className="font-semibold mb-3 text-foreground">Confirm Your Delivery</h3>

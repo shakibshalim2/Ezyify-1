@@ -155,26 +155,26 @@ export async function checkPerformanceRegression(
       checks.push(successRateCheck);
     }
 
-    // 3. Check RUM data (if available)
+    // 3. Check RUM data (if available) — compare latest sample against the rolling average
     const rumMetrics = getStoredRUMMetrics();
-    if (rumMetrics.length > 0 && deploymentVersion) {
+    if (rumMetrics.length > 1 && deploymentVersion) {
       const avgMetrics = getAverageMetrics();
-      const degradations = detectPerformanceDegradation(avgMetrics, deploymentVersion);
-      
-      degradations.forEach(trend => {
-        if (trend.degraded) {
+      const latest = rumMetrics[rumMetrics.length - 1];
+      const degradation = detectPerformanceDegradation(latest, avgMetrics, REGRESSION_THRESHOLDS.warning);
+      if (degradation.degraded) {
+        degradation.issues.forEach(issue => {
           checks.push({
-            metric: `RUM ${trend.metric.toUpperCase()}`,
-            baseline: trend.previous,
-            current: trend.current,
-            change: trend.current - trend.previous,
-            changePercent: trend.change,
+            metric: `RUM ${issue}`,
+            baseline: 0,
+            current: 0,
+            change: 0,
+            changePercent: 0,
             threshold: REGRESSION_THRESHOLDS.warning * 100,
-            passed: !trend.degraded,
-            severity: trend.change > REGRESSION_THRESHOLDS.critical * 100 ? 'critical' : 'warning',
+            passed: false,
+            severity: 'warning',
           });
-        }
-      });
+        });
+      }
     }
 
   } catch (error) {

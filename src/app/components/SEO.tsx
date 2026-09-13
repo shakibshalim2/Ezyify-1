@@ -137,7 +137,7 @@ export function SEO({
 
     // Add JSON-LD structured data
     if (jsonLd) {
-      let script = document.querySelector('script[type="application/ld+json"]');
+      let script = document.querySelector('script[type="application/ld+json"]') as HTMLScriptElement | null;
       if (!script) {
         script = document.createElement('script');
         script.type = 'application/ld+json';

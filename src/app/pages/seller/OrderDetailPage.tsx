@@ -125,7 +125,7 @@ export default function OrderDetailPage() {
                         className="w-20 h-20 rounded-xl object-cover bg-muted"
                       />
                       <div className="flex-1">
-                        <Link to={`/product/${item.productId}`} className="font-medium hover:text-primary">
+                        <Link to={`/product/${item.id}`} className="font-medium hover:text-primary">
                           {item.name}
                         </Link>
                         <p className="text-sm text-muted-foreground mt-1">

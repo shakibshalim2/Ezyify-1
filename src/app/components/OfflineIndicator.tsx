@@ -55,8 +55,9 @@ export function OfflineIndicator() {
     <>
       {/* Fixed Bottom Banner for Offline */}
       <div
+        aria-hidden={isOnline}
         className={`fixed bottom-0 left-0 right-0 z-50 p-4 transition-transform duration-300 ${
-          !isOnline ? 'translate-y-0' : 'translate-y-full'
+          !isOnline ? 'translate-y-0' : 'translate-y-full invisible'
         }`}
       >
         <Alert className="border-error bg-error/8">
@@ -90,8 +91,9 @@ export function OfflineIndicator() {
 
       {/* Brief "Back Online" Notification */}
       <div
+        aria-hidden={!(isOnline && wasOffline && showOfflineAlert)}
         className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 transition-transform duration-300 ${
-          isOnline && wasOffline && showOfflineAlert ? 'translate-y-0' : '-translate-y-32'
+          isOnline && wasOffline && showOfflineAlert ? 'translate-y-0' : '-translate-y-[200%] invisible'
         }`}
       >
         <Alert className="border-success bg-success/5 shadow-lg">

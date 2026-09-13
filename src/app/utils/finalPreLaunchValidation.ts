@@ -387,7 +387,7 @@ class FinalPreLaunchValidation {
     };
   }
 
-  private async testUserJourney(journey: UserJourneyTest): ValidationResult {
+  private async testUserJourney(journey: UserJourneyTest): Promise<ValidationResult> {
     // Simulate journey testing
     const passed = true; // All journeys are implemented
 

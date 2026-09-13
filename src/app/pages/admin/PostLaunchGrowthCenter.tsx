@@ -23,6 +23,7 @@ import {
   Gift,
   Share2,
   Activity,
+  Shield,
   BarChart3,
   Settings,
   PlayCircle,

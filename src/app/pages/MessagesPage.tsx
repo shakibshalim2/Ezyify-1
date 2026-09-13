@@ -688,7 +688,7 @@ export default function MessagesPage() {
       });
     }, 22000);
     return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, []);
 
   // ── Derived ──────────────────────────────────────────────────────────────────
@@ -1656,7 +1656,7 @@ export default function MessagesPage() {
                         )}
 
                         {/* Time + status */}
-                        {msg.type !== 'system' && msg.time && (
+                        {msg.time && (
                           <div className={`flex items-center gap-1 mt-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
                             <span className="text-[10px] text-muted-foreground/50">{msg.time}</span>
                             {isMine && (

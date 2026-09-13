@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Search, Mic, Upload, ShoppingCart, User, Bell, Globe, Menu, X, Home, Compass, Video, ShoppingBag } from 'lucide-react';
-import logoImage from 'figma:asset/4dfeabb63b9146a1c7993b184576f965eb7f1f71.png';
+import logoImage from '../../assets/logo-full.png';
 
 interface NavbarProps {
   onVoiceClick: () => void;

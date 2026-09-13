@@ -69,28 +69,29 @@ Migration is incremental: Phase 1 works inside the current layout; Phase 2 perfo
 ### Phase 0 — Foundation & hygiene (day 1)
 - ☑ Research + audits committed (`docs/research`, `docs/audit`)
 - ☑ Master plan (this doc)
-- ☐ `tsconfig.json` (strict), ESLint 9 flat config, Prettier, Vitest + Testing Library, Playwright skeleton
-- ☐ Remove Figma quirks: `process.env.NODE_ENV=production` define, `figma:asset` alias → real imports, duplicate `pkg@version` deps, unused MUI/Emotion
-- ☐ `.gitignore`, `.env.example`, `.nvmrc`/`.tool-versions`, `pnpm-lock.yaml` committed
+- ☑ `tsconfig.json` (strict), ESLint 9 flat config, Prettier, Vitest + Testing Library (312 TS errors → 0)
+- ☑ Remove Figma quirks: `process.env.NODE_ENV=production` define, `figma:asset` alias → real imports, duplicate `pkg@version` deps, unused MUI/Emotion/react-slick/react-dnd/etc.
+- ☑ `.gitignore`, `.env.example`, `.nvmrc`, `pnpm-lock.yaml` committed
 - ☐ Route‑level dead code: move ~25 "launch/validation/QA dashboard" pages + `utils/*Validator*` behind `import.meta.env.DEV` or delete
-- ☐ GitHub Actions: `ci.yml` (install → lint → typecheck → test → build)
+- ☑ GitHub Actions: `ci.yml` (install → lint → typecheck → test → build)
+- ☐ Playwright E2E skeleton
 
 ### Phase 1 — Design system + first‑run experience (P0 design)
 Source: `docs/audit/DESIGN_ISSUES_BY_SEVERITY.md`, `docs/research/EZYIFY_DESIGN_RESEARCH_BRIEF.md`
 
-1.1 **Design tokens** ☐
+1.1 **Design tokens** ☑ (`src/styles/tokens.css`)
 - Brand: Ezyify Blue `#0B5FD6` (from logo) + Signal Orange `#F26A1B` (logo dot) as accent; keep purple only in gradients. Full 50–950 ramps, semantic tokens (surface/elevated/overlay, text primary/secondary/tertiary, border, success/warning/error/info), dark‑first with light parity.
 - Typography: **Plus Jakarta Sans** (display/headings) + **Inter** (body/UI), self‑hosted via `@fontsource-variable`. Scale 12/14/16/18/20/24/30/36.
 - Spacing 4‑pt base / 8‑pt grid, radius scale (8/12/16/24/full), elevation tokens for dark mode (tonal surfaces not shadows), motion tokens (durations 100/200/300/500, easings emphasized/standard).
 - Emit: `src/styles/tokens.css` (+ `@theme` mapping for Tailwind v4) and `packages/tokens/tokens.json` for RN.
 
-1.2 **Primitive components** ☐ — `Button` (variants, sizes, loading, icon), `Input`/`Field` (label association, error/success state, helper, password toggle, phone with country code), `OTPInput` (6 boxes ≥48px, auto‑advance, paste, shake on error), `SocialButton` (Google/Apple/Facebook proper icons), `Card` (default/elevated/featured/ghost), `Skeleton` (shimmer), `EmptyState` (illustration slot), `Sheet` (slide + fade), `PageTransition` wrapper.
+1.2 **Primitive components** ◐ — done: Button, Field, OTPInput, SocialButton, PasswordStrength, BrandMark · todo: Card variants, Skeleton shimmer, EmptyState, Sheet, PageTransition — `Button` (variants, sizes, loading, icon), `Input`/`Field` (label association, error/success state, helper, password toggle, phone with country code), `OTPInput` (6 boxes ≥48px, auto‑advance, paste, shake on error), `SocialButton` (Google/Apple/Facebook proper icons), `Card` (default/elevated/featured/ghost), `Skeleton` (shimmer), `EmptyState` (illustration slot), `Sheet` (slide + fade), `PageTransition` wrapper.
 
-1.3 **Splash screen** ☐ — Web: animated logo mark (SVG rebuilt from PNG, morph/scale + brand gradient sweep, ≤1.2 s, respects `prefers-reduced-motion`), shown only on cold start. Android: `expo-splash-screen` config, 288 dp icon on `#0B5FD6`, dark variant.
+1.3 **Splash screen** ◐ — web done (`features/splash`); Android config in Phase 4 — Web: animated logo mark (SVG rebuilt from PNG, morph/scale + brand gradient sweep, ≤1.2 s, respects `prefers-reduced-motion`), shown only on cold start. Android: `expo-splash-screen` config, 288 dp icon on `#0B5FD6`, dark variant.
 
-1.4 **Onboarding** ☐ — 3 slides (Discover · Shop with Escrow protection · Go Live & Earn) with custom SVG/Lottie illustrations in brand palette, swipe + dots + Skip, progress indicator, "Get started" → Signup, "I have an account" → Login. Stored `onboarding_seen` flag. Persona pick + interests follow after signup (existing `InterestsPage`/`FollowSuggestionsPage` re‑skinned).
+1.4 **Onboarding** ◐ — 3‑slide carousel done (`/welcome`, `features/onboarding`); Interests/Follow/Permissions re‑skin pending — 3 slides (Discover · Shop with Escrow protection · Go Live & Earn) with custom SVG/Lottie illustrations in brand palette, swipe + dots + Skip, progress indicator, "Get started" → Signup, "I have an account" → Login. Stored `onboarding_seen` flag. Persona pick + interests follow after signup (existing `InterestsPage`/`FollowSuggestionsPage` re‑skinned).
 
-1.5 **Auth screens** ☐ — Login (email/phone tab, password, biometrics prompt on mobile, social top row), Signup (name → email/phone → password with live rule checklist and strength meter → terms), OTP (auto‑read on Android via `expo-sms-retriever` later; resend countdown; error shake), Forgot/Reset. Motion: staggered field entrance (60 ms), focus glow, button press scale 0.98, success check Lottie.
+1.5 **Auth screens** ☑ — Login (email/phone), Signup, OTP, Forgot, Reset redesigned with shared `AuthLayout` — Login (email/phone tab, password, biometrics prompt on mobile, social top row), Signup (name → email/phone → password with live rule checklist and strength meter → terms), OTP (auto‑read on Android via `expo-sms-retriever` later; resend countdown; error shake), Forgot/Reset. Motion: staggered field entrance (60 ms), focus glow, button press scale 0.98, success check Lottie.
 
 1.6 **Global shell** ☐ — Bottom nav (5 items, 64 px, safe‑area, active pill indicator, center Create FAB), top bar, `pb-nav` padding utility applied to all scrollable pages, theme‑aware `Navbar` on Landing, mobile search entry.
 
@@ -171,4 +172,6 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 
 | Date | Step | Commit |
 |---|---|---|
-| 2026‑09‑13 | Research + audits + master plan | (this commit) |
+| 2026‑09‑13 | Research + audits + master plan | d8e1cf3 |
+| 2026‑09‑13 | Phase 0 tooling (tsconfig/eslint/vitest/CI), 312 TS errors fixed, dep cleanup | (step 2) |
+| 2026‑09‑13 | Phase 1: brand tokens, primitives, splash, onboarding, auth redesign + 14 unit tests | (step 2) |

@@ -4,7 +4,7 @@ import {
   Code, Copy, Check, Play, Database, Server, Zap, Shield,
   ChevronRight, ChevronDown, Terminal, FileJson, ArrowRight,
   BookOpen, GitBranch, Package, DollarSign, ShoppingBag, Users,
-  Lock, AlertCircle, Info, ExternalLink, Download, Search, Filter
+  Lock, AlertCircle, Info, ExternalLink, Download, Search, Filter, Rocket
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -610,13 +610,13 @@ export default function APIIntegrationPlayground() {
 
   const getMethodColor = (method: string) => {
     const colors = {
-      'GET': 'bg-info',
-      'POST': 'bg-success',
+      'GET': 'bg-success',
+      'POST': 'bg-primary',
       'PUT': 'bg-warning',
       'PATCH': 'bg-warning',
       'DELETE': 'bg-error'
     };
-    return colors[method as keyof typeof colors] || bg-muted-foreground;
+    return colors[method as keyof typeof colors] || 'bg-muted-foreground';
   };
 
   const getPriorityBadge = (priority: string) => {

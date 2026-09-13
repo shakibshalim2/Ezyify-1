@@ -1,7 +1,7 @@
 import { toast } from 'sonner';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { Search, Filter, AlertTriangle, CheckCircle, XCircle, Eye, Flag, MessageSquare, Image, Video, ShoppingBag, TrendingUp } from 'lucide-react';
+import { Search, Filter, AlertTriangle, CheckCircle, XCircle, Eye, Flag, MessageSquare, Image, Video, ShoppingBag, TrendingUp, Clock } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
@@ -13,6 +13,21 @@ import { Textarea } from '../../../components/ui/textarea';
 import { Label } from '../../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Skeleton } from '../../../components/ui/skeleton';
+
+interface FlaggedContent {
+  id: string;
+  type: string;
+  content: any;
+  flaggedBy?: string | any;
+  reportedBy?: string | any;
+  reason: string;
+  severity?: string;
+  timestamp?: string;
+  status: string;
+  priority?: string;
+  flagCount?: number;
+  [key: string]: any;
+}
 
 // Skeleton Component
 function ContentModerationSkeleton() {
@@ -350,7 +365,7 @@ export default function ContentModerationQueue() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
                                 {getTypeBadge(item.type)}
-                                {getPriorityBadge(item.priority)}
+                                {item.priority && getPriorityBadge(item.priority)}
                                 <Badge className="bg-error/10 text-error">
                                   <Flag className="w-3 h-3 mr-1" />
                                   {item.flagCount} reports

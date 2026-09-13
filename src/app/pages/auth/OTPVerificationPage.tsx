@@ -1,141 +1,193 @@
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
+import { AnimatePresence, motion } from 'motion/react';
+import { toast } from 'sonner';
+import { Check, MailCheck, MessageSquareText, RefreshCw } from 'lucide-react';
 import { SEO } from '../../components/SEO';
-import { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { ArrowLeft, Shield, RefreshCw } from 'lucide-react';
-import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { Button } from '../../components/primitives/Button';
+import { OTPInput } from '../../components/primitives/OTPInput';
+import { AuthLayout } from '../../features/auth/AuthLayout';
+import { fadeUp, springSoft } from '../../lib/motion';
+
+interface OTPState {
+  channel?: 'email' | 'sms';
+  destination?: string;
+  next?: string;
+}
+
+const RESEND_SECONDS = 45;
+/** Demo-only: any code ending in 0 is accepted until the API is wired. */
+const DEMO_VALID = (code: string) => code.endsWith('0') || code === '123456';
+
+function maskDestination(value: string, channel: 'email' | 'sms') {
+  if (channel === 'email') {
+    const [user, domain] = value.split('@');
+    if (!domain) return value;
+    return `${user.slice(0, 2)}${'•'.repeat(Math.max(2, user.length - 2))}@${domain}`;
+  }
+  return value.replace(/\d(?=\d{3})/g, '•');
+}
 
 export default function OTPVerificationPage() {
   const navigate = useNavigate();
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [timer, setTimer] = useState(60);
-  const [canResend, setCanResend] = useState(false);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const { state } = useLocation() as { state: OTPState | null };
+  const channel = state?.channel ?? 'email';
+  const destination = state?.destination ?? 'your email';
+  const next = state?.next ?? '/onboarding/interests';
+
+  const [code, setCode] = useState('');
+  const [error, setError] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verified, setVerified] = useState(false);
+  const [seconds, setSeconds] = useState(RESEND_SECONDS);
+  const [attempts, setAttempts] = useState(0);
 
   useEffect(() => {
-    if (timer > 0) {
-      const interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
-      }, 1000);
-      return () => clearInterval(interval);
+    if (seconds <= 0) return;
+    const t = window.setTimeout(() => setSeconds((s) => s - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [seconds]);
+
+  const verify = async (value: string) => {
+    if (verifying || verified) return;
+    setVerifying(true);
+    setError(false);
+    await new Promise((r) => setTimeout(r, 600));
+    if (DEMO_VALID(value)) {
+      setVerified(true);
+      window.setTimeout(() => navigate(next, { replace: true }), 900);
     } else {
-      setCanResend(true);
-    }
-  }, [timer]);
-
-  const handleChange = (index: number, value: string) => {
-    if (value.length > 1) return;
-    
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-
-    // Auto-focus next input
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
-
-    // Auto-submit when all filled (regardless of which slot was last changed)
-    if (newOtp.every(digit => digit !== '')) {
-      handleVerify(newOtp.join(''));
+      setError(true);
+      setAttempts((a) => a + 1);
+      setCode('');
+      setVerifying(false);
     }
   };
 
-  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
+  const resend = () => {
+    setSeconds(RESEND_SECONDS);
+    setCode('');
+    setError(false);
+    toast.success(`New code sent to ${maskDestination(destination, channel)}`);
   };
 
-  const handleVerify = (_code: string) => {
-    setTimeout(() => {
-      navigate('/onboarding');
-    }, 500);
-  };
-
-  const handleResend = () => {
-    setTimer(60);
-    setCanResend(false);
-    setOtp(['', '', '', '', '', '']);
-    inputRefs.current[0]?.focus();
-  };
+  const Icon = channel === 'email' ? MailCheck : MessageSquareText;
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <SEO title="Verify Account — Ezyify" description="Verify your Ezyify account with a one-time code." />
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <div className="flex items-center gap-2 mb-4">
-            <Link to="/signup">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-            </Link>
-          </div>
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-accent rounded-full mb-4">
-            <Shield className="w-8 h-8 text-primary" />
-          </div>
-          <CardTitle className="text-2xl">Verify Your Account</CardTitle>
-          <CardDescription>
-            We've sent a 6-digit verification code to your email/phone
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* OTP Input */}
-          <div className="flex gap-1.5 sm:gap-2 justify-center">
-            {otp.map((digit, index) => (
-              <input
-                key={index}
-                ref={(el) => (inputRefs.current[index] = el)}
-                type="text"
-                inputMode="numeric"
-                maxLength={1}
-                value={digit}
-                onChange={(e) => handleChange(index, e.target.value)}
-                onKeyDown={(e) => handleKeyDown(index, e)}
-                className="w-10 h-12 sm:w-12 sm:h-14 text-center text-xl font-semibold border-2 border-border rounded-xl focus:border-primary focus:outline-none transition-colors"
-                autoFocus={index === 0}
-              />
-            ))}
-          </div>
-
-          {/* Timer / Resend */}
-          <div className="text-center">
-            {canResend ? (
-              <Button 
-                variant="ghost" 
-                onClick={handleResend}
-                className="text-primary"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Resend Code
-              </Button>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Resend code in <span className="font-medium text-primary">{timer}s</span>
-              </p>
-            )}
-          </div>
-
-          {/* Verify Button */}
-          <Button 
-            onClick={() => handleVerify(otp.join(''))}
-            disabled={otp.some(digit => !digit)}
-            className="w-full"
-            size="lg"
+    <AuthLayout
+      title="Enter the 6‑digit code"
+      subtitle={
+        <>
+          We sent it to <span className="font-semibold text-foreground">{maskDestination(destination, channel)}</span>
+          {channel === 'sms' ? ' by SMS.' : '.'}{' '}
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="font-medium text-primary hover:underline"
           >
-            Verify & Continue
-          </Button>
+            Change
+          </button>
+        </>
+      }
+      backTo={channel === 'sms' ? '/login' : '/signup'}
+      hero={
+        <div className="mx-auto flex size-28 items-center justify-center rounded-[28px] bg-primary-subtle text-primary sm:size-32">
+          <Icon className="size-14" strokeWidth={1.6} />
+        </div>
+      }
+    >
+      <SEO title="Verify code — Ezyify" description="Enter the verification code we sent you." />
 
-          {/* Help Text */}
-          <div className="p-4 bg-muted rounded-xl">
-            <p className="text-sm text-foreground">
-              💡 Didn't receive the code? Check your spam folder or try resending.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+      <motion.div variants={fadeUp} className="relative">
+        <AnimatePresence mode="wait">
+          {verified ? (
+            <motion.div
+              key="ok"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={springSoft}
+              className="flex flex-col items-center gap-3 py-6 text-center"
+              role="status"
+            >
+              <span className="flex size-20 items-center justify-center rounded-full bg-success text-success-foreground shadow-lg">
+                <motion.span
+                  initial={{ scale: 0, rotate: -30 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ ...springSoft, delay: 0.1 }}
+                >
+                  <Check className="size-10" strokeWidth={3} />
+                </motion.span>
+              </span>
+              <p className="font-display text-xl font-semibold">Verified!</p>
+              <p className="text-sm text-foreground-secondary">Taking you in…</p>
+            </motion.div>
+          ) : (
+            <motion.div key="input" exit={{ opacity: 0, y: -8 }} className="space-y-4">
+              <OTPInput
+                value={code}
+                onChange={(v) => {
+                  setCode(v);
+                  if (error) setError(false);
+                }}
+                onComplete={verify}
+                error={error}
+                disabled={verifying}
+              />
+              <AnimatePresence>
+                {error && (
+                  <motion.p
+                    role="alert"
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="text-center text-sm text-error"
+                  >
+                    That code isn’t right. {attempts >= 3 ? 'Request a new one below.' : 'Please try again.'}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      {!verified && (
+        <>
+          <motion.div variants={fadeUp} className="mt-6">
+            <Button
+              size="xl"
+              fullWidth
+              variant="gradient"
+              loading={verifying}
+              loadingText="Verifying…"
+              disabled={code.length < 6}
+              onClick={() => verify(code)}
+            >
+              Verify
+            </Button>
+          </motion.div>
+
+          <motion.div variants={fadeUp} className="mt-6 text-center text-sm text-foreground-secondary">
+            {seconds > 0 ? (
+              <p>
+                Resend code in{' '}
+                <span className="font-semibold tabular-nums text-foreground">
+                  0:{String(seconds).padStart(2, '0')}
+                </span>
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={resend}
+                className="inline-flex h-11 items-center gap-2 rounded-full px-4 font-semibold text-primary transition hover:bg-primary-subtle"
+              >
+                <RefreshCw className="size-4" />
+                Resend code
+              </button>
+            )}
+          </motion.div>
+        </>
+      )}
+    </AuthLayout>
   );
 }

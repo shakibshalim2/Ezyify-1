@@ -188,7 +188,7 @@ export default function LaunchPreparationCenter() {
       case 'complete': return 'bg-success';
       case 'in-progress': return 'bg-info';
       case 'blocked': return 'bg-error';
-      default: return bg-border;
+      default: return 'bg-border';
     }
   };
 

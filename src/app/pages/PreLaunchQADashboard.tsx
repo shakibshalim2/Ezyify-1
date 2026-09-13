@@ -67,7 +67,7 @@ interface QATest {
   priority: TestPriority;
   status: TestStatus;
   assignee?: string;
-  automatable: boolean;
+  automatable?: boolean;
   pageUrl?: string;
   lastRun?: Date;
   issues?: string[];

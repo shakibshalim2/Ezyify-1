@@ -1,113 +1,113 @@
-import { SEO } from '../../components/SEO';
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import { ArrowLeft, Mail, CheckCircle } from 'lucide-react';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { AnimatePresence, motion } from 'motion/react';
+import { KeyRound, Mail, MailOpen } from 'lucide-react';
+import { SEO } from '../../components/SEO';
+import { Button } from '../../components/primitives/Button';
+import { Field } from '../../components/primitives/Field';
+import { AuthLayout } from '../../features/auth/AuthLayout';
+import { fadeUp, springSoft } from '../../lib/motion';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [error, setError] = useState<string>();
+  const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setIsSubmitted(true);
+    if (!EMAIL_RE.test(email.trim())) {
+      setError('Enter the email you signed up with');
+      return;
+    }
+    setError(undefined);
+    setSubmitting(true);
+    await new Promise((r) => setTimeout(r, 800));
+    setSubmitting(false);
+    setSent(true);
   };
 
-  if (isSubmitted) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-accent rounded-full mb-4 mx-auto">
-              <CheckCircle className="w-10 h-10 text-primary" />
-            </div>
-            <CardTitle>Check Your Email</CardTitle>
-            <CardDescription>
-              We've sent password reset instructions to <strong>{email}</strong>
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 bg-accent rounded-2xl border border-border">
-              <p className="text-sm text-foreground">
-                📧 Didn't receive the email? Check your spam folder or try again in a few minutes.
-              </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => setIsSubmitted(false)}
-              >
-                Try Different Email
-              </Button>
-              
-              <Link to="/login" className="block">
-                <Button variant="ghost" className="w-full">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Login
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <SEO title="Reset Password — Ezyify" description="Reset your Ezyify account password securely." />
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <div className="flex items-center gap-2 mb-4">
-            <Link to="/login">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-            </Link>
-          </div>
-          <CardTitle className="text-2xl">Forgot Password?</CardTitle>
-          <CardDescription>
-            No worries! Enter your email and we'll send you reset instructions.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
-                  required
-                />
-              </div>
+    <AuthLayout
+      title={sent ? 'Check your inbox' : 'Forgot your password?'}
+      subtitle={
+        sent ? (
+          <>
+            We sent a reset link to <span className="font-semibold text-foreground">{email}</span>. It expires in
+            30 minutes.
+          </>
+        ) : (
+          'No worries — enter your email and we’ll send you a link to reset it.'
+        )
+      }
+      backTo="/login"
+      backLabel="Sign in"
+      hero={
+        <motion.div
+          key={sent ? 'sent' : 'ask'}
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={springSoft}
+          className="mx-auto flex size-28 items-center justify-center rounded-[28px] bg-primary-subtle text-primary sm:size-32"
+        >
+          {sent ? <MailOpen className="size-14" strokeWidth={1.6} /> : <KeyRound className="size-14" strokeWidth={1.6} />}
+        </motion.div>
+      }
+      footer={
+        <>
+          Remembered it?{' '}
+          <Link to="/login" className="font-semibold text-primary hover:underline">
+            Back to sign in
+          </Link>
+        </>
+      }
+    >
+      <SEO title="Reset password — Ezyify" description="Reset your Ezyify password." />
+      <AnimatePresence mode="wait" initial={false}>
+        {sent ? (
+          <motion.div
+            key="sent"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="space-y-4"
+          >
+            <div className="rounded-2xl border border-border bg-background-elevated p-4 text-sm text-foreground-secondary">
+              Didn’t get it? Check your spam folder, or make sure the address is correct.
             </div>
-
-            <Button type="submit" className="w-full" size="lg">
-              Send Reset Instructions
+            <Button size="lg" fullWidth variant="outline" onClick={() => setSent(false)}>
+              Use a different email
             </Button>
-
-            <div className="text-center text-sm text-muted-foreground">
-              Remember your password?{' '}
-              <Link to="/login" className="text-primary hover:text-primary-hover hover:underline">
-                Sign In
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+            <Button size="lg" fullWidth variant="ghost" onClick={handleSubmit} loading={submitting}>
+              Resend link
+            </Button>
+          </motion.div>
+        ) : (
+          <motion.form key="ask" onSubmit={handleSubmit} noValidate className="space-y-5" exit={{ opacity: 0 }}>
+            <motion.div variants={fadeUp}>
+              <Field
+                label="Email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                error={error}
+                leftIcon={<Mail className="size-5" />}
+                autoFocus
+              />
+            </motion.div>
+            <motion.div variants={fadeUp}>
+              <Button type="submit" size="xl" fullWidth variant="gradient" loading={submitting} loadingText="Sending…">
+                Send reset link
+              </Button>
+            </motion.div>
+          </motion.form>
+        )}
+      </AnimatePresence>
+    </AuthLayout>
   );
 }

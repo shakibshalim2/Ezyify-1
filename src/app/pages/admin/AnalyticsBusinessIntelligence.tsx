@@ -447,8 +447,8 @@ export default function AnalyticsBusinessIntelligence() {
                           ৳{(value / 1000).toFixed(0)}k
                         </div>
                         <div
-                          className="w-full rounded-t-lg transition-all hover:opacity-80" style={{ background: "var(--brand-gradient)" }}
-                          style={{ height: `${height}%` }}
+                          className="w-full rounded-t-lg transition-all hover:opacity-80" 
+                          style={{ background: "var(--brand-gradient)", height: `${height}%` }}
                         />
                         <div className="text-xs text-muted-foreground mt-2">
                           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][idx]}

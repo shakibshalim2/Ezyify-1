@@ -375,14 +375,14 @@ export default function RealTimeAnalyticsDashboard() {
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">User Engagement Over Time</h3>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={hourlyData}>
+                <RechartsLine data={hourlyData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="hour" />
                   <YAxis />
                   <Tooltip />
                   <Legend />
                   <Line type="monotone" dataKey="users" stroke="#3b82f6" strokeWidth={2} />
-                </LineChart>
+                </RechartsLine>
               </ResponsiveContainer>
             </Card>
           </TabsContent>

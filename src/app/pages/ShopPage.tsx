@@ -157,8 +157,8 @@ export default function ShopPage() {
       const matchesPrice = product.price >= filters.priceRange[0] && product.price <= filters.priceRange[1];
       const matchesBrand = filters.brands.length === 0 || filters.brands.includes(product.seller.name);
       const matchesRating = filters.ratings.length === 0 || filters.ratings.some(r => product.rating >= r);
-      const matchesStock = !filters.inStockOnly || product.stock > 0;
-      const matchesShipping = !filters.freeShipping || product.freeShipping;
+      const matchesStock = !filters.inStockOnly || (product.stock ?? 0) > 0;
+      const matchesShipping = !filters.freeShipping || (product as any).freeShipping;
       const matchesOnSale = !filters.onSale || (product.originalPrice && product.originalPrice > product.price);
       
       return matchesCategory && matchesSearch && matchesPrice && matchesBrand && 

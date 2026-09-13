@@ -272,9 +272,10 @@ export default function CheckoutPage() {
       const pendingReferralRaw = sessionStorage.getItem('ezyify_pending_referral');
       if (pendingReferralRaw) {
         try {
-          const { referralId } = JSON.parse(pendingReferralRaw);
+          const { productId } = JSON.parse(pendingReferralRaw);
           const orderId = `order-${Date.now()}`;
-          ReferralService.attributePurchase(referralId, orderId, total);
+          const buyerUserId = (JSON.parse(localStorage.getItem('ezyify_user') ?? 'null')?.id as string) ?? 'guest';
+          ReferralService.attributePurchase({ productId, buyerUserId, orderId, orderValue: total });
           sessionStorage.removeItem('ezyify_pending_referral');
         } catch (_) {}
       }

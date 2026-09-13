@@ -205,7 +205,7 @@ export default function LoopsPage() {
         }, 50);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [loops]);
 
   // Scroll navigation
@@ -218,7 +218,7 @@ export default function LoopsPage() {
       setCurrentIndex(next);
       scrollTo(next);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [currentIndex, loops]);
 
   const prevLoop = useCallback(() => {
@@ -227,7 +227,7 @@ export default function LoopsPage() {
       setCurrentIndex(prev);
       scrollTo(prev);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [currentIndex, loops]);
 
   const handleScroll = () => {

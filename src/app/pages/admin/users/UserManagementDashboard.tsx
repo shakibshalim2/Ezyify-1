@@ -96,11 +96,6 @@ export default function UserManagementDashboard() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Show skeleton while loading
-  if (isLoading) {
-    return <UserManagementSkeleton />;
-  }
-
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -111,6 +106,11 @@ export default function UserManagementDashboard() {
     userId: ''
   });
   const [actionReason, setActionReason] = useState('');
+
+  // Show skeleton while loading
+  if (isLoading) {
+    return <UserManagementSkeleton />;
+  }
 
   // Mock user data
   const users: User[] = [

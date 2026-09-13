@@ -231,7 +231,7 @@ class APILatencyTracker {
       recordCount: this.records.length,
       endpoints: this.getEndpoints().length,
       overallStats: this.getLatencyStats(),
-      endpointStats: Array.from(this.getAllEndpointStats.entries()),
+      endpointStats: Array.from(this.getAllEndpointStats().entries()),
       slowestEndpoints: this.getSlowestEndpoints(),
       unreliableEndpoints: this.getUnreliableEndpoints(),
       thresholdCheck: this.checkThresholds(),
