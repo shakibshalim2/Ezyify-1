@@ -1,0 +1,470 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "EZYIFY Payment & Escrow API",
+    "version": "1.0.0",
+    "description": "Complete API specification for EZYIFY's escrow-based payment system. This API enables secure transactions, buyer protection, and commission-based payouts.",
+    "contact": {
+      "name": "EZYIFY Backend Team",
+      "email": "backend@ezyify.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.ezyify.com/v1",
+      "description": "Production server"
+    },
+    {
+      "url": "https://staging-api.ezyify.com/v1",
+      "description": "Staging server"
+    },
+    {
+      "url": "http://localhost:3000/api/v1",
+      "description": "Local development"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Payment & Escrow",
+      "description": "Payment processing and escrow management"
+    },
+    {
+      "name": "Orders",
+      "description": "Order management and tracking"
+    },
+    {
+      "name": "Wallet",
+      "description": "Wallet balance and transactions"
+    },
+    {
+      "name": "Refunds & Disputes",
+      "description": "Refund requests and dispute resolution"
+    },
+    {
+      "name": "Withdrawals",
+      "description": "Seller withdrawal management"
+    }
+  ],
+  "paths": {
+    "/payments/process": {
+      "post": {
+        "tags": ["Payment & Escrow"],
+        "summary": "Process Payment",
+        "description": "Process payment and hold funds in escrow until delivery confirmation",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["orderId", "amount", "currency", "paymentMethod"],
+                "properties": {
+                  "orderId": {"type": "string", "example": "ord_abc123"},
+                  "amount": {"type": "number", "example": 125.50},
+                  "currency": {"type": "string", "example": "USD"},
+                  "paymentMethod": {
+                    "type": "string",
+                    "enum": ["card", "wallet", "ezyify-wallet"],
+                    "example": "ezyify-wallet"
+                  },
+                  "paymentDetails": {
+                    "type": "object",
+                    "properties": {
+                      "cardToken": {"type": "string"},
+                      "billingAddress": {"type": "object"}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment processed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "transactionId": {"type": "string"},
+                    "escrowId": {"type": "string"},
+                    "status": {"type": "string"},
+                    "message": {"type": "string"},
+                    "releaseTrigger": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/escrow/release": {
+      "post": {
+        "tags": ["Payment & Escrow"],
+        "summary": "Release Escrow",
+        "description": "Release funds from escrow to seller after buyer confirms delivery",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["orderId", "buyerId", "productCondition"],
+                "properties": {
+                  "orderId": {"type": "string"},
+                  "buyerId": {"type": "string"},
+                  "productCondition": {
+                    "type": "string",
+                    "enum": ["good", "damaged"]
+                  },
+                  "confirmationImages": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Escrow released successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "escrowReleased": {"type": "boolean"},
+                    "sellerPayout": {"type": "number"},
+                    "platformCommission": {"type": "number"},
+                    "gatewayFee": {"type": "number"},
+                    "orderStatus": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/escrow/status/{orderId}": {
+      "get": {
+        "tags": ["Payment & Escrow"],
+        "summary": "Check Escrow Status",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Escrow status retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": {"type": "string"},
+                    "escrowStatus": {"type": "string"},
+                    "amount": {"type": "number"},
+                    "createdAt": {"type": "string", "format": "date-time"},
+                    "autoReleaseDate": {"type": "string", "format": "date-time"},
+                    "daysUntilAutoRelease": {"type": "integer"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments/calculate-commission": {
+      "post": {
+        "tags": ["Payment & Escrow"],
+        "summary": "Calculate Commission",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["amount", "category"],
+                "properties": {
+                  "amount": {"type": "number"},
+                  "category": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Commission calculated"
+          }
+        }
+      }
+    },
+    "/orders/create": {
+      "post": {
+        "tags": ["Orders"],
+        "summary": "Create Order",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "buyerId": {"type": "string"},
+                  "sellerId": {"type": "string"},
+                  "products": {"type": "array"},
+                  "totalAmount": {"type": "number"},
+                  "shippingAddress": {"type": "object"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order created"
+          }
+        }
+      }
+    },
+    "/orders/{orderId}": {
+      "get": {
+        "tags": ["Orders"],
+        "summary": "Get Order Details",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order details retrieved"
+          }
+        }
+      }
+    },
+    "/orders/{orderId}/status": {
+      "patch": {
+        "tags": ["Orders"],
+        "summary": "Update Order Status",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {"type": "string"},
+                  "notes": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status updated"
+          }
+        }
+      }
+    },
+    "/orders/{orderId}/confirm-delivery": {
+      "post": {
+        "tags": ["Orders"],
+        "summary": "Confirm Delivery (Buyer Only)",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "productCondition": {
+                    "type": "string",
+                    "enum": ["good", "damaged"]
+                  },
+                  "confirmationImages": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Delivery confirmed"
+          }
+        }
+      }
+    },
+    "/orders": {
+      "get": {
+        "tags": ["Orders"],
+        "summary": "List Orders",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {"type": "integer"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orders list"
+          }
+        }
+      }
+    },
+    "/wallet/balance": {
+      "get": {
+        "tags": ["Wallet"],
+        "summary": "Get Wallet Balance",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Balance retrieved"
+          }
+        }
+      }
+    },
+    "/wallet/transactions": {
+      "get": {
+        "tags": ["Wallet"],
+        "summary": "Get Transaction History",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {"type": "integer"}
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {"type": "integer"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transactions retrieved"
+          }
+        }
+      }
+    },
+    "/refunds/request": {
+      "post": {
+        "tags": ["Refunds & Disputes"],
+        "summary": "Request Refund",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orderId": {"type": "string"},
+                  "amount": {"type": "number"},
+                  "reason": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Refund requested"
+          }
+        }
+      }
+    },
+    "/withdrawals/request": {
+      "post": {
+        "tags": ["Withdrawals"],
+        "summary": "Request Withdrawal",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amount": {"type": "number"},
+                  "method": {"type": "string"},
+                  "bankDetails": {"type": "object"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Withdrawal requested"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

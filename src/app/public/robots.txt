@@ -1,0 +1,86 @@
+# robots.txt for Ezyify — E-Commerce Social Media Ecosystem
+# https://ezyify.com | https://www.robotstxt.org/robotstxt.html
+
+# All search engines
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://ezyify.com/sitemap.xml
+
+# Disallow private/authenticated pages
+Disallow: /admin/
+Disallow: /creator-dashboard
+Disallow: /seller-dashboard
+Disallow: /dashboard
+Disallow: /settings/
+Disallow: /cart
+Disallow: /wishlist
+Disallow: /checkout
+Disallow: /messages
+Disallow: /notifications
+Disallow: /orders/
+Disallow: /wallet
+Disallow: /profile/me
+
+# Disallow auth flow pages (no indexing value)
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /otp-verification
+Disallow: /onboarding/
+
+# Disallow internal tooling
+Disallow: /api/
+Disallow: /_next/
+Disallow: /static/
+
+# Avoid indexing search result pages with parameters (duplicate content)
+Disallow: /search?*
+Disallow: /shop?*
+
+# Allow key category pages despite query params
+Allow: /shop?category=fashion
+Allow: /shop?category=electronics
+Allow: /shop?category=home-decor
+Allow: /shop?category=beauty
+Allow: /shop?category=sports
+
+# Google
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+# Googlebot Image
+User-agent: Googlebot-Image
+Allow: /
+Disallow: /admin/
+
+# Bing
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 0
+
+# Facebook (Open Graph)
+User-agent: facebookexternalhit
+Allow: /
+
+# Twitter/X (Twitter Cards)
+User-agent: Twitterbot
+Allow: /
+
+# Pinterest
+User-agent: Pinterestbot
+Allow: /
+
+# Yandex
+User-agent: Yandex
+Crawl-delay: 2
+
+# Block known aggressive scrapers
+User-agent: DotBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /

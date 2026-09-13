@@ -1,0 +1,469 @@
+{
+  "info": {
+    "name": "EZYIFY Payment & Escrow API",
+    "description": "Complete API collection for EZYIFY's backend integration. Import this into Postman to test all 22 endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "your_jwt_token_here",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Payment & Escrow",
+      "item": [
+        {
+          "name": "1.1 Process Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"ord_abc123\",\n  \"amount\": 125.50,\n  \"currency\": \"USD\",\n  \"paymentMethod\": \"ezyify-wallet\",\n  \"paymentDetails\": {\n    \"cardToken\": \"tok_visa_1234\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["payments", "process"]
+            }
+          }
+        },
+        {
+          "name": "1.2 Release Escrow",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"ord_abc123\",\n  \"buyerId\": \"usr_buyer_001\",\n  \"productCondition\": \"good\",\n  \"confirmationImages\": [\"url1.jpg\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/escrow/release",
+              "host": ["{{baseUrl}}"],
+              "path": ["escrow", "release"]
+            }
+          }
+        },
+        {
+          "name": "1.3 Check Escrow Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/escrow/status/ord_abc123",
+              "host": ["{{baseUrl}}"],
+              "path": ["escrow", "status", "ord_abc123"]
+            }
+          }
+        },
+        {
+          "name": "1.5 Calculate Commission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 125.50,\n  \"category\": \"electronics\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/calculate-commission",
+              "host": ["{{baseUrl}}"],
+              "path": ["payments", "calculate-commission"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Order Management",
+      "item": [
+        {
+          "name": "2.1 Create Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"buyerId\": \"usr_buyer_001\",\n  \"sellerId\": \"usr_seller_002\",\n  \"products\": [\n    {\n      \"productId\": \"prd_123\",\n      \"quantity\": 1,\n      \"price\": 125.50\n    }\n  ],\n  \"totalAmount\": 125.50,\n  \"shippingAddress\": {\n    \"street\": \"123 Main St\",\n    \"city\": \"Dhaka\",\n    \"zip\": \"1200\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/orders/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "create"]
+            }
+          }
+        },
+        {
+          "name": "2.2 Get Order Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/ord_abc123",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "ord_abc123"]
+            }
+          }
+        },
+        {
+          "name": "2.3 Update Order Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"shipped\",\n  \"notes\": \"Order shipped via Pathao\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/orders/ord_abc123/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "ord_abc123", "status"]
+            }
+          }
+        },
+        {
+          "name": "2.4 Confirm Delivery (Buyer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productCondition\": \"good\",\n  \"confirmationImages\": [\"url1.jpg\", \"url2.jpg\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/orders/ord_abc123/confirm-delivery",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "ord_abc123", "confirm-delivery"]
+            }
+          }
+        },
+        {
+          "name": "2.5 List Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders?role=buyer&status=in_transit&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders"],
+              "query": [
+                {"key": "role", "value": "buyer"},
+                {"key": "status", "value": "in_transit"},
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "20"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.6 Cancel Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Changed my mind\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/orders/ord_abc123/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "ord_abc123", "cancel"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Wallet",
+      "item": [
+        {
+          "name": "3.1 Get Wallet Balance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/balance",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallet", "balance"]
+            }
+          }
+        },
+        {
+          "name": "3.2 Get Transaction History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/transactions?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallet", "transactions"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "20"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "3.3 Add Funds to Wallet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500.00,\n  \"paymentMethod\": \"card\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wallet/add-funds",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallet", "add-funds"]
+            }
+          }
+        },
+        {
+          "name": "3.4 Transfer Funds",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fromWallet\": \"wlt_buyer_001\",\n  \"toWallet\": \"wlt_seller_002\",\n  \"amount\": 125.50\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wallet/transfer",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallet", "transfer"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Refunds & Disputes",
+      "item": [
+        {
+          "name": "4.1 Request Refund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"ord_abc123\",\n  \"amount\": 125.50,\n  \"reason\": \"Product damaged on arrival\",\n  \"evidence\": [\"photo1.jpg\", \"photo2.jpg\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/refunds/request",
+              "host": ["{{baseUrl}}"],
+              "path": ["refunds", "request"]
+            }
+          }
+        },
+        {
+          "name": "4.2 Get Refund Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/refunds/ref_xyz789",
+              "host": ["{{baseUrl}}"],
+              "path": ["refunds", "ref_xyz789"]
+            }
+          }
+        },
+        {
+          "name": "4.3 Create Dispute",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"ord_abc123\",\n  \"reason\": \"Product not as described\",\n  \"evidence\": [\"photo1.jpg\", \"photo2.jpg\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/disputes/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["disputes", "create"]
+            }
+          }
+        },
+        {
+          "name": "4.4 Get Dispute Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/disputes/dsp_abc123",
+              "host": ["{{baseUrl}}"],
+              "path": ["disputes", "dsp_abc123"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Withdrawals",
+      "item": [
+        {
+          "name": "5.1 Request Withdrawal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500.00,\n  \"method\": \"bank_transfer\",\n  \"bankDetails\": {\n    \"accountNumber\": \"1234567890\",\n    \"bankName\": \"Example Bank\",\n    \"accountHolder\": \"John Doe\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/withdrawals/request",
+              "host": ["{{baseUrl}}"],
+              "path": ["withdrawals", "request"]
+            }
+          }
+        },
+        {
+          "name": "5.2 Get Withdrawal Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/withdrawals/wth_xyz789",
+              "host": ["{{baseUrl}}"],
+              "path": ["withdrawals", "wth_xyz789"]
+            }
+          }
+        },
+        {
+          "name": "5.3 List Withdrawal History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/withdrawals?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["withdrawals"],
+              "query": [
+                {"key": "page", "value": "1"},
+                {"key": "limit", "value": "20"}
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
