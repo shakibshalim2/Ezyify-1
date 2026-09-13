@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   Search, X, TrendingUp, ArrowLeft, Zap,
 } from 'lucide-react';
+import { storage } from '../lib/storage';
 import { SEO, SEOConfigs } from '../components/SEO';
 import { Button } from '../components/primitives/Button';
 import { Card } from '../components/primitives/Card';
@@ -86,9 +87,7 @@ export default function SearchPage() {
   // Load initial data
   useEffect(() => {
     const loadInitialData = () => {
-      const recentSearches = JSON.parse(
-        localStorage.getItem('ezyify.search.recent') || '[]'
-      ) as string[];
+      const recentSearches = storage.get<string[]>('ezyify.search.recent', []);
 
       const trendingSearches = [
         'Wireless Earbuds',
@@ -180,9 +179,7 @@ export default function SearchPage() {
   };
 
   const addRecentSearch = (searchTerm: string) => {
-    const recent = JSON.parse(
-      localStorage.getItem('ezyify.search.recent') || '[]'
-    ) as string[];
+    const recent = storage.get<string[]>('ezyify.search.recent', []);
     const updated = [
       searchTerm,
       ...recent.filter(s => s !== searchTerm),
@@ -192,9 +189,7 @@ export default function SearchPage() {
   };
 
   const removeRecentSearch = (searchTerm: string) => {
-    const recent = JSON.parse(
-      localStorage.getItem('ezyify.search.recent') || '[]'
-    ) as string[];
+    const recent = storage.get<string[]>('ezyify.search.recent', []);
     const updated = recent.filter(s => s !== searchTerm);
     localStorage.setItem('ezyify.search.recent', JSON.stringify(updated));
     setState(prev => ({ ...prev, recentSearches: updated }));

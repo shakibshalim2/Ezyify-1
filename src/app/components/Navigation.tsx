@@ -150,7 +150,7 @@ export default function Navigation() {
                       className={`relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
                         active
                           ? 'bg-primary/10 text-primary'
-                          : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/70'
+                          : 'text-foreground-secondary/80 hover:text-foreground hover:bg-muted/70'
                       }`}
                     >
                       {(link as any).isLive ? (
@@ -177,7 +177,7 @@ export default function Navigation() {
             {/* Center: Search */}
             <div className="flex-1 max-w-sm lg:max-w-md mx-2 hidden md:block">
               <form onSubmit={handleSearch} className="relative">
-                <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-150 ${searchFocused ? 'text-primary' : 'text-muted-foreground'}`} />
+                <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-150 ${searchFocused ? 'text-primary' : 'text-foreground-secondary'}`} />
                 <input
                   type="text"
                   value={searchQuery}
@@ -186,7 +186,7 @@ export default function Navigation() {
                   onBlur={() => setSearchFocused(false)}
                   placeholder="Search products, creators, stores…"
                   autoComplete="off"
-                  className={`w-full pl-10 pr-4 py-2 rounded-full text-sm text-foreground placeholder:text-muted-foreground transition-all duration-200 outline-none ${
+                  className={`w-full pl-10 pr-4 py-2 rounded-full text-sm text-foreground placeholder:text-foreground-secondary transition-all duration-200 outline-none ${
                     searchFocused
                       ? 'bg-card ring-2 ring-primary/25 border border-primary/25 shadow-sm'
                       : 'bg-muted/70 border border-border/50 hover:bg-muted hover:border-border'
@@ -240,14 +240,14 @@ export default function Navigation() {
                   <div className="w-7 h-7 rounded-full bg-brand-gradient flex items-center justify-center ring-2 ring-primary/20">
                     <User className="w-4 h-4 text-white" />
                   </div>
-                  <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-3.5 h-3.5 text-foreground-secondary transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {userMenuOpen && (
                   <div className="absolute right-0 top-full mt-2 w-52 bg-popover border border-border rounded-2xl shadow-xl overflow-hidden animate-scale-in z-50">
                     <div className="px-4 py-3 border-b border-border">
                       <p className="font-semibold text-sm text-foreground">My Account</p>
-                      <p className="text-xs text-muted-foreground">user@ezyify.com</p>
+                      <p className="text-xs text-foreground-secondary">user@ezyify.com</p>
                     </div>
                     <div className="py-1">
                       {[
@@ -258,7 +258,7 @@ export default function Navigation() {
                         { label: 'Settings', icon: Settings, path: '/settings' },
                       ].map(({ label, icon: Icon, path }) => (
                         <Link key={path} to={path} className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors">
-                          <Icon className="w-4 h-4 text-muted-foreground" />
+                          <Icon className="w-4 h-4 text-foreground-secondary" />
                           {label}
                         </Link>
                       ))}
@@ -282,14 +282,14 @@ export default function Navigation() {
         {/* Mobile Search — compact row below main bar */}
         <div className="md:hidden px-3 pb-2">
           <form onSubmit={handleSearch} className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground-secondary pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search products, creators, stores…"
               autoComplete="off"
-              className="w-full pl-8 pr-4 py-1.5 bg-muted/70 border border-border/40 rounded-full text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/25 focus:bg-card transition-all"
+              className="w-full pl-8 pr-4 py-1.5 bg-muted/70 border border-border/40 rounded-full text-sm text-foreground placeholder:text-foreground-secondary outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/25 focus:bg-card transition-all"
             />
           </form>
         </div>
@@ -311,7 +311,7 @@ export default function Navigation() {
             </div>
 
             <div className="p-3 space-y-0.5">
-              <p className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Navigate</p>
+              <p className="px-3 py-1.5 text-xs font-semibold text-foreground-secondary uppercase tracking-wider">Navigate</p>
               {navLinks.map((link) => {
                 const Icon = link.icon;
                 const active = location.pathname === link.path || (link.path !== '/' && location.pathname.startsWith(link.path));
@@ -326,7 +326,7 @@ export default function Navigation() {
               })}
 
               <div className="h-px bg-border my-2" />
-              <p className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Account</p>
+              <p className="px-3 py-1.5 text-xs font-semibold text-foreground-secondary uppercase tracking-wider">Account</p>
 
               {[
                 { label: 'Profile', icon: User, path: '/profile/me' },
@@ -340,7 +340,7 @@ export default function Navigation() {
               ].map(({ label, icon: Icon, path }) => (
                 <Link key={path} to={path} onClick={() => setIsMenuOpen(false)}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-muted transition-colors">
-                  <Icon className="w-5 h-5 text-muted-foreground" />
+                  <Icon className="w-5 h-5 text-foreground-secondary" />
                   {label}
                 </Link>
               ))}

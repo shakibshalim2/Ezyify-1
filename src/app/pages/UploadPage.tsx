@@ -141,18 +141,6 @@ export default function UploadPage() {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Log for verification
-      console.log('Published content:', {
-        type: contentType,
-        medias: medias.map(m => ({ name: m.file.name, type: m.type })),
-        caption,
-        hashtags,
-        location,
-        publishNow,
-        scheduledDate: !publishNow ? scheduledDate : undefined,
-        visibility,
-        publishingTo
-      });
 
       setShowSuccess(true);
       toast.success('Content published!');

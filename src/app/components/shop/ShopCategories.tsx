@@ -95,7 +95,7 @@ export const ShopCategories = React.memo(({ variant = 'grid', limit }: ShopCateg
               <h3 className="text-sm font-medium text-foreground line-clamp-2 group-hover:text-primary transition-colors">
                 {category.name}
               </h3>
-              <p className="text-xs text-muted-foreground">{category.count} items</p>
+              <p className="text-xs text-foreground-secondary">{category.count} items</p>
             </Link>
           ))}
         </div>
@@ -127,7 +127,7 @@ export const ShopCategories = React.memo(({ variant = 'grid', limit }: ShopCateg
             <h3 className="font-medium text-foreground group-hover:text-primary transition-colors line-clamp-1">
               {category.name}
             </h3>
-            <p className="text-xs text-muted-foreground mt-1">{category.count} products</p>
+            <p className="text-xs text-foreground-secondary mt-1">{category.count} products</p>
           </div>
         </Link>
       ))}

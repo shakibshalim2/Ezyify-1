@@ -40,19 +40,19 @@ export const ShopHome = React.memo(({
         {/* Header */}
         <div className="mb-8">
           <h1 className="mb-2">Shop</h1>
-          <p className="text-muted-foreground text-lg">Discover amazing products from verified creators and sellers</p>
+          <p className="text-foreground-secondary text-lg">Discover amazing products from verified creators and sellers</p>
         </div>
 
         {/* Search Bar */}
         <form onSubmit={onSearchSubmit} className="mb-8">
           <div className="relative max-w-3xl mx-auto">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-foreground-secondary" />
             <input
               type="text"
               placeholder="Search for products, brands, or categories..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 bg-card text-foreground border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground text-lg shadow-sm"
+              className="w-full pl-12 pr-4 py-4 bg-card text-foreground border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-foreground-secondary text-lg shadow-sm"
             />
           </div>
         </form>
@@ -77,7 +77,7 @@ export const ShopHome = React.memo(({
               </div>
               <div>
                 <h2 className="font-bold text-foreground">Flash Deals</h2>
-                <p className="text-xs text-muted-foreground">Limited time offers!</p>
+                <p className="text-xs text-foreground-secondary">Limited time offers!</p>
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -104,7 +104,7 @@ export const ShopHome = React.memo(({
             </div>
             <div>
               <h2 className="font-bold text-foreground">Trending Now</h2>
-              <p className="text-xs text-muted-foreground">Most popular this week</p>
+              <p className="text-xs text-foreground-secondary">Most popular this week</p>
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -129,7 +129,7 @@ export const ShopHome = React.memo(({
             </div>
             <div>
               <h2 className="font-bold text-foreground">Featured Products</h2>
-              <p className="text-xs text-muted-foreground">Hand-picked for you</p>
+              <p className="text-xs text-foreground-secondary">Hand-picked for you</p>
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -149,7 +149,7 @@ export const ShopHome = React.memo(({
         {/* Quick Category Links */}
         <div className="rounded-3xl p-8 text-center border border-border" style={{ background: 'var(--brand-gradient-subtle)' }}>
           <h2 className="font-bold text-foreground mb-3">Ready to Explore More?</h2>
-          <p className="text-sm text-muted-foreground mb-6">Browse thousands of products across all categories</p>
+          <p className="text-sm text-foreground-secondary mb-6">Browse thousands of products across all categories</p>
           <button
             onClick={onBrowseAll}
             className="px-8 py-3 rounded-full text-sm font-semibold text-white shadow-brand hover:shadow-brand-lg transition-all hover:scale-[1.02] active:scale-[0.98]"

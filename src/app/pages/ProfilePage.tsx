@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import {
   Play, Share2, Edit, MessageCircle,
   MapPin, Calendar, Link as LinkIcon, Bookmark, Package, Settings } from 'lucide-react';
+import { storage } from '../lib/storage';
 import { SEO } from '../components/SEO';
 import { Button } from '../components/primitives/Button';
 import { Card } from '../components/primitives/Card';
@@ -150,7 +151,7 @@ export default function ProfilePage() {
       const savedLoops = posts.filter(p => p.type === 'loop' && p.isSaved).slice(0, 6);
       const wishlistIds: string[] = (() => {
         try {
-          return JSON.parse(localStorage.getItem('ezyify_wishlist') || '[]');
+          return storage.get<string[]>('ezyify_wishlist', []);
         } catch {
           return [];
         }
@@ -160,9 +161,9 @@ export default function ProfilePage() {
         : products.slice(0, 8);
 
       // Load from localStorage
-      const likedPostIds = new Set<string>(JSON.parse(localStorage.getItem('ezyify_liked_posts') || '[]'));
+      const likedPostIds = new Set<string>(storage.get<string[]>('ezyify_liked_posts', []));
       const cartItems = new Set<string>(
-        JSON.parse(localStorage.getItem('ezyify_cart') || '[]').map((item: any) => item.id)
+        storage.get<{ id: string }[]>('ezyify_cart', []).map(item => item.id)
       );
 
       setState({
@@ -173,7 +174,7 @@ export default function ProfilePage() {
         savedPosts,
         savedLoops,
         savedProducts,
-        isFollowing: JSON.parse(localStorage.getItem('ezyify_following') || '[]').includes(user.username),
+        isFollowing: storage.get<string[]>('ezyify_following', []).includes(user.username),
         likedPostIds,
         cartItems,
       });
@@ -191,7 +192,7 @@ export default function ProfilePage() {
 
   const toggleFollow = () => {
     if (!state.user) return;
-    const following = JSON.parse(localStorage.getItem('ezyify_following') || '[]');
+    const following = storage.get<string[]>('ezyify_following', []);
     if (state.isFollowing) {
       localStorage.setItem('ezyify_following', JSON.stringify(
         following.filter((u: string) => u !== state.user.username)

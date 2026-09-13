@@ -147,7 +147,7 @@ export function DetailsForm({
             <Input
               value={hashtagInput}
               onChange={e => setHashtagInput(e.target.value)}
-              onKeyPress={e => {
+              onKeyDown={e => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   addHashtag(hashtagInput);

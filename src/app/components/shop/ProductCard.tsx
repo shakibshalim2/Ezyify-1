@@ -99,7 +99,7 @@ export const ProductCard = React.memo(({
           >
             {inCart
               ? <Check className="w-3.5 h-3.5" />
-              : <ShoppingCart className="w-3.5 h-3.5 text-muted-foreground" />
+              : <ShoppingCart className="w-3.5 h-3.5 text-foreground-secondary" />
             }
           </button>
         </div>

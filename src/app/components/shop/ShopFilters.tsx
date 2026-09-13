@@ -74,9 +74,9 @@ export function ShopFilters({ open, onOpenChange, filters, onFiltersChange, onAp
       >
         <h3 className="font-semibold text-foreground">{title}</h3>
         {expandedSections[sectionKey] ? (
-          <ChevronUp className="w-5 h-5 text-muted-foreground" />
+          <ChevronUp className="w-5 h-5 text-foreground-secondary" />
         ) : (
-          <ChevronDown className="w-5 h-5 text-muted-foreground" />
+          <ChevronDown className="w-5 h-5 text-foreground-secondary" />
         )}
       </button>
       {expandedSections[sectionKey] && (
@@ -119,7 +119,7 @@ export function ShopFilters({ open, onOpenChange, filters, onFiltersChange, onAp
             onClick={() => onOpenChange(false)}
             className="p-1 hover:bg-muted rounded-full transition-colors"
           >
-            <X className="w-5 h-5 text-muted-foreground" />
+            <X className="w-5 h-5 text-foreground-secondary" />
           </button>
         </div>
 
@@ -138,7 +138,7 @@ export function ShopFilters({ open, onOpenChange, filters, onFiltersChange, onAp
               />
               <div className="flex items-center justify-between text-sm">
                 <span className="text-foreground font-medium">${filters.priceRange[0]}</span>
-                <span className="text-muted-foreground">to</span>
+                <span className="text-foreground-secondary">to</span>
                 <span className="text-foreground font-medium">${filters.priceRange[1]}</span>
               </div>
             </div>

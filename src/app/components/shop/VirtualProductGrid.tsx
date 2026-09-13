@@ -78,7 +78,7 @@ export const VirtualProductGrid = React.memo(({
 
       {displayedCount < products.length && (
         <div ref={loaderRef} className="text-center py-8">
-          <div className="inline-flex items-center gap-2 text-muted-foreground">
+          <div className="inline-flex items-center gap-2 text-foreground-secondary">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             <span>Loading more...</span>
           </div>

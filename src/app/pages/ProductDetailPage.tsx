@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
-import { Share2 } from 'lucide-react';
+import { Share2, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, useReducedMotion } from 'motion/react';
 import { SEO } from '../components/SEO';
@@ -471,7 +471,7 @@ export default function ProductDetailPage() {
           aria-pressed={isInWishlist}
           aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
         >
-          {isInWishlist ? '❤️' : '🤍'} Wishlist
+          <Heart className={isInWishlist ? 'fill-error text-error' : ''} /> Wishlist
         </Button>
         <Button
           variant="outline"
