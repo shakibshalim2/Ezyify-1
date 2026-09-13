@@ -108,11 +108,11 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 - ☐ Migrate screens from local mock data to `useApi()` + MSW handlers that satisfy the core schemas (continues alongside backend work)
 
 ### Phase 4 — Mobile app (Expo, standalone signed builds)
-- 4.1 ☐ `apps/mobile` via `create-expo-app` (SDK 52, TypeScript, Expo Router), NativeWind, Reanimated, Moti, Lottie, expo-image/video, SecureStore
-- 4.2 ☐ `npx expo prebuild --platform android` → commit `android/` (so `./gradlew` builds work without EAS cloud)
-- 4.3 ☐ Signing: `keytool -genkeypair` upload keystore (kept out of git); `android/app/build.gradle` `signingConfigs.release` from `gradle.properties`/env; Play App Signing enrolled; ProGuard/R8 + resource shrinking on; `versionCode` auto‑bump script
-- 4.4 ☐ Build recipes documented (`docs/plan/ANDROID_RELEASE.md`): `./gradlew :app:bundleRelease` → `.aab`; `./gradlew :app:assembleRelease` → `.apk`; optional `eas build --local --profile production`
-- 4.5 ☐ Screens ported from web design: Splash → Onboarding → Auth → Tabs (Home, Explore, Create, Shop, Profile) → Loops → Product → Cart/Checkout → Messages → Wallet
+- 4.1 ☑ `apps/mobile` via `create-expo-app` (**SDK 57**, RN 0.86, React 19.2, Expo Router 57, React Compiler), Reanimated 4, expo-image, SecureStore, Inter/Plus Jakarta fonts; theme from `@ezyify/tokens`, runtime from `@ezyify/core`. NativeWind skipped (v5 still RC; styles use the token theme directly)
+- 4.2 ☑ `expo prebuild --platform android` → `android/` committed (so `./gradlew` builds work without EAS cloud)
+- 4.3 ☑ Signing: `plugins/withReleaseSigning.js` injects `signingConfigs.release` (keystore.properties or `EZYIFY_UPLOAD_*` env) on every prebuild; R8 + resource shrinking via `expo-build-properties`; `scripts/bump-version-code.mjs`. ☐ Play App Signing enrolment (user, at first upload)
+- 4.4 ☑ Build recipes documented (`docs/plan/ANDROID_RELEASE.md`): `./gradlew :app:bundleRelease` → `.aab`; `./gradlew :app:assembleRelease` → `.apk`; optional `eas build --local --profile production`
+- 4.5 ◐ Screens ported from web design (tabs shell, Home, Product detail w/ shared cart store done): Splash → Onboarding → Auth → Tabs (Home, Explore, Create, Shop, Profile) → Loops → Product → Cart/Checkout → Messages → Wallet
 - 4.6 ☐ Native concerns: deep links (`ezyify://`, App Links), push (FCM via expo-notifications), camera/upload, biometrics, 16 KB page‑size compliant deps, target SDK 35/36
 - 4.7 ☐ Play Store: data‑safety form, account‑deletion flow (in‑app + web URL), UGC reporting/blocking, content rating, privacy policy URL, store listing assets (icon 512, feature graphic 1024×500, screenshots)
 - 4.8 ☐ GitHub Action `android-release.yml` (secrets: keystore base64, passwords) → internal testing track
@@ -187,4 +187,5 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 | 2026‑09‑13 | Design review pass: token cleanup, safe storage reads, a11y/deprecation fixes | f98145f |
 | 2026‑09‑13 | Playwright smoke suite (mobile + desktop) wired into CI | 882371d |
 | 2026‑09‑13 | Phase 2f: Post detail, Storefront, Profile edit/followers, Deals, Categories, Wishlist, Dashboard, Help, Error pages | f77d82c |
-| 2026‑09‑13 | Phase 3: monorepo (`apps/web`, `packages/{core,tokens,config}`), Turborepo, typed zod API client + stores, CI on turbo | (this commit) |
+| 2026‑09‑13 | Phase 3: monorepo (`apps/web`, `packages/{core,tokens,config}`), Turborepo, typed zod API client + stores, CI on turbo | f30081a |
+| 2026‑09‑13 | Phase 4.1–4.4: `apps/mobile` (Expo SDK 57, standalone), committed `android/`, release‑signing plugin, icons/splash, tabs + Home + Product | (this commit) |

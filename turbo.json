@@ -1,17 +1,63 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "stream",
-  "globalDependencies": [".nvmrc", "pnpm-workspace.yaml"],
+  "globalDependencies": [
+    ".nvmrc",
+    "pnpm-workspace.yaml"
+  ],
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": ["dist/**", "build/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*",
+        "!android/**"
+      ],
+      "outputs": [
+        "dist/**",
+        "build/**"
+      ]
     },
-    "typecheck": { "dependsOn": ["^build"] },
-    "lint": { "dependsOn": ["^build"] },
-    "test": { "dependsOn": ["^build"], "outputs": ["coverage/**"] },
-    "e2e": { "dependsOn": ["build"], "cache": false, "outputs": ["playwright-report/**"] },
-    "dev": { "cache": false, "persistent": true }
+    "typecheck": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!android/**"
+      ]
+    },
+    "lint": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!android/**"
+      ]
+    },
+    "test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
+    },
+    "e2e": {
+      "dependsOn": [
+        "build"
+      ],
+      "cache": false,
+      "outputs": [
+        "playwright-report/**"
+      ]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
   }
 }

@@ -1,0 +1,51 @@
+name: Android release (signed AAB/APK)
+
+# Standalone native build — no Expo Go, no EAS cloud. Produces a Play-ready .aab and a sideloadable .apk.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['mobile-v*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EZYIFY_UPLOAD_STORE_FILE: ${{ github.workspace }}/apps/mobile/android/app/ezyify-upload.keystore
+      EZYIFY_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      EZYIFY_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      EZYIFY_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build --filter=@ezyify/core --filter=@ezyify/tokens
+
+      - name: Decode upload keystore
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$EZYIFY_UPLOAD_STORE_FILE"
+
+      - name: Build release AAB + APK
+        working-directory: apps/mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:bundleRelease :app:assembleRelease --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ezyify-android-release
+          path: |
+            apps/mobile/android/app/build/outputs/bundle/release/*.aab
+            apps/mobile/android/app/build/outputs/apk/release/*.apk
+          retention-days: 30
