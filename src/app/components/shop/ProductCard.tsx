@@ -138,7 +138,7 @@ export const ProductCard = React.memo(({
 
         <div className="flex items-center gap-1.5">
           <Star className="w-3 h-3 fill-amber-400 text-warning shrink-0" />
-          <span className="text-xs font-medium text-foreground">{product.rating}</span>
+          <span className="text-xs font-medium text-foreground tabular-nums">{Number(product.rating).toFixed(1)}</span>
           <span className="text-xs text-foreground-tertiary">({product.reviews?.toLocaleString()})</span>
           {product.sold > 500 && (
             <span className="text-[10px] font-semibold text-accent-brand ml-auto">{product.sold}+ sold</span>

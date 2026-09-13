@@ -237,8 +237,8 @@ const WithNavigation = memo(function WithNavigation() {
     <>
       <Navigation />
       <div className="min-h-screen bg-background">
-        {/* pt: mobile = nav height (5.5rem) + device safe-area-inset-top; desktop = h-16 (64px) = pt-16 */}
-        <div className="pt-[calc(5.75rem+var(--safe-top))] md:pt-[calc(3rem+var(--safe-top))] lg:pt-16 pb-nav lg:pb-0">
+        {/* Top offset = fixed top nav height (+ mobile search row); bottom offset = BottomNav on < lg */}
+        <div className={`pt-[calc(5.75rem+var(--safe-top))] md:pt-[calc(3rem+var(--safe-top))] lg:pt-16 lg:pb-0 ${location.pathname.startsWith('/messages') ? 'pb-[calc(var(--nav-height)+var(--safe-bottom))]' : 'pb-nav'}`}>
           <PageTransition key={location.pathname}>
             <Outlet />
           </PageTransition>
@@ -337,6 +337,7 @@ export default function App() {
               <Route path="/otp-verification" element={<OTPVerificationPage />} />
               <Route path="/landing" element={<LandingPage />} />
               <Route path="/stories/:username" element={<StoriesPage />} />
+              <Route path="/loops" element={<LoopsPage />} />
               <Route element={<WithNavigation />}>
                 <Route path="/" element={<FirstRunGate><HomePage /></FirstRunGate>} />
                 <Route path="/platform-overview" element={<PlatformOverviewPage />} />
@@ -348,7 +349,6 @@ export default function App() {
                 <Route path="/real-time-analytics-dashboard" element={<RealTimeAnalyticsDashboard />} />
                 <Route path="/customer-support-admin-panel" element={<CustomerSupportAdminPanel />} />
                 <Route path="/explore" element={<ExplorePage />} />
-                <Route path="/loops" element={<LoopsPage />} />
                 <Route path="/post/:id" element={<PostDetailPage />} />
                 <Route path="/shop" element={<ShopPage />} />
                 <Route path="/product/:id" element={<ProductDetailPage />} />

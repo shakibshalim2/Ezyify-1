@@ -1,23 +1,59 @@
-import { useState, useEffect } from 'react';
-import { VerifiedBadge } from '../components/VerifiedBadge';
-import { Link, useLocation } from 'react-router';
-import { Search, X, TrendingUp, Clock, Filter, Hash, Tag, Star, Heart, Play } from 'lucide-react';
-import { mockProducts, mockPosts, categoryData } from '../data/enhanced-mock-data';
-import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Skeleton } from '../components/ui/skeleton';
+import React, { useState, useEffect } from 'react';
+import { useLocation, Link } from 'react-router';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import {
+  Search, X, TrendingUp, ArrowLeft, Zap,
+} from 'lucide-react';
 import { SEO, SEOConfigs } from '../components/SEO';
+import { Button } from '../components/primitives/Button';
+import { Card } from '../components/primitives/Card';
+import { Skeleton } from '../components/primitives/Skeleton';
+import { VerifiedBadge } from '../components/VerifiedBadge';
+import { ImageWithFallback } from '../components/figma/ImageWithFallback';
+import { ProductCard } from '../components/shop/ProductCard';
+import { EmptySearchResults } from '../components/EmptyStates';
+import {
+  fadeUp, staggerContainer, DURATION, EASE_EMPHASIZED,
+} from '../lib/motion';
+import { mockProducts, mockPosts } from '../data/enhanced-mock-data';
 
-// SKELETON FOR INSTANT UI
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+type SearchTab = 'all' | 'products' | 'creators' | 'posts' | 'stores';
+
+interface SearchState {
+  trendingSearches: string[];
+  recentSearches: string[];
+  filteredProducts: any[];
+  filteredPosts: any[];
+  filteredCreators: any[];
+  filteredStores: any[];
+}
+
+interface Creator {
+  username: string;
+  name: string;
+  avatar: string;
+  verified?: boolean;
+  followers?: number;
+}
+
+interface Seller {
+  username: string;
+  name: string;
+  avatar: string;
+}
+
+// ─── Skeleton ────────────────────────────────────────────────────────────────
+
 function SearchSkeleton() {
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 pb-6">
+      <div className="max-w-7xl mx-auto px-4 lg:px-6 py-6">
         <Skeleton className="h-12 w-full mb-6" />
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-            <Skeleton key={i} className="aspect-square rounded-xl" />
+            <Skeleton key={i} className="aspect-square rounded-card" />
           ))}
         </div>
       </div>
@@ -25,587 +61,569 @@ function SearchSkeleton() {
   );
 }
 
+// ─── Search Page ────────────────────────────────────────────────────────────
+
 export default function SearchPage() {
   const location = useLocation();
+  const reduce = useReducedMotion();
   const searchParams = new URLSearchParams(location.search);
-  const queryParam = searchParams.get('q');
-  
-  const [searchQuery, setSearchQuery] = useState(queryParam || '');
-  const [activeTab, setActiveTab] = useState('all');
-  const [showFilters, setShowFilters] = useState(false);
-  const [filterCategory, setFilterCategory] = useState('all');
-  const [filterPrice, setFilterPrice] = useState('all');
-  const [filterSort, setFilterSort] = useState('relevant');
-  const [recentSearches, setRecentSearches] = useState<string[]>([
-    'Premium T-Shirt', 'Leather Bag', 'Gaming Keyboard'
-  ]);
+  const queryParam = searchParams.get('q') || '';
 
-  // PROGRESSIVE LOADING: Load data after initial render
-  const [pageData, setPageData] = useState<{
-    trendingSearches: string[];
-    trendingHashtags: any[];
-    filteredProducts: any[];
-    filteredPosts: any[];
-    filteredUsers: any[];
-  } | null>(null);
+  const [query, setQuery] = useState(queryParam);
+  const [activeTab, setActiveTab] = useState<SearchTab>('all');
+  const [state, setState] = useState<SearchState>({
+    trendingSearches: [],
+    recentSearches: [],
+    filteredProducts: [],
+    filteredPosts: [],
+    filteredCreators: [],
+    filteredStores: [],
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [likedProducts, setLikedProducts] = useState<Set<string>>(new Set());
+  const [cartItems, setCartItems] = useState<Set<string>>(new Set());
 
-  // Update search when URL query changes
+  // Load initial data
   useEffect(() => {
-    if (queryParam) {
-      setSearchQuery(queryParam);
-    }
-  }, [queryParam]);
+    const loadInitialData = () => {
+      const recentSearches = JSON.parse(
+        localStorage.getItem('ezyify.search.recent') || '[]'
+      ) as string[];
 
-  // Load search data progressively
-  useEffect(() => {
-    const loadSearchData = () => {
-      // Mock trending searches
       const trendingSearches = [
         'Wireless Earbuds',
         'Winter Fashion',
         'Smart Watch',
         'Home Decor',
         'Fitness Gear',
-        'Beauty Products'
+        'Beauty Products',
       ];
 
-      // Mock hashtags
-      const trendingHashtags = [
-        { tag: 'Fashion', count: 245000 },
-        { tag: 'Tech', count: 189000 },
-        { tag: 'HomeDecor', count: 156000 },
-        { tag: 'Fitness', count: 134000 },
-        { tag: 'Beauty', count: 98000 }
-      ];
-
-      // Search results
-      let filteredProducts = searchQuery
-        ? mockProducts.filter(p =>
-            p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            p.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-          )
-        : [];
-
-      // Apply category filter
-      if (filterCategory !== 'all') {
-        filteredProducts = filteredProducts.filter(p => p.category.toLowerCase() === filterCategory.toLowerCase());
-      }
-
-      // Apply price filter
-      if (filterPrice === 'under50') filteredProducts = filteredProducts.filter(p => p.price < 50);
-      else if (filterPrice === '50to100') filteredProducts = filteredProducts.filter(p => p.price >= 50 && p.price <= 100);
-      else if (filterPrice === '100to200') filteredProducts = filteredProducts.filter(p => p.price > 100 && p.price <= 200);
-      else if (filterPrice === 'over200') filteredProducts = filteredProducts.filter(p => p.price > 200);
-
-      // Apply sort
-      if (filterSort === 'newest') filteredProducts = [...filteredProducts].reverse();
-      else if (filterSort === 'price_asc') filteredProducts = [...filteredProducts].sort((a, b) => a.price - b.price);
-      else if (filterSort === 'price_desc') filteredProducts = [...filteredProducts].sort((a, b) => b.price - a.price);
-      else if (filterSort === 'rating') filteredProducts = [...filteredProducts].sort((a, b) => b.rating - a.rating);
-
-      const filteredPosts = searchQuery
-        ? mockPosts.filter(post => 
-            post.content.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            post.hashtags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            post.author.username.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-        : [];
-
-      const filteredUsers = searchQuery
-        ? mockPosts
-            .filter(post => 
-              post.author.username.toLowerCase().includes(searchQuery.toLowerCase())
-            )
-            .map(post => post.author)
-            .filter((user, index, self) => 
-              index === self.findIndex(u => u.username === user.username)
-            )
-        : [];
-
-      setPageData({
+      setState(prev => ({
+        ...prev,
         trendingSearches,
-        trendingHashtags,
-        filteredProducts,
-        filteredPosts,
-        filteredUsers
-      });
+        recentSearches,
+      }));
+      setIsLoading(false);
     };
 
-    if ('requestIdleCallback' in window) {
-      const handle = requestIdleCallback(loadSearchData, { timeout: 100 });
-      return () => cancelIdleCallback(handle);
-    } else {
-      const timer = setTimeout(loadSearchData, 16);
-      return () => clearTimeout(timer);
-    }
-  }, [searchQuery, filterCategory, filterPrice, filterSort]);
+    loadInitialData();
+  }, []);
 
-  if (!pageData) {
+  // Update search results when query changes
+  useEffect(() => {
+    if (!query) {
+      setState(prev => ({
+        ...prev,
+        filteredProducts: [],
+        filteredPosts: [],
+        filteredCreators: [],
+        filteredStores: [],
+      }));
+      return;
+    }
+
+    const q = query.toLowerCase();
+
+    // Filter products
+    const filteredProducts = mockProducts.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      (p.category ?? '').toLowerCase().includes(q) ||
+      (p.tags && p.tags.some((tag: string) => tag.toLowerCase().includes(q)))
+    ).slice(0, 12);
+
+    // Filter posts
+    const filteredPosts = mockPosts.filter(post =>
+      (post.content?.text ?? '').toLowerCase().includes(q) ||
+      (post.hashtags && post.hashtags.some((tag: string) => tag.toLowerCase().includes(q))) ||
+      (post.author?.username ?? '').toLowerCase().includes(q)
+    ).slice(0, 9);
+
+    // Filter creators (unique from posts)
+    const creatorMap = new Map<string, Creator>();
+    mockPosts.forEach(post => {
+      const author = post.author;
+      if (author && author.username.toLowerCase().includes(q)) {
+        if (!creatorMap.has(author.username)) {
+          creatorMap.set(author.username, { ...author, name: author.username.replace(/_/g, ' ') });
+        }
+      }
+    });
+    const filteredCreators = Array.from(creatorMap.values()).slice(0, 8);
+
+    // Filter stores (mock data)
+    const storeMap = new Map<string, Seller>();
+    mockProducts.forEach(p => {
+      // enhanced-mock-data stores the seller as a display name string
+      const sellerName = typeof p.seller === 'string' ? p.seller : (p.seller as { name?: string })?.name;
+      if (sellerName && sellerName.toLowerCase().includes(q)) {
+        const username = sellerName.toLowerCase().replace(/\s+/g, '_');
+        if (!storeMap.has(username)) {
+          storeMap.set(username, { username, name: sellerName, avatar: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(sellerName)}` });
+        }
+      }
+    });
+    const filteredStores = Array.from(storeMap.values()).slice(0, 8);
+
+    setState(prev => ({
+      ...prev,
+      filteredProducts,
+      filteredPosts,
+      filteredCreators,
+      filteredStores,
+    }));
+  }, [query]);
+
+  const handleSearch = (value: string) => {
+    setQuery(value);
+    setActiveTab('all');
+  };
+
+  const addRecentSearch = (searchTerm: string) => {
+    const recent = JSON.parse(
+      localStorage.getItem('ezyify.search.recent') || '[]'
+    ) as string[];
+    const updated = [
+      searchTerm,
+      ...recent.filter(s => s !== searchTerm),
+    ].slice(0, 8);
+    localStorage.setItem('ezyify.search.recent', JSON.stringify(updated));
+    setState(prev => ({ ...prev, recentSearches: updated }));
+  };
+
+  const removeRecentSearch = (searchTerm: string) => {
+    const recent = JSON.parse(
+      localStorage.getItem('ezyify.search.recent') || '[]'
+    ) as string[];
+    const updated = recent.filter(s => s !== searchTerm);
+    localStorage.setItem('ezyify.search.recent', JSON.stringify(updated));
+    setState(prev => ({ ...prev, recentSearches: updated }));
+  };
+
+  const clearSearchQuery = () => {
+    setQuery('');
+  };
+
+  const toggleLike = (productId: string) => {
+    const updated = new Set(likedProducts);
+    if (updated.has(productId)) {
+      updated.delete(productId);
+    } else {
+      updated.add(productId);
+    }
+    setLikedProducts(updated);
+  };
+
+  const toggleCart = (productId: string) => {
+    const updated = new Set(cartItems);
+    if (updated.has(productId)) {
+      updated.delete(productId);
+    } else {
+      updated.add(productId);
+    }
+    setCartItems(updated);
+  };
+
+  const tabsData = [
+    { id: 'all' as SearchTab, label: 'All', count: state.filteredProducts.length + state.filteredPosts.length },
+    { id: 'products' as SearchTab, label: 'Products', count: state.filteredProducts.length },
+    { id: 'creators' as SearchTab, label: 'Creators', count: state.filteredCreators.length },
+    { id: 'posts' as SearchTab, label: 'Posts', count: state.filteredPosts.length },
+    { id: 'stores' as SearchTab, label: 'Stores', count: state.filteredStores.length },
+  ];
+
+  if (isLoading) {
     return <SearchSkeleton />;
   }
 
-  const { trendingSearches, trendingHashtags, filteredProducts, filteredPosts, filteredUsers } = pageData;
-
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    if (query && !recentSearches.includes(query)) {
-      setRecentSearches([query, ...recentSearches.slice(0, 4)]);
-    }
-  };
-
-  const clearRecentSearch = (query: string) => {
-    setRecentSearches(recentSearches.filter(s => s !== query));
-  };
+  const hasQuery = query.trim().length > 0;
 
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-0">
       <SEO {...SEOConfigs.search} />
-      <div className="max-w-7xl mx-auto px-4 pb-6">
-        {/* Search Header */}
-        <div className="mb-6">
-          <div className="flex gap-3 mb-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                placeholder="Search products, posts, users..."
-                className="w-full pl-12 pr-10 py-3 bg-card text-foreground border border-border rounded-full focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground"
-                autoFocus
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
+
+      <div className="max-w-7xl mx-auto px-4 lg:px-6 py-6">
+        {/* Search Field with Back Arrow & Clear Button */}
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 flex gap-2 items-center"
+        >
+          {hasQuery && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={clearSearchQuery}
+              aria-label="Back"
+            >
+              <ArrowLeft className="size-5" />
+            </Button>
+          )}
+          <div className="flex-1 relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-foreground-tertiary pointer-events-none" />
+            <input
+              type="text"
+              value={query}
+              onChange={e => handleSearch(e.target.value)}
+              placeholder="Search products, creators, posts..."
+              className="w-full h-12 pl-12 pr-12 rounded-full border border-border bg-background text-foreground placeholder:text-foreground-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              autoFocus
+            />
+            <AnimatePresence>
+              {query && (
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={clearSearchQuery}
+                  aria-label="Clear search"
                   className="absolute right-4 top-1/2 -translate-y-1/2"
                 >
-                  <X className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" />
-                </button>
+                  <X className="size-5 text-foreground-secondary hover:text-foreground transition-colors" />
+                </motion.button>
               )}
-            </div>
-            <Button 
-              variant="outline"
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2"
-            >
-              <Filter className="w-5 h-5" />
-              <span className="hidden sm:inline">Filters</span>
-            </Button>
+            </AnimatePresence>
           </div>
+        </motion.div>
 
-          {/* Filters Panel */}
-          {showFilters && (
-            <div className="bg-card rounded-2xl p-4 mb-4 border border-border">
-              <h3 className="font-medium text-foreground mb-3">Filters</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm text-muted-foreground mb-2 block">Category</label>
-                  <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full px-3.5 py-2 bg-input-background text-foreground border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
-                    <option value="all">All Categories</option>
-                    {categoryData.filter(c => c.id !== 'all').map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground mb-2 block">Price Range</label>
-                  <select value={filterPrice} onChange={(e) => setFilterPrice(e.target.value)} className="w-full px-3.5 py-2 bg-input-background text-foreground border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
-                    <option value="all">All Prices</option>
-                    <option value="under50">Under $50</option>
-                    <option value="50to100">$50 - $100</option>
-                    <option value="100to200">$100 - $200</option>
-                    <option value="over200">Over $200</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground mb-2 block">Sort By</label>
-                  <select value={filterSort} onChange={(e) => setFilterSort(e.target.value)} className="w-full px-3.5 py-2 bg-input-background text-foreground border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
-                    <option value="relevant">Most Relevant</option>
-                    <option value="newest">Newest First</option>
-                    <option value="price_asc">Price: Low to High</option>
-                    <option value="price_desc">Price: High to Low</option>
-                    <option value="rating">Best Rating</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Search Results or Suggestions */}
-        {!searchQuery ? (
-          <div className="space-y-6">
+        {!hasQuery ? (
+          // Empty state: recent searches + trending
+          <motion.div
+            variants={staggerContainer(reduce ? 0 : 0.05)}
+            initial="hidden"
+            animate="visible"
+            className="space-y-8"
+          >
             {/* Recent Searches */}
-            {recentSearches.length > 0 && (
-              <div className="bg-card border border-border rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-foreground flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-muted-foreground" />
-                    Recent Searches
-                  </h2>
-                  <button 
-                    onClick={() => setRecentSearches([])}
-                    className="text-sm text-primary hover:underline"
-                  >
-                    Clear All
-                  </button>
-                </div>
+            {state.recentSearches.length > 0 && (
+              <motion.div variants={fadeUp}>
+                <h3 className="font-display text-lg font-semibold mb-3 text-foreground">
+                  Recent
+                </h3>
                 <div className="flex flex-wrap gap-2">
-                  {recentSearches.map((query, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-2 bg-muted hover:bg-muted/80 rounded-full px-4 py-2 transition-colors group"
-                    >
+                  {state.recentSearches.map(search => (
+                    <motion.div key={search} variants={fadeUp}>
                       <button
-                        onClick={() => handleSearch(query)}
-                        className="flex items-center gap-2 text-foreground"
+                        onClick={() => handleSearch(search)}
+                        className="inline-flex items-center gap-2 h-10 px-3 rounded-full border border-border bg-card hover:border-border-strong hover:bg-background-elevated transition-colors"
                       >
-                        <Clock className="w-4 h-4 text-muted-foreground" />
-                        <span>{query}</span>
+                        <span className="text-sm font-medium">{search}</span>
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            removeRecentSearch(search);
+                          }}
+                          className="text-foreground-tertiary hover:text-foreground"
+                          aria-label={`Remove "${search}" from recent searches`}
+                        >
+                          <X className="size-4" />
+                        </button>
                       </button>
-                      <button
-                        onClick={() => clearRecentSearch(query)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                      </button>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {/* Trending Searches */}
-            <div className="bg-card border border-border rounded-2xl p-6">
-              <h2 className="text-foreground mb-4 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-primary" />
-                Trending Searches
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                {trendingSearches.map((query, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSearch(query)}
-                    className="flex items-center gap-2 bg-accent hover:bg-accent/80 rounded-xl px-4 py-3 transition-colors text-foreground"
+            <motion.div variants={fadeUp}>
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="size-5 text-foreground" />
+                <h3 className="font-display text-lg font-semibold text-foreground">
+                  Trending
+                </h3>
+              </div>
+              <div className="space-y-2">
+                {state.trendingSearches.map((search, idx) => (
+                  <motion.button
+                    key={search}
+                    variants={fadeUp}
+                    onClick={() => {
+                      handleSearch(search);
+                      addRecentSearch(search);
+                    }}
+                    className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors group flex items-center gap-3"
                   >
-                    <TrendingUp className="w-4 h-4 text-primary" />
-                    <span>{query}</span>
-                  </button>
+                    <span className="font-display font-bold text-foreground-tertiary w-6 text-center">
+                      {(idx + 1).toString().padStart(2, '0')}
+                    </span>
+                    <span className="text-foreground group-hover:text-primary transition-colors">
+                      {search}
+                    </span>
+                    <Zap className="size-4 ml-auto text-foreground-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </motion.button>
                 ))}
               </div>
-            </div>
-
-            {/* Trending Hashtags */}
-            <div className="bg-card border border-border rounded-2xl p-6">
-              <h2 className="text-foreground mb-4 flex items-center gap-2">
-                <Hash className="w-5 h-5 text-primary" />
-                Trending Hashtags
-              </h2>
-              <div className="space-y-3">
-                {trendingHashtags.map((hashtag, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSearch(`#${hashtag.tag}`)}
-                    className="w-full flex items-center justify-between p-3 hover:bg-muted rounded-xl transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-muted rounded-xl flex items-center justify-center text-foreground">
-                        #{idx + 1}
-                      </div>
-                      <div className="text-left">
-                        <p className="font-medium text-foreground">#{hashtag.tag}</p>
-                        <p className="text-sm text-muted-foreground">{(hashtag.count / 1000).toFixed(0)}K posts</p>
-                      </div>
-                    </div>
-                    <TrendingUp className="w-5 h-5 text-primary" />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Popular Categories */}
-            <div className="bg-card border border-border rounded-2xl p-6">
-              <h2 className="text-foreground mb-4 flex items-center gap-2">
-                <Tag className="w-5 h-5 text-primary" />
-                Popular Categories
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {categoryData.filter(c => c.id !== 'all').map(category => (
-                  <Link
-                    key={category.id}
-                    to={`/shop?category=${category.id}`}
-                    className="group relative aspect-square rounded-2xl overflow-hidden hover:shadow-lg transition-shadow"
-                  >
-                    <img
-                      loading="lazy" 
-                      src={category.image} 
-                      alt={category.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                    <div className="absolute bottom-3 left-3 right-3 text-white">
-                      <p className="font-medium mb-0.5">{category.name}</p>
-                      <p className="text-xs text-white/75">{category.count} products</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         ) : (
-          /* Search Results */
-          <div>
-            {/* Results Count */}
-            <div className="mb-6">
-              <p className="text-muted-foreground">
-                Found {filteredProducts.length + filteredPosts.length + filteredUsers.length} results for "{searchQuery}"
-              </p>
-            </div>
+          // Search results
+          <motion.div
+            variants={staggerContainer(reduce ? 0 : 0.05)}
+            initial="hidden"
+            animate="visible"
+            className="space-y-6"
+          >
+            {/* Result Tabs with Counts */}
+            <motion.div variants={fadeUp} className="-mx-4 lg:-mx-6 sticky top-0 z-10 bg-background/95 backdrop-blur-sm">
+              <div className="max-w-7xl mx-auto px-4 lg:px-6">
+                <div className="flex gap-6 overflow-x-auto pb-2">
+                  {tabsData.map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`relative py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+                        activeTab === tab.id
+                          ? 'text-foreground'
+                          : 'text-foreground-secondary hover:text-foreground'
+                      }`}
+                    >
+                      {tab.label}
+                      {tab.count > 0 && (
+                        <span className="ml-2 text-xs text-foreground-tertiary">
+                          {tab.count}
+                        </span>
+                      )}
+                      {activeTab === tab.id && (
+                        <motion.div
+                          layoutId="search-tab-underline"
+                          className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground"
+                          transition={{ duration: DURATION.fast }}
+                        />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-              <TabsList className="grid w-full grid-cols-4 bg-card">
-                <TabsTrigger value="all">
-                  All ({filteredProducts.length + filteredPosts.length + filteredUsers.length})
-                </TabsTrigger>
-                <TabsTrigger value="products">
-                  Products ({filteredProducts.length})
-                </TabsTrigger>
-                <TabsTrigger value="posts">
-                  Posts ({filteredPosts.length})
-                </TabsTrigger>
-                <TabsTrigger value="users">
-                  Users ({filteredUsers.length})
-                </TabsTrigger>
-              </TabsList>
-
-              {/* All Results */}
-              <TabsContent value="all" className="mt-6 space-y-6">
-                {/* Users */}
-                {filteredUsers.length > 0 && (
-                  <div className="bg-card border border-border rounded-2xl p-6">
-                    <h3 className="text-foreground mb-4">Users</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {filteredUsers.slice(0, 4).map((user, idx) => (
-                        <Link
-                          key={idx}
-                          to={`/profile/${user.username}`}
-                          className="flex items-center gap-3 p-3 hover:bg-muted rounded-xl transition-colors"
-                        >
-                          <img
-                      loading="lazy"
-                            src={user.avatar}
-                            alt={user.username}
-                            className="w-12 h-12 rounded-full object-cover"
+            {/* Tab: All */}
+            {activeTab === 'all' && (
+              <motion.div
+                variants={staggerContainer(reduce ? 0 : 0.05)}
+                initial="hidden"
+                animate="visible"
+                className="space-y-8"
+              >
+                {/* Products in All */}
+                {state.filteredProducts.length > 0 && (
+                  <motion.div variants={fadeUp}>
+                    <h3 className="font-display text-lg font-semibold mb-4">Products</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4">
+                      {state.filteredProducts.slice(0, 4).map(product => (
+                        <motion.div key={product.id} variants={fadeUp}>
+                          <ProductCard
+                            product={product}
+                            isLiked={likedProducts.has(product.id)}
+                            inCart={cartItems.has(product.id)}
+                            onToggleLike={() => toggleLike(product.id)}
+                            onAddToCart={() => toggleCart(product.id)}
                           />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-1">
-                              <p className="font-medium text-foreground">{user.username}</p>
-                              {user.verified && <VerifiedBadge size="sm" />}
-                            </div>
-                            <p className="text-sm text-muted-foreground">@{user.username}</p>
-                          </div>
-                          <Button size="sm" variant="outline">Follow</Button>
-                        </Link>
+                        </motion.div>
                       ))}
                     </div>
-                  </div>
+                  </motion.div>
                 )}
 
-                {/* Products */}
-                {filteredProducts.length > 0 && (
-                  <div className="bg-card border border-border rounded-2xl p-6">
-                    <h3 className="text-foreground mb-4">Products</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {filteredProducts.slice(0, 8).map(product => (
-                        <Link
-                          key={product.id}
-                          to={`/product/${product.id}`}
-                          className="bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg transition-shadow group"
+                {/* Posts in All */}
+                {state.filteredPosts.length > 0 && (
+                  <motion.div variants={fadeUp}>
+                    <h3 className="font-display text-lg font-semibold mb-4">Posts</h3>
+                    <div className="grid grid-cols-3 gap-2 lg:gap-4">
+                      {state.filteredPosts.slice(0, 6).map(post => (
+                        <motion.button
+                          key={post.id}
+                          variants={fadeUp}
+                          className="group relative aspect-square rounded-card overflow-hidden bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                          <div className="aspect-square relative overflow-hidden">
-                            {product.badge && (
-                              <Badge className="absolute top-2 left-2 z-10 bg-error text-error-foreground">
-                                {product.badge}
-                              </Badge>
-                            )}
-                            <img
-                      loading="lazy" 
-                              src={product.image} 
-                              alt={product.name}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                          {post.content?.media?.url && (
+                            <ImageWithFallback
+                              src={post.content.media.url}
+                              alt={post.content.text}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                             />
-                          </div>
-                          <div className="p-3">
-                            <p className="text-sm text-muted-foreground mb-1">{product.seller}</p>
-                            <h3 className="font-medium text-foreground mb-2 line-clamp-2">{product.name}</h3>
-                            <div className="flex items-center gap-1 mb-2">
-                              <Star className="w-4 h-4 fill-primary text-primary" />
-                              <span className="text-sm text-foreground">{product.rating}</span>
-                            </div>
-                            <p className="text-foreground">${product.price}</p>
-                          </div>
-                        </Link>
+                          )}
+                        </motion.button>
                       ))}
                     </div>
-                  </div>
+                  </motion.div>
                 )}
 
-                {/* Posts */}
-                {filteredPosts.length > 0 && (
-                  <div className="bg-card border border-border rounded-2xl p-6">
-                    <h3 className="text-foreground mb-4">Posts</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                      {filteredPosts.slice(0, 8).map(post => {
-                        const imageUrl = typeof post.content.media.url === 'string' 
-                          ? post.content.media.url 
-                          : post.content.media.url[0];
-                        
-                        return (
-                          <Link
-                            key={post.id}
-                            to={`/post/${post.id}`}
-                            className="relative aspect-square rounded-2xl overflow-hidden group"
-                          >
-                            <img
-                      loading="lazy" 
-                              src={imageUrl} 
-                              alt={post.content.text}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                {state.filteredProducts.length === 0 && state.filteredPosts.length === 0 && (
+                  <EmptySearchResults />
+                )}
+              </motion.div>
+            )}
+
+            {/* Tab: Products */}
+            {activeTab === 'products' && (
+              <motion.div
+                variants={staggerContainer(reduce ? 0 : 0.05)}
+                initial="hidden"
+                animate="visible"
+              >
+                {state.filteredProducts.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4">
+                    {state.filteredProducts.map(product => (
+                      <motion.div key={product.id} variants={fadeUp}>
+                        <ProductCard
+                          product={product}
+                          isLiked={likedProducts.has(product.id)}
+                          inCart={cartItems.has(product.id)}
+                          onToggleLike={() => toggleLike(product.id)}
+                          onAddToCart={() => toggleCart(product.id)}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptySearchResults />
+                )}
+              </motion.div>
+            )}
+
+            {/* Tab: Creators */}
+            {activeTab === 'creators' && (
+              <motion.div
+                variants={staggerContainer(reduce ? 0 : 0.05)}
+                initial="hidden"
+                animate="visible"
+              >
+                {state.filteredCreators.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
+                    {state.filteredCreators.map(creator => (
+                      <motion.div key={creator.username} variants={fadeUp}>
+                        <Link
+                          to={`/profile/${creator.username}`}
+                          className="flex items-center gap-4 p-4 rounded-card border border-border bg-card hover:bg-background-elevated hover:border-border-strong transition-colors"
+                        >
+                          <div className="relative flex-shrink-0">
+                            <ImageWithFallback
+                              src={creator.avatar}
+                              alt={creator.username}
+                              className="size-16 rounded-full object-cover"
+                              width={64}
+                              height={64}
                             />
-                            <div className="absolute inset-0 bg-muted/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <div className="text-foreground flex items-center gap-4">
-                                <div className="flex items-center gap-1">
-                                  <Heart className="w-5 h-5 fill-foreground" />
-                                  <span>{(post.engagement.likes / 1000).toFixed(1)}K</span>
-                                </div>
-                              </div>
-                            </div>
-                            {post.content.media.type === 'video' && (
-                              <div className="absolute top-2 right-2">
-                                <Play className="w-6 h-6 text-foreground drop-shadow-lg" />
-                              </div>
+                            {creator.verified && (
+                              <span className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5">
+                                <VerifiedBadge size="sm" />
+                              </span>
                             )}
-                          </Link>
-                        );
-                      })}
-                    </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <p className="font-semibold text-foreground truncate">
+                                {creator.name}
+                              </p>
+                            </div>
+                            <p className="text-xs text-foreground-secondary truncate mb-2">
+                              @{creator.username}
+                            </p>
+                            <p className="text-xs text-foreground-tertiary">
+                              {creator.followers?.toLocaleString()} followers
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                          >
+                            Follow
+                          </Button>
+                        </Link>
+                      </motion.div>
+                    ))}
                   </div>
+                ) : (
+                  <EmptySearchResults />
                 )}
+              </motion.div>
+            )}
 
-                {filteredProducts.length === 0 && filteredPosts.length === 0 && filteredUsers.length === 0 && (
-                  <div className="text-center py-12">
-                    <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-foreground mb-2">No results found</h3>
-                    <p className="text-muted-foreground">Try adjusting your search or filters</p>
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* Products Tab */}
-              <TabsContent value="products" className="mt-6">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {filteredProducts.map(product => (
-                    <Link
-                      key={product.id}
-                      to={`/product/${product.id}`}
-                      className="bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg transition-shadow group"
-                    >
-                      <div className="aspect-square relative overflow-hidden">
-                        {product.badge && (
-                          <Badge className="absolute top-2 left-2 z-10 bg-error text-error-foreground">
-                            {product.badge}
-                          </Badge>
-                        )}
-                        <img
-                      loading="lazy" 
-                          src={product.image} 
-                          alt={product.name}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                        />
-                      </div>
-                      <div className="p-3">
-                        <p className="text-sm text-muted-foreground mb-1">{product.seller}</p>
-                        <h3 className="font-medium text-foreground mb-2 line-clamp-2">{product.name}</h3>
-                        <div className="flex items-center gap-1 mb-2">
-                          <Star className="w-4 h-4 fill-primary text-primary" />
-                          <span className="text-sm text-foreground">{product.rating}</span>
-                        </div>
-                        <p className="text-foreground">${product.price}</p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </TabsContent>
-
-              {/* Posts Tab */}
-              <TabsContent value="posts" className="mt-6">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                  {filteredPosts.map(post => {
-                    const imageUrl = typeof post.content.media.url === 'string' 
-                      ? post.content.media.url 
-                      : post.content.media.url[0];
-                    
-                    return (
-                      <Link
+            {/* Tab: Posts */}
+            {activeTab === 'posts' && (
+              <motion.div
+                variants={staggerContainer(reduce ? 0 : 0.05)}
+                initial="hidden"
+                animate="visible"
+              >
+                {state.filteredPosts.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2 lg:gap-4">
+                    {state.filteredPosts.map(post => (
+                      <motion.button
                         key={post.id}
-                        to={`/post/${post.id}`}
-                        className="relative aspect-square rounded-2xl overflow-hidden group"
+                        variants={fadeUp}
+                        className="group relative aspect-square rounded-card overflow-hidden bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <img
-                      loading="lazy" 
-                          src={imageUrl} 
-                          alt={post.content.text}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                        />
-                        <div className="absolute inset-0 bg-muted/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <div className="text-foreground flex items-center gap-4">
-                            <div className="flex items-center gap-1">
-                              <Heart className="w-5 h-5 fill-foreground" />
-                              <span>{(post.engagement.likes / 1000).toFixed(1)}K</span>
+                        {post.content?.media?.url && (
+                          <ImageWithFallback
+                            src={post.content.media.url}
+                            alt={post.content.text}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                        )}
+                      </motion.button>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptySearchResults />
+                )}
+              </motion.div>
+            )}
+
+            {/* Tab: Stores */}
+            {activeTab === 'stores' && (
+              <motion.div
+                variants={staggerContainer(reduce ? 0 : 0.05)}
+                initial="hidden"
+                animate="visible"
+              >
+                {state.filteredStores.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
+                    {state.filteredStores.map(store => (
+                      <motion.div key={store.username} variants={fadeUp}>
+                        <Card variant="default" className="p-4">
+                          <div className="flex items-start gap-3 mb-3">
+                            <ImageWithFallback
+                              src={store.avatar}
+                              alt={store.name}
+                              className="size-14 rounded-full object-cover"
+                              width={56}
+                              height={56}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-foreground truncate">
+                                {store.name}
+                              </p>
+                              <p className="text-xs text-foreground-secondary truncate">
+                                @{store.username}
+                              </p>
                             </div>
                           </div>
-                        </div>
-                        {post.content.media.type === 'video' && (
-                          <div className="absolute top-2 right-2">
-                            <Play className="w-6 h-6 text-foreground drop-shadow-lg" />
-                          </div>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </TabsContent>
-
-              {/* Users Tab */}
-              <TabsContent value="users" className="mt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {filteredUsers.map((user, idx) => (
-                    <Link
-                      key={idx}
-                      to={`/profile/${user.username}`}
-                      className="bg-card border border-border rounded-2xl p-4 hover:shadow-lg transition-shadow flex items-center gap-4"
-                    >
-                      <img
-                      loading="lazy"
-                        src={user.avatar}
-                        alt={user.username}
-                        className="w-16 h-16 rounded-full object-cover"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-1 mb-1">
-                          <p className="font-medium text-foreground">{user.username}</p>
-                          {user.verified && <VerifiedBadge size="sm" />}
-                        </div>
-                        <p className="text-muted-foreground mb-2">@{user.username}</p>
-                        <Button size="sm" variant="outline">Follow</Button>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
+                          <Button
+                            asChild
+                            variant="primary"
+                            size="sm"
+                            fullWidth
+                          >
+                            <Link to={`/store/${store.username}`}>
+                              Visit store
+                            </Link>
+                          </Button>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptySearchResults />
+                )}
+              </motion.div>
+            )}
+          </motion.div>
         )}
       </div>
     </div>

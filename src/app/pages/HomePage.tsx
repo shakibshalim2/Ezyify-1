@@ -13,6 +13,7 @@ import { EmptyPosts } from '../components/EmptyStates';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { SEO } from '../components/SEO';
 import { PostCard } from '../components/PostCard';
+import { HeroBanner } from '../components/home/HeroBanner';
 import { useMemoryOptimization } from '../hooks/useMemoryOptimization';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
@@ -1234,6 +1235,15 @@ export default function HomePage() {
             ))}
           </div>
         </div>
+
+        {/* ─── Hero ─────────────────────────────────────────────────────────── */}
+        {activeFilter === 'foryou' && (
+          <HeroBanner
+            liveCount={LIVE_STREAMS.length}
+            featuredImage={feedData?.products?.[0]?.image}
+            featuredName={feedData?.products?.[0]?.name}
+          />
+        )}
 
         {/* ─── Feed filter tabs ──────────────────────────────────────────────── */}
         <div ref={feedTopRef} className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide px-3.5 sm:px-0 mb-3 sm:mb-4">
