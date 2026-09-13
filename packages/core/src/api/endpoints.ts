@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ApiClient } from './client';
+import type { ApiClient } from './client.js';
 import {
   CartSchema,
   CategorySchema,
@@ -35,7 +35,7 @@ import {
   type ReportRequest,
   type SignupRequest,
   type VerifyOtpRequest,
-} from '../schemas';
+} from '../schemas/index.js';
 
 const Ok = z.object({ ok: z.literal(true) }).or(z.null());
 type PageQuery = { page?: number; pageSize?: number };

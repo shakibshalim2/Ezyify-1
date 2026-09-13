@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
-import { createApiClient, ApiError, type TokenStore } from './client';
+import { createApiClient, ApiError, type TokenStore } from './client.js';
 
 const ok = (data: unknown, status = 200) =>
   new Response(JSON.stringify({ success: true, data }), { status, headers: { 'Content-Type': 'application/json' } });

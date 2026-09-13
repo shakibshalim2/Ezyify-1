@@ -1,0 +1,644 @@
+// Ezyify data model — mirrors packages/core zod schemas (the wire contract) and BACKEND_API_SPECIFICATION.md.
+// Money is integer minor units everywhere; all timestamps are timestamptz.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  runtime  = "nodejs"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  user
+  creator
+  seller
+  admin
+  superadmin
+}
+
+enum Currency {
+  USD
+  IDR
+  EUR
+  GBP
+}
+
+enum PostKind {
+  post
+  loop
+  story
+}
+
+enum MediaType {
+  image
+  video
+}
+
+enum OrderStatus {
+  pending_payment
+  paid
+  processing
+  shipped
+  out_for_delivery
+  delivered
+  completed
+  cancelled
+  refund_requested
+  refunded
+  disputed
+}
+
+enum EscrowStatus {
+  held
+  released
+  refunded
+  disputed
+}
+
+enum PaymentMethod {
+  wallet
+  card
+  bank_transfer
+  cod
+}
+
+enum TransactionType {
+  topup
+  purchase
+  refund
+  commission
+  withdrawal
+  transfer
+}
+
+enum TransactionStatus {
+  pending
+  completed
+  failed
+}
+
+enum NotificationType {
+  like
+  comment
+  follow
+  purchase
+  live
+  order
+  trending
+  repost
+  system
+}
+
+enum MessageStatus {
+  sending
+  sent
+  delivered
+  read
+}
+
+enum ReportTargetType {
+  user
+  post
+  loop
+  story
+  product
+  message
+  live
+  comment
+}
+
+enum ReportStatus {
+  open
+  reviewing
+  actioned
+  dismissed
+}
+
+enum DevicePlatform {
+  android
+  ios
+  web
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  phone         String?   @unique
+  username      String    @unique
+  name          String
+  passwordHash  String
+  role          Role      @default(user)
+  verified      Boolean   @default(false)
+  emailVerified Boolean   @default(false)
+  avatarUrl     String?
+  coverUrl      String?
+  bio           String?   @db.VarChar(160)
+  website       String?
+  location      String?   @db.VarChar(80)
+  interests     String[]  @default([])
+  deletedAt     DateTime? // soft delete → hard purge job after 30 days
+  deletionReason String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions      RefreshSession[]
+  otps          OtpCode[]
+  devices       Device[]
+  wallet        Wallet?
+  addresses     Address[]
+  products      Product[]        @relation("SellerProducts")
+  cart          Cart?
+  buyerOrders   Order[]          @relation("BuyerOrders")
+  sellerOrders  Order[]          @relation("SellerOrders")
+  posts         Post[]
+  comments      Comment[]
+  likes         Like[]
+  saves         Save[]
+  followers     Follow[]         @relation("Following")
+  following     Follow[]         @relation("Follower")
+  blocks        Block[]          @relation("Blocker")
+  blockedBy     Block[]          @relation("Blocked")
+  participants  Participant[]
+  messages      Message[]
+  notifications Notification[]   @relation("Recipient")
+  actedNotifs   Notification[]   @relation("Actor")
+  reports       Report[]         @relation("Reporter")
+  reviews       Review[]
+
+  @@index([role])
+  @@index([deletedAt])
+}
+
+/// Refresh-token rotation: each row is one device session; `replacedById` chain detects reuse.
+model RefreshSession {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique
+  userAgent    String?
+  ip           String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel   String   // email | phone
+  codeHash  String
+  purpose   String   // verify | reset | login
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, purpose])
+}
+
+model Device {
+  id         String         @id @default(cuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String         @unique
+  platform   DevicePlatform
+  provider   String         // fcm | apns | expo | webpush
+  appVersion String
+  locale     String?
+  lastSeenAt DateTime       @default(now())
+  createdAt  DateTime       @default(now())
+
+  @@index([userId])
+}
+
+model Address {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String
+  recipient String
+  phone     String
+  line1     String
+  line2     String?
+  city      String
+  region    String?
+  postal    String
+  country   String  @db.Char(2)
+  isDefault Boolean @default(false)
+  orders    Order[]
+
+  @@index([userId])
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  slug     String    @unique
+  name     String
+  imageUrl String?
+  products Product[]
+}
+
+model Product {
+  id             String    @id @default(cuid())
+  slug           String    @unique
+  name           String
+  description    String
+  sellerId       String
+  seller         User      @relation("SellerProducts", fields: [sellerId], references: [id])
+  categoryId     String
+  category       Category  @relation(fields: [categoryId], references: [id])
+  price          Int
+  compareAtPrice Int?
+  currency       Currency  @default(USD)
+  images         String[]
+  tags           String[]  @default([])
+  badge          String?   // new | sale | bestseller | limited | live
+  stock          Int       @default(0)
+  soldCount      Int       @default(0)
+  ratingSum      Int       @default(0)
+  ratingCount    Int       @default(0)
+  freeShipOver   Int?
+  etaMinDays     Int       @default(3)
+  etaMaxDays     Int       @default(5)
+  affiliatePct   Int       @default(0) // basis points /100
+  published      Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  variants   ProductVariant[]
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  reviews    Review[]
+  postTags   PostProduct[]
+
+  @@index([sellerId])
+  @@index([categoryId])
+  @@index([published, createdAt])
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  options   Json    // { Color: 'Blue', Size: 'M' }
+  price     Int
+  stock     Int     @default(0)
+  imageUrl  String?
+  cartItems CartItem[]
+
+  @@index([productId])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int
+  text      String?
+  createdAt DateTime @default(now())
+
+  @@unique([productId, userId])
+}
+
+model Cart {
+  id         String     @id @default(cuid())
+  userId     String     @unique
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  couponCode String?
+  items      CartItem[]
+  updatedAt  DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String          @id @default(cuid())
+  cartId    String
+  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  quantity  Int
+
+  @@unique([cartId, productId, variantId])
+}
+
+/// One order per seller per checkout (multi-seller carts fan out). Escrow lives on the order.
+model Order {
+  id            String        @id @default(cuid())
+  orderNumber   String        @unique
+  buyerId       String
+  buyer         User          @relation("BuyerOrders", fields: [buyerId], references: [id])
+  sellerId      String
+  seller        User          @relation("SellerOrders", fields: [sellerId], references: [id])
+  addressId     String
+  address       Address       @relation(fields: [addressId], references: [id])
+  status        OrderStatus   @default(pending_payment)
+  paymentMethod PaymentMethod
+  currency      Currency      @default(USD)
+  subtotal      Int
+  shipping      Int
+  discount      Int           @default(0)
+  total         Int
+  escrowStatus  EscrowStatus  @default(held)
+  autoReleaseAt DateTime?
+  trackingCarrier String?
+  trackingNumber  String?
+  trackingUrl     String?
+  note          String?
+  idempotencyKey String?      @unique
+  placedAt      DateTime      @default(now())
+  paidAt        DateTime?
+  deliveredAt   DateTime?
+  completedAt   DateTime?
+
+  items    OrderItem[]
+  events   OrderEvent[]
+  ledger   EscrowLedger[]
+  refunds  RefundRequest[]
+
+  @@index([buyerId, placedAt])
+  @@index([sellerId, status])
+  @@index([escrowStatus, autoReleaseAt])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  name      String
+  imageUrl  String
+  variant   String?
+  quantity  Int
+  unitPrice Int
+
+  @@index([orderId])
+}
+
+model OrderEvent {
+  id      String      @id @default(cuid())
+  orderId String
+  order   Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status  OrderStatus
+  note    String?
+  at      DateTime    @default(now())
+
+  @@index([orderId, at])
+}
+
+/// Double-entry style ledger for escrow moves: hold / release / refund / commission.
+model EscrowLedger {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kind      String   // hold | release | refund | commission | fee
+  amount    Int
+  currency  Currency
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model RefundRequest {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reason    String
+  itemIds   String[]
+  status    String   @default("requested") // requested | approved | rejected | negotiating | disputed | refunded
+  amount    Int?
+  createdAt DateTime @default(now())
+  resolvedAt DateTime?
+
+  @@index([orderId])
+}
+
+model Wallet {
+  id        String        @id @default(cuid())
+  userId    String        @unique
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency  Currency      @default(USD)
+  balance   Int           @default(0)
+  pending   Int           @default(0)
+  updatedAt DateTime      @updatedAt
+  transactions Transaction[]
+}
+
+model Transaction {
+  id          String            @id @default(cuid())
+  walletId    String
+  wallet      Wallet            @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  type        TransactionType
+  direction   String            // in | out
+  amount      Int
+  currency    Currency
+  status      TransactionStatus @default(completed)
+  description String
+  reference   String?           // orderId / payout id / processor id
+  idempotencyKey String?        @unique
+  createdAt   DateTime          @default(now())
+
+  @@index([walletId, createdAt])
+}
+
+model Post {
+  id        String    @id @default(cuid())
+  kind      PostKind  @default(post)
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  caption   String    @db.VarChar(2200)
+  hashtags  String[]  @default([])
+  location  String?
+  likeCount    Int    @default(0)
+  commentCount Int    @default(0)
+  shareCount   Int    @default(0)
+  saveCount    Int    @default(0)
+  viewCount    Int    @default(0)
+  expiresAt DateTime? // stories
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  media    PostMedia[]
+  products PostProduct[]
+  comments Comment[]
+  likes    Like[]
+  saves    Save[]
+
+  @@index([authorId, createdAt])
+  @@index([kind, createdAt])
+}
+
+model PostMedia {
+  id           String    @id @default(cuid())
+  postId       String
+  post         Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  type         MediaType
+  url          String
+  thumbnailUrl String?
+  width        Int?
+  height       Int?
+  durationMs   Int?
+  position     Int       @default(0)
+
+  @@index([postId, position])
+}
+
+model PostProduct {
+  postId    String
+  post      Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([postId, productId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  text      String   @db.VarChar(1000)
+  likeCount Int      @default(0)
+  parentId  String?
+  createdAt DateTime @default(now())
+
+  @@index([postId, createdAt])
+}
+
+model Like {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, postId])
+  @@index([postId])
+}
+
+model Save {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, postId])
+}
+
+model Follow {
+  followerId  String
+  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@id([followerId, followingId])
+  @@index([followingId])
+}
+
+model Block {
+  blockerId String
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([blockerId, blockedId])
+}
+
+model Conversation {
+  id           String        @id @default(cuid())
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  participants Participant[]
+  messages     Message[]
+}
+
+model Participant {
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime?
+
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String        @id @default(cuid())
+  conversationId String
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  text           String?
+  mediaUrl       String?
+  mediaType      MediaType?
+  productId      String?
+  status         MessageStatus @default(sent)
+  createdAt      DateTime      @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model Notification {
+  id           String           @id @default(cuid())
+  recipientId  String
+  recipient    User             @relation("Recipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actorId      String?
+  actor        User?            @relation("Actor", fields: [actorId], references: [id], onDelete: SetNull)
+  type         NotificationType
+  message      String
+  href         String?
+  thumbnailUrl String?
+  readAt       DateTime?
+  createdAt    DateTime         @default(now())
+
+  @@index([recipientId, createdAt])
+  @@index([recipientId, readAt])
+}
+
+model Report {
+  id         String           @id @default(cuid())
+  reporterId String
+  reporter   User             @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType ReportTargetType
+  targetId   String
+  reason     String
+  details    String?          @db.VarChar(1000)
+  status     ReportStatus     @default(open)
+  createdAt  DateTime         @default(now())
+  resolvedAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+}
+
+/// Idempotency for payment/checkout endpoints: key → stored response.
+model IdempotencyKey {
+  key        String   @id
+  userId     String
+  method     String
+  path       String
+  statusCode Int
+  response   Json
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}

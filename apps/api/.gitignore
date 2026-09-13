@@ -1,0 +1,7 @@
+dist
+coverage
+.env
+.env.test
+!.env.test.example
+src/generated
+openapi.json

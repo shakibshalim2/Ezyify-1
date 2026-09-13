@@ -63,6 +63,19 @@
       "dependsOn": [
         "build"
       ]
+    },
+    "@ezyify/api#test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "cache": false
     }
-  }
+  },
+  "globalPassThroughEnv": [
+    "DATABASE_URL",
+    "JWT_ACCESS_SECRET",
+    "JWT_REFRESH_SECRET",
+    "NODE_ENV",
+    "CI"
+  ]
 }

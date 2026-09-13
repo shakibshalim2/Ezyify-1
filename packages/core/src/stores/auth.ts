@@ -1,7 +1,7 @@
 import { createStore } from 'zustand/vanilla';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Session, UserSummary } from '../schemas/user';
-import { STORAGE_KEYS, memoryStorage, type KeyValueStorage } from './storage';
+import type { Session, UserSummary } from '../schemas/user.js';
+import { STORAGE_KEYS, memoryStorage, type KeyValueStorage } from './storage.js';
 
 export interface AuthState {
   user: UserSummary | null;

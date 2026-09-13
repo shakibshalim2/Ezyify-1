@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { IdSchema, IsoDateSchema, MoneySchema } from './common';
-import { ProductSummarySchema } from './catalog';
-import { UserSummarySchema } from './user';
+import { IdSchema, IsoDateSchema, MoneySchema } from './common.js';
+import { ProductSummarySchema } from './catalog.js';
+import { UserSummarySchema } from './user.js';
 
 export const CartItemSchema = z.object({
   productId: IdSchema,

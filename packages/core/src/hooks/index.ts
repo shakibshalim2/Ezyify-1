@@ -1,8 +1,8 @@
 import { createContext, useContext, useMemo } from 'react';
 import { useStore } from 'zustand';
-import type { Endpoints } from '../api/endpoints';
-import type { AuthStore, AuthState } from '../stores/auth';
-import type { CartStore, CartState } from '../stores/cart';
+import type { Endpoints } from '../api/endpoints.js';
+import type { AuthStore, AuthState } from '../stores/auth.js';
+import type { CartStore, CartState } from '../stores/cart.js';
 
 export interface EzyifyRuntime {
   api: Endpoints;

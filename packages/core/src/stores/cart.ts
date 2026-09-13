@@ -1,6 +1,6 @@
 import { createStore } from 'zustand/vanilla';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { STORAGE_KEYS, memoryStorage, type KeyValueStorage } from './storage';
+import { STORAGE_KEYS, memoryStorage, type KeyValueStorage } from './storage.js';
 
 export interface LocalCartLine {
   productId: string;

@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import { envelope, type ApiErrorBody } from '../schemas/common';
+import { envelope, type ApiErrorBody } from '../schemas/common.js';
 
 export class ApiError extends Error {
   readonly code: ApiErrorBody['code'];

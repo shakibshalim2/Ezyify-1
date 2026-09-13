@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatMoney, money, discountPercent, formatRelativeTime } from './index';
+import { formatMoney, money, discountPercent, formatRelativeTime } from './index.js';
 
 describe('utils', () => {
   it('formats money from minor units', () => {

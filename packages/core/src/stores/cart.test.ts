@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createCartStore } from './cart';
-import { memoryStorage } from './storage';
+import { createCartStore } from './cart.js';
+import { memoryStorage } from './storage.js';
 
 describe('cart store', () => {
   it('merges same product+variant and caps at 99', () => {

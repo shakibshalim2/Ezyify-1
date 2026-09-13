@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { IdSchema } from './common';
-import { SessionSchema } from './user';
+import { IdSchema } from './common.js';
+import { SessionSchema } from './user.js';
 
 export const PasswordSchema = z
   .string()

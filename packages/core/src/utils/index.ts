@@ -1,4 +1,4 @@
-import type { Money } from '../schemas/common';
+import type { Money } from '../schemas/common.js';
 
 const LOCALE: Record<Money['currency'], string> = { USD: 'en-US', IDR: 'id-ID', EUR: 'de-DE', GBP: 'en-GB' };
 const MINOR_UNITS: Record<Money['currency'], number> = { USD: 100, IDR: 1, EUR: 100, GBP: 100 };

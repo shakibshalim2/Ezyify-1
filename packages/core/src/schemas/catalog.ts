@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { IdSchema, IsoDateSchema, MoneySchema } from './common';
-import { UserSummarySchema } from './user';
+import { IdSchema, IsoDateSchema, MoneySchema } from './common.js';
+import { UserSummarySchema } from './user.js';
 
 export const ProductBadgeSchema = z.enum(['new', 'sale', 'bestseller', 'limited', 'live']);
 

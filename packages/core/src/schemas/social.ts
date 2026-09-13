@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { IdSchema, IsoDateSchema } from './common';
-import { UserSummarySchema } from './user';
+import { IdSchema, IsoDateSchema } from './common.js';
+import { UserSummarySchema } from './user.js';
 
 export const MediaSchema = z.object({
   type: z.enum(['image', 'video']),

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SignupRequestSchema, PasswordSchema, envelope, ProductSummarySchema, RegisterDeviceRequestSchema, DeleteAccountRequestSchema, ReportRequestSchema } from './index';
+import { SignupRequestSchema, PasswordSchema, envelope, ProductSummarySchema, RegisterDeviceRequestSchema, DeleteAccountRequestSchema, ReportRequestSchema } from './index.js';
 import { z } from 'zod';
 
 describe('schemas', () => {
