@@ -58,6 +58,11 @@
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "@ezyify/tokens#test": {
+      "dependsOn": [
+        "build"
+      ]
     }
   }
 }
