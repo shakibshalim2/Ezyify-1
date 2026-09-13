@@ -25,13 +25,14 @@ import { initProductionCleanupValidator } from './utils/productionCleanupValidat
 import { initProductionAuditHelper } from './utils/productionAuditHelper';
 
 import { isPreviewMode } from './utils/previewModeIsolation';
+import { devRoutes } from './routes/devRoutes';
 
 // Initialize browser compatibility check immediately - SKIP IN PREVIEW
 // Minimal safe module-level init — no DOM manipulation, no timers that overwrite content
 if (typeof window !== 'undefined') {
   try {
     // Deferred non-critical validators — low priority, won't block render
-    if (typeof requestIdleCallback !== 'undefined') {
+    if (import.meta.env.DEV && typeof requestIdleCallback !== 'undefined') {
       requestIdleCallback(() => {
         try { initProductionCleanupValidator(); } catch (e) {}
         try { initProductionAuditHelper(); } catch (e) {}
@@ -98,9 +99,7 @@ const UploadPage = createLazyComponent(() => import('./pages/UploadPage'));
 const ForgotPasswordPage = createLazyComponent(() => import('./pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = createLazyComponent(() => import('./pages/auth/ResetPasswordPage'));
 const OTPVerificationPage = createLazyComponent(() => import('./pages/auth/OTPVerificationPage'));
-const PlatformOverviewPage = createLazyComponent(() => import('./pages/PlatformOverviewPage'));
 const UserDashboardPage = createLazyComponent(() => import('./pages/user/UserDashboard'));
-const LaunchControlCenter = createLazyComponent(() => import('./pages/LaunchControlCenter'));
 const CheckoutPage = createLazyComponent(() => import('./pages/user/index').then(m => ({ default: m.CheckoutPage })));
 const WalletPage = createLazyComponent(() => import('./pages/user/index').then(m => ({ default: m.WalletPage })));
 const OrdersPage = createLazyComponent(() => import('./pages/user/index').then(m => ({ default: m.OrdersPage })));
@@ -131,29 +130,8 @@ const AddProductPage = createLazyComponent(() => import('./pages/seller/AddProdu
 const EditProductPage = createLazyComponent(() => import('./pages/seller/EditProductPage'));
 const OrderDetailPage = createLazyComponent(() => import('./pages/seller/OrderDetailPage'));
 const AdminDashboardPage = createLazyComponent(() => import('./pages/admin/DashboardPage'));
-const PaymentSystemStatusPage = createLazyComponent(() => import('./pages/admin/PaymentSystemStatusPage'));
-const PreDeploymentCheckerPage = createLazyComponent(() => import('./pages/admin/PreDeploymentCheckerPage'));
-const LaunchDashboardPage = createLazyComponent(() => import('./pages/admin/LaunchDashboardPage'));
-const IconGeneratorPage = createLazyComponent(() => import('./pages/admin/IconGeneratorPage'));
-const PerformanceVerificationDashboard = createLazyComponent(() => import('./pages/admin/PerformanceVerificationDashboard'));
 
 // Batch 5
-const ProductionValidationCenter = createLazyComponent(() => import('./pages/admin/ProductionValidationCenter'));
-const LaunchPreparationCenter = createLazyComponent(() => import('./pages/admin/LaunchPreparationCenter'));
-const AutomatedLaunchDashboard = createLazyComponent(() => import('./pages/admin/AutomatedLaunchDashboard'));
-const MasterLaunchControl = createLazyComponent(() => import('./pages/admin/MasterLaunchControl'));
-const LaunchExecutionConsole = createLazyComponent(() => import('./pages/admin/LaunchExecutionConsole'));
-const LaunchDayCommandCenter = createLazyComponent(() => import('./pages/admin/LaunchDayCommandCenter'));
-const MarketingAcquisitionHub = createLazyComponent(() => import('./pages/admin/MarketingAcquisitionHub'));
-const AnalyticsBusinessIntelligence = createLazyComponent(() => import('./pages/admin/AnalyticsBusinessIntelligence'));
-const PostLaunchGrowthCenter = createLazyComponent(() => import('./pages/admin/PostLaunchGrowthCenter'));
-const PerformanceMonitoringDashboard = createLazyComponent(() => import('./pages/admin/PerformanceMonitoringDashboard'));
-const APIIntegrationPlayground = createLazyComponent(() => import('./pages/APIIntegrationPlayground'));
-const BackendIntegrationStatus = createLazyComponent(() => import('./pages/BackendIntegrationStatus'));
-const APITestingDashboard = createLazyComponent(() => import('./pages/APITestingDashboard'));
-const PreLaunchQADashboard = createLazyComponent(() => import('./pages/PreLaunchQADashboard'));
-const RealTimeAnalyticsDashboard = createLazyComponent(() => import('./pages/RealTimeAnalyticsDashboard'));
-const CustomerSupportAdminPanel = createLazyComponent(() => import('./pages/CustomerSupportAdminPanel'));
 
 // Batch 6
 const LandingPage = createLazyComponent(() => import('./pages/LandingPage'));
@@ -217,7 +195,6 @@ const FraudDetectionDashboard = createLazyComponent(() => import('./pages/admin/
 const SellerApprovalQueue = createLazyComponent(() => import('./pages/admin/operations/SellerApprovalQueue'));
 const LiveShoppingPage = createLazyComponent(() => import('./pages/LiveShoppingPage'));
 const RefundNegotiationPage = createLazyComponent(() => import('./pages/orders/RefundNegotiationPage'));
-const SystemArchitectureVisualizerPage = createLazyComponent(() => import('./components/SystemArchitectureVisualizer'));
 
 
 function PageLoader() {
@@ -285,8 +262,10 @@ export default function App() {
         if (typeof navigator !== 'undefined') registerServiceWorker();
       } catch (e) {}
       try { initializeOptimizations(); } catch (e) {}
-      try { logPlatformStatus(); } catch (e) {}
-      try { displayLaunchStatusBanner(); showLaunchReminder(); } catch (e) {}
+      if (import.meta.env.DEV) {
+        try { logPlatformStatus(); } catch (e) {}
+        try { displayLaunchStatusBanner(); showLaunchReminder(); } catch (e) {}
+      }
     };
 
     if (typeof requestIdleCallback !== 'undefined') {
@@ -340,14 +319,6 @@ export default function App() {
               <Route path="/loops" element={<LoopsPage />} />
               <Route element={<WithNavigation />}>
                 <Route path="/" element={<FirstRunGate><HomePage /></FirstRunGate>} />
-                <Route path="/platform-overview" element={<PlatformOverviewPage />} />
-                <Route path="/launch-control" element={<LaunchControlCenter />} />
-                <Route path="/api-integration-playground" element={<APIIntegrationPlayground />} />
-                <Route path="/backend-integration-status" element={<BackendIntegrationStatus />} />
-                <Route path="/api-testing-dashboard" element={<APITestingDashboard />} />
-                <Route path="/pre-launch-qa-dashboard" element={<PreLaunchQADashboard />} />
-                <Route path="/real-time-analytics-dashboard" element={<RealTimeAnalyticsDashboard />} />
-                <Route path="/customer-support-admin-panel" element={<CustomerSupportAdminPanel />} />
                 <Route path="/explore" element={<ExplorePage />} />
                 <Route path="/post/:id" element={<PostDetailPage />} />
                 <Route path="/shop" element={<ShopPage />} />
@@ -387,21 +358,6 @@ export default function App() {
                 <Route path="/seller/reviews" element={<SellerReviewsPage />} />
                 <Route path="/seller/support" element={<SellerSupportPage />} />
                 <Route path="/admin" element={<AdminDashboardPage />} />
-                <Route path="/admin/payment-system-status" element={<PaymentSystemStatusPage />} />
-                <Route path="/admin/icon-generator" element={<IconGeneratorPage />} />
-                <Route path="/admin/launch-dashboard" element={<LaunchDashboardPage />} />
-                <Route path="/admin/pre-deployment-checker" element={<PreDeploymentCheckerPage />} />
-                <Route path="/admin/performance-verification" element={<PerformanceVerificationDashboard />} />
-                <Route path="/admin/production-validation" element={<ProductionValidationCenter />} />
-                <Route path="/admin/launch-preparation" element={<LaunchPreparationCenter />} />
-                <Route path="/admin/automated-launch-dashboard" element={<AutomatedLaunchDashboard />} />
-                <Route path="/admin/master-launch-control" element={<MasterLaunchControl />} />
-                <Route path="/admin/launch-execution-console" element={<LaunchExecutionConsole />} />
-                <Route path="/admin/launch-command-center" element={<LaunchDayCommandCenter />} />
-                <Route path="/admin/marketing-acquisition" element={<MarketingAcquisitionHub />} />
-                <Route path="/admin/analytics-bi" element={<AnalyticsBusinessIntelligence />} />
-                <Route path="/admin/growth-center" element={<PostLaunchGrowthCenter />} />
-                <Route path="/admin/performance-monitoring" element={<PerformanceMonitoringDashboard />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/help" element={<HelpPage />} />
                 <Route path="/payment-guide" element={<PaymentGuide />} />
@@ -456,7 +412,6 @@ export default function App() {
                 <Route path="/verification-status" element={<VerificationStatusPage />} />
                 <Route path="/transparency" element={<TransparencyPage />} />
                 <Route path="/commission-policy" element={<CommissionPolicyPage />} />
-                <Route path="/admin/system-architecture" element={<SystemArchitectureVisualizerPage />} />
                 <Route path="/user/multi-seller-order-tracking" element={<MultiSellerOrderTrackingPage />} />
                 <Route path="/admin/users" element={<UserManagementDashboard />} />
                 <Route path="/admin/moderation" element={<ContentModerationQueue />} />
@@ -464,6 +419,7 @@ export default function App() {
                 <Route path="/admin/operations/seller-approval" element={<SellerApprovalQueue />} />
                 <Route path="/live-shopping" element={<LiveShoppingPage />} />
                 <Route path="/orders/refund-negotiation" element={<RefundNegotiationPage />} />
+                {devRoutes}
                 {/* Catch-all: any unmatched path shows 404 */}
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
