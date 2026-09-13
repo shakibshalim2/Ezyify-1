@@ -18,6 +18,15 @@ interface AppState {
 
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter(x => x !== id) : [...list, id]);
 
+// Web static rendering evaluates this module on node where AsyncStorage's localStorage shim has no `window`;
+// swallow storage failures there instead of crashing the render.
+const safe = <T,>(fn: () => Promise<T>, fallback: T) => fn().catch(() => fallback);
+const storage = {
+  getItem: (k: string) => safe(() => AsyncStorage.getItem(k), null),
+  setItem: (k: string, v: string) => safe(() => AsyncStorage.setItem(k, v), undefined),
+  removeItem: (k: string) => safe(() => AsyncStorage.removeItem(k), undefined),
+};
+
 /** Non-sensitive UI preferences; session/cart live in the SecureStore-backed core stores. */
 export const useAppStore = create<AppState>()(
   persist(
@@ -36,7 +45,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'ezyify.app',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => storage),
       partialize: s => ({ onboardingSeen: s.onboardingSeen, interests: s.interests, likedPostIds: s.likedPostIds, savedPostIds: s.savedPostIds, followedIds: s.followedIds }) as Partial<AppState>,
       onRehydrateStorage: () => () => {
         useAppStore.setState({ hydrated: true });

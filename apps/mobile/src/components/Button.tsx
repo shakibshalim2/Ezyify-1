@@ -16,13 +16,14 @@ export interface ButtonProps extends Omit<PressableProps, 'style' | 'children'> 
   size?: Size;
   loading?: boolean;
   fullWidth?: boolean;
+  textColor?: string;
   style?: ViewStyle;
 }
 
 const HEIGHT: Record<Size, number> = { sm: 36, md: 44, lg: 52 };
 
 /** Press feedback: spring scale + light haptic, matching the web `Button` motion spec. */
-export function Button({ label, variant = 'primary', size = 'md', loading, fullWidth, disabled, style, onPress, ...rest }: ButtonProps) {
+export function Button({ label, variant = 'primary', size = 'md', loading, fullWidth, disabled, textColor, style, onPress, ...rest }: ButtonProps) {
   const { colors, radius, gradients, motion } = useTheme();
   const scale = useSharedValue(1);
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
@@ -34,18 +35,19 @@ export function Button({ label, variant = 'primary', size = 'md', loading, fullW
     ghost: 'transparent',
     accent: colors.accent,
   }[variant];
-  const fg = {
+  let fg = {
     primary: colors.primaryForeground,
     gradient: colors.primaryForeground,
     secondary: colors.foreground,
     ghost: colors.primary,
     accent: colors.accentForeground,
   }[variant];
+  if (textColor) fg = textColor;
 
   const content = loading ? (
     <ActivityIndicator color={fg} />
   ) : (
-    <Text variant="label" style={{ color: fg, fontSize: size === 'lg' ? 16 : 14 }}>
+    <Text variant="label" numberOfLines={1} style={{ color: fg, fontSize: size === 'lg' ? 16 : 14 }}>
       {label}
     </Text>
   );
@@ -53,6 +55,7 @@ export function Button({ label, variant = 'primary', size = 'md', loading, fullW
   return (
     <AnimatedPressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled || !!loading, busy: !!loading }}
       disabled={disabled || loading}
       onPressIn={() => {
@@ -87,5 +90,5 @@ export function Button({ label, variant = 'primary', size = 'md', loading, fullW
 }
 
 const styles = StyleSheet.create({
-  base: { paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexDirection: 'row', gap: 8 },
+  base: { paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexDirection: 'row', gap: 8, minWidth: 0 },
 });

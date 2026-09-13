@@ -27,8 +27,17 @@ function RootStack() {
           animation: 'fade_from_bottom',
         }}
       >
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="product/[id]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+        <Stack.Screen name="index" options={{ animation: 'none' }} />
+        <Stack.Screen name="(onboarding)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="product/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="loops" options={{ animation: 'fade', contentStyle: { backgroundColor: '#000' } }} />
+        <Stack.Screen name="story/[id]" options={{ animation: 'fade', presentation: 'fullScreenModal', contentStyle: { backgroundColor: '#000' } }} />
+        <Stack.Screen name="create" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="cart" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="checkout" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="order-success" options={{ animation: 'fade', gestureEnabled: false }} />
       </Stack>
     </>
   );

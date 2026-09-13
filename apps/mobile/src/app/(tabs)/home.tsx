@@ -1,52 +1,72 @@
-import { View, FlatList } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useCallback, useState } from 'react';
+import { FlatList, RefreshControl, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCartCount } from '@ezyify/core';
-import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
-import { Button } from '@/components/Button';
-import { ProductCard } from '@/components/ProductCard';
-import { sampleProducts } from '@/lib/sample-data';
+import { IconButton } from '@/components/IconButton';
+import { BrandMark, BrandWordmark } from '@/components/BrandMark';
+import { StoriesRail } from '@/components/StoriesRail';
+import { PostCard } from '@/components/PostCard';
+import { Skeleton } from '@/components/Skeleton';
+import { posts } from '@/lib/mock';
 import { useTheme } from '@/theme';
 
+function PostSkeleton() {
+  const { colors, radius } = useTheme();
+  return (
+    <View style={{ backgroundColor: colors.card, borderRadius: radius.card, padding: 12, gap: 12, borderWidth: 1, borderColor: colors.borderSubtle }}>
+      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+        <Skeleton width={40} height={40} radius={20} />
+        <View style={{ gap: 6 }}><Skeleton width={120} height={14} /><Skeleton width={80} height={10} /></View>
+      </View>
+      <Skeleton height={340} radius={12} />
+      <Skeleton width="70%" height={12} />
+    </View>
+  );
+}
+
 export default function HomeScreen() {
-  const { colors, radius, gradients } = useTheme();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const cartCount = useCartCount();
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    await new Promise(r => setTimeout(r, 800));
+    setRefreshing(false);
+  }, []);
 
   return (
-    <Screen scroll={false} padded={false}>
-      <FlatList
-        data={sampleProducts}
-        keyExtractor={p => p.id}
-        numColumns={2}
-        columnWrapperStyle={{ gap: 12, paddingHorizontal: 16 }}
-        contentContainerStyle={{ gap: 12, paddingBottom: 24 }}
-        ListHeaderComponent={
-          <View style={{ paddingHorizontal: 16, gap: 16, paddingBottom: 8 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 }}>
-              <Text variant="title">Ezyify</Text>
-              <Text variant="caption" tone="secondary">
-                Cart · {cartCount}
-              </Text>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={{ paddingTop: insets.top, height: insets.top + 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 8 }}>
+        <BrandMark size={30} />
+        <BrandWordmark size={22} />
+        <View style={{ flex: 1 }} />
+        <IconButton icon="notifications-outline" label="Notifications" onPress={() => router.push('/notifications')} />
+        <View>
+          <IconButton icon="bag-handle-outline" label="Cart" onPress={() => router.push('/cart')} />
+          {cartCount > 0 && (
+            <View style={{ position: 'absolute', top: 6, right: 6, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
+              <Text variant="caption" style={{ color: colors.accentForeground, fontSize: 10, fontFamily: 'Inter_600SemiBold' }}>{cartCount}</Text>
             </View>
-            <LinearGradient
-              colors={[gradients.vivid[0], gradients.vivid[1], gradients.vivid[2]]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{ borderRadius: radius.sheet, padding: 20, gap: 12 }}
-            >
-              <Text variant="caption" style={{ color: colors.primaryForeground, opacity: 0.85, letterSpacing: 1.5 }}>
-                DISCOVER
-              </Text>
-              <Text variant="display" style={{ color: colors.primaryForeground }}>
-                Shopping that feels like scrolling
-              </Text>
-              <Button label="Explore live drops" variant="accent" size="md" />
-            </LinearGradient>
-            <Text variant="heading">Trending now</Text>
-          </View>
-        }
-        renderItem={({ item }) => <ProductCard product={item} />}
+          )}
+        </View>
+      </View>
+      <FlatList
+        data={loading ? [] : posts}
+        keyExtractor={p => p.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
+        ListHeaderComponent={<View style={{ paddingVertical: 8 }}><StoriesRail /></View>}
+        ListEmptyComponent={<View style={{ paddingHorizontal: 16, gap: 12 }}><PostSkeleton /><PostSkeleton /></View>}
+        contentContainerStyle={{ paddingBottom: 24, gap: 12, paddingHorizontal: 16 }}
+        renderItem={({ item }) => <PostCard post={item} />}
+        onScrollBeginDrag={() => setLoading(false)}
+        removeClippedSubviews
       />
-    </Screen>
+    </View>
   );
 }

@@ -1,4 +1,6 @@
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { QueryClient } from '@tanstack/react-query';
 import {
@@ -13,12 +15,18 @@ import {
 
 const REFRESH_KEY = 'ezyify.refreshToken';
 
-/** SecureStore-backed KV (Keystore on Android). Keys must be alphanumeric + [._-]. */
+const safeKey = (key: string) => key.replace(/[^A-Za-z0-9._-]/g, '_');
+const isNative = Platform.OS !== 'web';
+
+/** SecureStore (Keystore) on device; expo-secure-store has no web module, so the web preview falls back to AsyncStorage. */
 const secureStorage: KeyValueStorage = {
-  getItem: key => SecureStore.getItemAsync(key.replace(/[^A-Za-z0-9._-]/g, '_')),
-  setItem: (key, value) => SecureStore.setItemAsync(key.replace(/[^A-Za-z0-9._-]/g, '_'), value),
-  removeItem: key => SecureStore.deleteItemAsync(key.replace(/[^A-Za-z0-9._-]/g, '_')),
+  getItem: key => (isNative ? SecureStore.getItemAsync(safeKey(key)) : AsyncStorage.getItem(key).catch(() => null)),
+  setItem: (key, value) => (isNative ? SecureStore.setItemAsync(safeKey(key), value) : AsyncStorage.setItem(key, value).catch(() => undefined)),
+  removeItem: key => (isNative ? SecureStore.deleteItemAsync(safeKey(key)) : AsyncStorage.removeItem(key).catch(() => undefined)),
 };
+const getRefreshToken = () => (isNative ? SecureStore.getItemAsync(REFRESH_KEY) : AsyncStorage.getItem(REFRESH_KEY));
+const setRefreshToken = (v: string) => (isNative ? SecureStore.setItemAsync(REFRESH_KEY, v) : AsyncStorage.setItem(REFRESH_KEY, v));
+const clearRefreshToken = () => (isNative ? SecureStore.deleteItemAsync(REFRESH_KEY) : AsyncStorage.removeItem(REFRESH_KEY));
 
 const baseUrl: string = Constants.expoConfig?.extra?.apiBaseUrl ?? 'https://api.ezyify.app/v1';
 
@@ -34,7 +42,7 @@ export function createMobileRuntime(): EzyifyRuntime & { queryClient: QueryClien
     },
     // Native has no cookie jar: the refresh token is kept in SecureStore and sent explicitly.
     refresh: async () => {
-      const refreshToken = await SecureStore.getItemAsync(REFRESH_KEY);
+      const refreshToken = await getRefreshToken();
       if (!refreshToken) return null;
       try {
         const res = await fetch(`${baseUrl.replace(/\/$/, '')}/auth/refresh`, {
@@ -48,7 +56,7 @@ export function createMobileRuntime(): EzyifyRuntime & { queryClient: QueryClien
           data?: { accessToken: string; expiresIn: number; refreshToken?: string };
         };
         if (!json.success || !json.data) return null;
-        if (json.data.refreshToken) await SecureStore.setItemAsync(REFRESH_KEY, json.data.refreshToken);
+        if (json.data.refreshToken) await setRefreshToken(json.data.refreshToken);
         auth.getState().setAccessToken(json.data.accessToken, json.data.expiresIn);
         return json.data.accessToken;
       } catch {
@@ -61,7 +69,7 @@ export function createMobileRuntime(): EzyifyRuntime & { queryClient: QueryClien
     baseUrl,
     tokens,
     onSessionExpired: async () => {
-      await SecureStore.deleteItemAsync(REFRESH_KEY);
+      await clearRefreshToken();
       auth.getState().clear();
     },
   });

@@ -1,7 +1,6 @@
 import { Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/theme';
-import { Text } from './Text';
 
 type Provider = 'google' | 'apple' | 'facebook';
 const META: Record<Provider, { icon: keyof typeof Ionicons.glyphMap; label: string }> = {
