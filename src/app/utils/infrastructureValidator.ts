@@ -3,14 +3,14 @@
  * Validates CDN, caching, network conditions, and infrastructure readiness
  */
 
-interface InfrastructureCheck {
+export interface InfrastructureCheck {
   name: string;
   passed: boolean;
   message: string;
   details?: any;
 }
 
-interface ValidationReport {
+export interface ValidationReport {
   passed: boolean;
   score: number;
   checks: InfrastructureCheck[];

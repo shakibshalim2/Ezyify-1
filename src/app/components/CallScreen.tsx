@@ -52,7 +52,7 @@ function CallBtn({
 
 interface CallScreenProps {
   session: CallSessionData;
-  onEnd: (outcome: CallOutcome, durationSecs: number) => void;
+  onEnd: (outcome?: CallOutcome, durationSecs?: number) => void;
 }
 
 export function CallScreen({ session, onEnd }: CallScreenProps) {
@@ -95,7 +95,7 @@ export function CallScreen({ session, onEnd }: CallScreenProps) {
       }
     }, ringMs);
     return clearAll;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, []);
 
   const endCall = useCallback(() => {

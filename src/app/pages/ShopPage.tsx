@@ -1,127 +1,178 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, SlidersHorizontal, Grid3x3, Grid } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router';
+import { Search, Flame } from 'lucide-react';
+import { motion } from 'motion/react';
+import { useReducedMotion } from 'motion/react';
 import { products, categories as productCategories } from '../data/products';
-import { ProductGridLoading } from '../components/LoadingStates';
 import { Skeleton } from '../components/ui/skeleton';
 import { EmptySearchResults } from '../components/EmptyStates';
 import { SEO, SEOConfigs } from '../components/SEO';
-import { ShopFilters, FilterState } from '../components/shop/ShopFilters';
-import { ShopHome } from '../components/shop/ShopHome';
-import { VirtualProductGrid } from '../components/shop/VirtualProductGrid';
+import { Button } from '../components/primitives/Button';
+import { ProductCard } from '../components/shop/ProductCard';
 import { toast } from 'sonner';
+import { fadeUp, staggerContainer, DURATION } from '../lib/motion';
+import { cn } from '../components/ui/utils';
 
 const SORT_OPTIONS = [
   { value: 'featured', label: 'Featured' },
-  { value: 'newest', label: 'New Arrivals' },
+  { value: 'newest', label: 'Newest' },
   { value: 'price-low', label: 'Price: Low to High' },
   { value: 'price-high', label: 'Price: High to Low' },
   { value: 'rating', label: 'Highest Rated' },
   { value: 'popular', label: 'Best Selling' },
 ];
 
-// SKELETON FOR INSTANT UI
-function ShopSkeleton({ activeView }: { activeView: 'home' | 'products' }) {
-  if (activeView === 'home') {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-screen-2xl mx-auto px-4 pb-6">
-          <Skeleton className="h-12 w-full mb-6" />
-          <div className="space-y-8">
-            <Skeleton className="h-64 w-full rounded-xl" />
-            <Skeleton className="h-48 w-full rounded-xl" />
-          </div>
-        </div>
+function PromoCarouselSlide({ slide, isActive }: { slide: any; isActive: boolean }) {
+  return (
+    <motion.div
+      initial={false}
+      animate={{ opacity: isActive ? 1 : 0, scale: isActive ? 1 : 0.95 }}
+      transition={{ duration: DURATION.normal }}
+      className={cn(
+        'absolute inset-0 rounded-card overflow-hidden',
+        !isActive && 'pointer-events-none',
+      )}
+    >
+      <div className={cn('h-full flex flex-col justify-center px-6 py-8 text-white', slide.className)}>
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={isActive ? { opacity: 1, y: 0 } : undefined}
+          transition={{ delay: 0.1, duration: DURATION.slow }}
+        >
+          <h3 className="font-display text-2xl md:text-3xl font-bold mb-2">{slide.headline}</h3>
+          <p className="text-sm md:text-base opacity-90 mb-4">{slide.description}</p>
+          <Button size="md" variant="primary" className="w-fit">
+            {slide.cta}
+          </Button>
+        </motion.div>
       </div>
-    );
-  }
+    </motion.div>
+  );
+}
+
+function FlashDealCountdown() {
+  const [timeLeft, setTimeLeft] = useState('02:45:30');
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        const [h, m, s] = prev.split(':').map(Number);
+        let newS = s - 1, newM = m, newH = h;
+        if (newS < 0) { newS = 59; newM -= 1; }
+        if (newM < 0) { newM = 59; newH -= 1; }
+        if (newH < 0) return '00:00:00';
+        return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}:${String(newS).padStart(2, '0')}`;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-screen-2xl mx-auto px-4 pb-6">
-        <div className="flex gap-4 mb-6">
-          <Skeleton className="h-12 flex-1" />
-          <Skeleton className="h-12 w-32" />
+    <div className="inline-flex items-center gap-2 bg-accent-brand-subtle px-3 py-1.5 rounded-xl">
+      <Flame className="size-4 text-accent-brand" />
+      <span className="text-xs font-semibold text-accent-brand">Flash Deal ends in</span>
+      <span className="font-display font-bold text-accent-brand tabular-nums">{timeLeft}</span>
+    </div>
+  );
+}
+
+function CategoryTile({ cat, prefersReducedMotion }: { cat: any; prefersReducedMotion: boolean }) {
+  if (prefersReducedMotion) {
+    return (
+      <button
+        key={cat.name}
+        className="group relative overflow-hidden rounded-card h-40 md:h-48 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <img src={cat.image} alt={cat.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+        <div className="absolute inset-0 flex flex-col justify-end items-start p-4">
+          <h3 className="font-display font-semibold text-white">{cat.name}</h3>
+          <p className="text-xs text-white/80">{cat.count} items</p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-            <div key={i} className="bg-card border border-border rounded-2xl overflow-hidden">
-              <Skeleton className="aspect-square" />
-              <div className="p-4 space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-6 w-1/2" />
-              </div>
-            </div>
-          ))}
-        </div>
+      </button>
+    );
+  }
+  return (
+    <motion.button
+      key={cat.name}
+      variants={fadeUp}
+      className="group relative overflow-hidden rounded-card h-40 md:h-48 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <img src={cat.image} alt={cat.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+      <div className="absolute inset-0 flex flex-col justify-end items-start p-4">
+        <h3 className="font-display font-semibold text-white">{cat.name}</h3>
+        <p className="text-xs text-white/80">{cat.count} items</p>
       </div>
+    </motion.button>
+  );
+}
+
+function ProductGridSkeleton({ count = 8 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="rounded-card overflow-hidden border border-border">
+          <Skeleton className="aspect-square" />
+          <div className="p-3 space-y-2">
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-2/3" />
+            <Skeleton className="h-5 w-1/2" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
 export default function ShopPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const categoryParam = searchParams.get('category');
-  
-  // ALL STATE HOOKS AT THE TOP - BEFORE ANY EARLY RETURNS
+  const prefersReducedMotion = useReducedMotion();
+
   const [selectedCategory, setSelectedCategory] = useState(categoryParam || 'All');
   const [sortBy, setSortBy] = useState('featured');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'large' | 'grid'>('grid');
-  const [showFilters, setShowFilters] = useState(false);
-  const [activeView, setActiveView] = useState<'home' | 'products'>('home');
-  
-  const [filters, setFilters] = useState<FilterState>({
-    priceRange: [0, 500],
-    categories: [],
-    brands: [],
-    ratings: [],
-    inStockOnly: false,
-    freeShipping: false,
-    onSale: false
-  });
-
-  // PROGRESSIVE LOADING: Load shop data after initial render
-  const [pageData, setPageData] = useState<{
-    likedProducts: Set<string>;
-    cartItems: Set<string>;
-  } | null>(null);
-
-  // These hooks MUST be called BEFORE early return
+  const [filters, setFilters] = useState({ minPrice: 0, maxPrice: 500, minRating: 0 });
+  const [isLoading, setIsLoading] = useState(false);
+  const [pageData, setPageData] = useState<any>(null);
   const [likedProducts, setLikedProducts] = useState<Set<string>>(new Set());
   const [cartItems, setCartItems] = useState<Set<string>>(new Set());
-  const [isLoading, setIsLoading] = useState(false);
+  const [carouselIndex, setCarouselIndex] = useState(0);
 
-  // Load shop data
+  const allCategories = useMemo(() => ['All', ...productCategories], []);
+
+  const promoSlides = [
+    { headline: '50% Off Electronics', description: 'Limited time only', cta: 'Shop Now', className: 'bg-brand-gradient' },
+    { headline: 'New Season Fashion', description: 'Exclusive collections', cta: 'Explore', className: 'bg-brand-gradient-warm' },
+    { headline: 'Beauty & Personal Care', description: 'Premium brands on sale', cta: 'Browse', className: 'bg-aurora' },
+  ];
+
+  const categoryData = [
+    { name: 'Electronics', count: 234, image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300&h=300&fit=crop' },
+    { name: 'Fashion', count: 156, image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300&h=300&fit=crop' },
+    { name: 'Beauty', count: 89, image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=300&h=300&fit=crop' },
+    { name: 'Home', count: 145, image: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=300&h=300&fit=crop' },
+  ];
+
   useEffect(() => {
     const loadShopData = () => {
-      // Load wishlist from localStorage
       const savedWishlist = localStorage.getItem('ezyify_wishlist');
-      let likedProductsData = new Set<string>();
-      if (savedWishlist) {
-        try {
-          likedProductsData = new Set(JSON.parse(savedWishlist));
-        } catch (e) {
-          console.error('Failed to parse wishlist', e);
-        }
-      }
+      const likedSet = new Set<string>(savedWishlist ? JSON.parse(savedWishlist) : []);
 
-      // Load cart from localStorage
       const savedCart = localStorage.getItem('ezyify_cart');
-      let cartItemsData = new Set<string>();
+      const cartSet = new Set<string>();
       if (savedCart) {
         try {
           const cart = JSON.parse(savedCart);
-          cartItemsData = new Set(cart.map((item: any) => item.id));
+          cart.forEach((item: any) => cartSet.add(item.id));
         } catch (e) {
           console.error('Failed to parse cart', e);
         }
       }
 
-      setPageData({ likedProducts: likedProductsData, cartItems: cartItemsData });
-      setLikedProducts(likedProductsData);
-      setCartItems(cartItemsData);
+      setPageData({ loaded: true });
+      setLikedProducts(likedSet);
+      setCartItems(cartSet);
     };
 
     if ('requestIdleCallback' in window) {
@@ -133,43 +184,26 @@ export default function ShopPage() {
     }
   }, []);
 
-  // Update view based on search/category
   useEffect(() => {
-    if (categoryParam) {
-      setSelectedCategory(categoryParam);
-      setActiveView('products');
-    } else if (searchQuery) {
-      setActiveView('products');
-    }
-  }, [categoryParam, searchQuery]);
+    if (prefersReducedMotion) return;
+    const timer = setInterval(() => {
+      setCarouselIndex(prev => (prev + 1) % promoSlides.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [prefersReducedMotion, promoSlides.length]);
 
-  // Memoize categories - MUST be before early return
-  const allCategories = useMemo(() => ['All', ...productCategories], []);
-
-  // Memoized filtered products - MUST be before early return
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
-      const matchesSearch = searchQuery === '' || 
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchesPrice = product.price >= filters.priceRange[0] && product.price <= filters.priceRange[1];
-      const matchesBrand = filters.brands.length === 0 || filters.brands.includes(product.seller.name);
-      const matchesRating = filters.ratings.length === 0 || filters.ratings.some(r => product.rating >= r);
-      const matchesStock = !filters.inStockOnly || product.stock > 0;
-      const matchesShipping = !filters.freeShipping || product.freeShipping;
-      const matchesOnSale = !filters.onSale || (product.originalPrice && product.originalPrice > product.price);
-      
-      return matchesCategory && matchesSearch && matchesPrice && matchesBrand && 
-             matchesRating && matchesStock && matchesShipping && matchesOnSale;
+      const matchesSearch = !searchQuery || product.name.toLowerCase().includes(searchQuery.toLowerCase()) || product.description.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesPrice = product.price >= filters.minPrice && product.price <= filters.maxPrice;
+      const matchesRating = product.rating >= filters.minRating;
+      return matchesCategory && matchesSearch && matchesPrice && matchesRating;
     });
   }, [selectedCategory, searchQuery, filters]);
 
-  // Memoized sorted products - MUST be before early return
   const sortedProducts = useMemo(() => {
     const sorted = [...filteredProducts];
-    
     switch (sortBy) {
       case 'newest':
         return sorted.reverse();
@@ -186,14 +220,11 @@ export default function ShopPage() {
     }
   }, [filteredProducts, sortBy]);
 
-  // ALL CALLBACKS BEFORE EARLY RETURN
   const toggleLike = useCallback((e: React.MouseEvent, productId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    
     const savedWishlist = localStorage.getItem('ezyify_wishlist');
     const wishlist = savedWishlist ? JSON.parse(savedWishlist) : [];
-    
     if (wishlist.includes(productId)) {
       const filtered = wishlist.filter((id: string) => id !== productId);
       localStorage.setItem('ezyify_wishlist', JSON.stringify(filtered));
@@ -210,238 +241,182 @@ export default function ShopPage() {
   const addToCart = useCallback((e: React.MouseEvent, productId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    
     const savedCart = localStorage.getItem('ezyify_cart');
     const cart = savedCart ? JSON.parse(savedCart) : [];
-    const existingItem = cart.find((item: any) => item.id === productId);
-    
-    if (existingItem) {
-      existingItem.quantity += 1;
-      toast.success('Quantity updated in cart');
+    const existing = cart.find((item: any) => item.id === productId);
+    if (existing) {
+      existing.quantity += 1;
     } else {
       cart.push({ id: productId, quantity: 1 });
-      toast.success('Added to cart');
     }
-    
     localStorage.setItem('ezyify_cart', JSON.stringify(cart));
     const ids = cart.map((item: any) => item.id);
     setCartItems(new Set(ids));
+    toast.success('Added to cart');
   }, []);
 
-  const handleCategoryClick = useCallback((category: string) => {
-    setSelectedCategory(category);
-    setActiveView('products');
-    setIsLoading(true);
-    setTimeout(() => setIsLoading(false), 500);
-  }, []);
-
-  const handleSearchSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      setActiveView('products');
-    }
-  }, [searchQuery]);
-
-  const handleApplyFilters = useCallback(() => {
-    setIsLoading(true);
-    setTimeout(() => setIsLoading(false), 300);
-  }, []);
-
-  const handleResetFilters = useCallback(() => {
-    setFilters({
-      priceRange: [0, 500],
-      categories: [],
-      brands: [],
-      ratings: [],
-      inStockOnly: false,
-      freeShipping: false,
-      onSale: false
-    });
-  }, []);
-
-  const trendingProducts = useMemo(() => {
-    const sorted = [...products].sort((a, b) => (b.sold || 0) - (a.sold || 0));
-    return sorted.slice(0, 4);
-  }, []);
-  
-  const featuredProducts = useMemo(() => {
-    return products.filter(p => p.rating >= 4.7).slice(0, 2);
-  }, []);
-  
   const flashDeals = useMemo(() => {
-    return products.filter(p => 
-      p.originalPrice && (p.originalPrice - p.price) / p.originalPrice > 0.3
-    ).slice(0, 2);
+    return products.filter(p => p.originalPrice && (p.originalPrice - p.price) / p.originalPrice > 0.3).slice(0, 6);
   }, []);
 
-  // Show skeleton while loading - AFTER ALL HOOKS
   if (!pageData) {
-    return <ShopSkeleton activeView={activeView} />;
-  }
-
-  // Shop Home View
-  if (activeView === 'home' && !categoryParam && !searchQuery) {
     return (
-      <ShopHome
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onSearchSubmit={handleSearchSubmit}
-        onBrowseAll={() => setActiveView('products')}
-        flashDeals={flashDeals}
-        trendingProducts={trendingProducts}
-        featuredProducts={featuredProducts}
-        likedProducts={likedProducts}
-        cartItems={cartItems}
-        onToggleLike={toggleLike}
-        onAddToCart={addToCart}
-      />
+      <div className="min-h-screen bg-background">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <Skeleton className="h-12 w-full mb-6" />
+          <Skeleton className="h-48 w-full rounded-card mb-6" />
+          <ProductGridSkeleton />
+        </div>
+      </div>
     );
   }
 
-  // Products List View
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-nav">
       <SEO {...SEOConfigs.shop} />
-      
-      <div className="max-w-screen-2xl mx-auto px-2 sm:px-4 lg:px-6 pb-6">
-        {/* Header */}
-        <div className="mb-6">
-          <button
-            onClick={() => {
-              setActiveView('home');
-              setSelectedCategory('All');
-              setSearchQuery('');
-              setSearchParams({});
-            }}
-            className="text-primary hover:text-primary/80 font-medium mb-2"
-          >
-            ← Back to Shop
-          </button>
-          <h1 className="text-foreground">
-            {selectedCategory !== 'All' ? selectedCategory : searchQuery ? `Search: "${searchQuery}"` : 'All Products'}
-          </h1>
-        </div>
 
-        {/* Search & Filters */}
-        <div className="bg-card border border-border rounded-2xl p-4 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+      <div className="max-w-7xl mx-auto px-4 py-4 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col gap-3">
+          <h1 className="font-display text-2xl font-bold text-foreground">Shop</h1>
+          <div className="flex gap-2">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-foreground-tertiary" />
               <input
                 type="text"
                 placeholder="Search products..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-muted text-foreground border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 bg-background-elevated border border-border rounded-xl text-foreground placeholder:text-foreground-tertiary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
-            <button 
-              onClick={() => setShowFilters(true)}
-              className="px-4 py-2.5 border border-border rounded-xl hover:bg-muted flex items-center gap-2 text-foreground font-medium"
-            >
-              <SlidersHorizontal className="w-5 h-5" />
-              <span>Filters</span>
-              {(filters.brands.length + filters.ratings.length) > 0 && (
-                <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
-                  {filters.brands.length + filters.ratings.length}
-                </span>
-              )}
-            </button>
-          </div>
-
-          {/* Category Pills */}
-          <div className="flex gap-2 mt-4 overflow-x-auto pb-2 scrollbar-hide">
-            {allCategories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => handleCategoryClick(cat)}
-                className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-semibold transition-all ${
-                  selectedCategory === cat
-                    ? 'text-white shadow-brand'
-                    : 'bg-muted text-foreground hover:bg-muted/80 border border-border'
-                }`}
-                style={selectedCategory === cat ? { background: 'var(--brand-gradient)' } : {}}
-              >
-                {cat}
-              </button>
-            ))}
           </div>
         </div>
 
-        {/* Sort & View */}
-        <div className="bg-card border border-border rounded-2xl p-4 mb-6 flex items-center justify-between flex-wrap gap-4">
-          <div className="flex gap-2 flex-wrap">
-            {SORT_OPTIONS.map(option => (
-              <button
-                key={option.value}
-                onClick={() => setSortBy(option.value)}
-                className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${
-                  sortBy === option.value 
-                    ? 'bg-primary text-primary-foreground shadow-md' 
-                    : 'bg-muted text-foreground hover:bg-muted/80'
-                }`}
-              >
-                {option.label}
-              </button>
+        {/* Category Chips */}
+        <motion.div
+          initial={prefersReducedMotion ? {} : { opacity: 0, x: -12 }}
+          animate={prefersReducedMotion ? {} : { opacity: 1, x: 0 }}
+          transition={{ duration: DURATION.normal }}
+          className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+        >
+          {allCategories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              aria-pressed={selectedCategory === cat}
+              className={cn(
+                'px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all',
+                selectedCategory === cat ? 'bg-primary text-primary-foreground' : 'bg-background-elevated border border-border text-foreground hover:border-border-strong',
+              )}
+            >
+              {cat}
+            </button>
+          ))}
+        </motion.div>
+
+        {/* Hero Promo Carousel */}
+        <motion.div
+          initial={prefersReducedMotion ? {} : { opacity: 0, y: 12 }}
+          animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+          transition={{ duration: DURATION.slow }}
+          className="relative h-48 md:h-64 rounded-card overflow-hidden border border-border-subtle"
+        >
+          {promoSlides.map((slide, idx) => (
+            <PromoCarouselSlide key={idx} slide={slide} isActive={idx === carouselIndex} />
+          ))}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+            {promoSlides.map((_, idx) => (
+              <motion.button
+                key={idx}
+                onClick={() => setCarouselIndex(idx)}
+                className={cn('rounded-full transition-all', idx === carouselIndex ? 'bg-white w-2 h-2' : 'bg-white/50 w-1.5 h-1.5')}
+              />
             ))}
           </div>
-          
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground hidden sm:inline">
-              {sortedProducts.length} {sortedProducts.length === 1 ? 'product' : 'products'}
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setViewMode('large')}
-                className={`p-2 rounded-xl transition-all ${
-                  viewMode === 'large' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                }`}
-              >
-                <Grid className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-xl transition-all ${
-                  viewMode === 'grid' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                }`}
-              >
-                <Grid3x3 className="w-5 h-5" />
-              </button>
+        </motion.div>
+
+        {/* Flash Deals */}
+        {flashDeals.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-lg font-semibold text-foreground flex items-center gap-2">
+                <Flame className="size-5 text-accent-brand" />
+                Flash Deals
+              </h2>
+              <FlashDealCountdown />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {flashDeals.map(product => (
+                <ProductCard key={product.id} product={product} size="small" isLiked={likedProducts.has(product.id)} inCart={cartItems.has(product.id)} onToggleLike={toggleLike} onAddToCart={addToCart} />
+              ))}
             </div>
           </div>
-        </div>
-
-        {/* Products Grid */}
-        {isLoading ? (
-          <ProductGridLoading count={viewMode === 'large' ? 6 : 12} />
-        ) : sortedProducts.length === 0 ? (
-          <div className="py-16">
-            <EmptySearchResults />
-          </div>
-        ) : (
-          <VirtualProductGrid
-            products={sortedProducts}
-            viewMode={viewMode}
-            likedProducts={likedProducts}
-            cartItems={cartItems}
-            onToggleLike={toggleLike}
-            onAddToCart={addToCart}
-          />
         )}
-      </div>
 
-      <ShopFilters
-        open={showFilters}
-        onOpenChange={setShowFilters}
-        filters={filters}
-        onFiltersChange={setFilters}
-        onApply={handleApplyFilters}
-        onReset={handleResetFilters}
-      />
+        {/* Category Grid */}
+        <motion.div
+          initial={prefersReducedMotion ? {} : { opacity: 0, y: 12 }}
+          animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: DURATION.slow }}
+          className="space-y-3"
+        >
+          <h2 className="font-display text-lg font-semibold text-foreground">Browse Categories</h2>
+          {prefersReducedMotion ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {categoryData.map(cat => (
+                <CategoryTile key={cat.name} cat={cat} prefersReducedMotion />
+              ))}
+            </div>
+          ) : (
+            <motion.div variants={staggerContainer(0.05)} initial="hidden" animate="visible" className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {categoryData.map(cat => (
+                <CategoryTile key={cat.name} cat={cat} prefersReducedMotion={false} />
+              ))}
+            </motion.div>
+          )}
+        </motion.div>
+
+        {/* Products Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="font-display text-lg font-semibold text-foreground">{selectedCategory !== 'All' ? selectedCategory : 'All Products'}</h2>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              className="px-3 py-2 bg-background-elevated border border-border rounded-xl text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              {SORT_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {isLoading ? (
+            <ProductGridSkeleton />
+          ) : sortedProducts.length === 0 ? (
+            <div className="py-16">
+              <EmptySearchResults />
+            </div>
+          ) : prefersReducedMotion ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {sortedProducts.map(product => (
+                <ProductCard key={product.id} product={product} isLiked={likedProducts.has(product.id)} inCart={cartItems.has(product.id)} onToggleLike={toggleLike} onAddToCart={addToCart} />
+              ))}
+            </div>
+          ) : (
+            <motion.div variants={staggerContainer(0.03)} initial="hidden" animate="visible" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {sortedProducts.map(product => (
+                <motion.div key={product.id} variants={fadeUp}>
+                  <ProductCard product={product} isLiked={likedProducts.has(product.id)} inCart={cartItems.has(product.id)} onToggleLike={toggleLike} onAddToCart={addToCart} />
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+        </div>
+      </div>
 
       <style>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }

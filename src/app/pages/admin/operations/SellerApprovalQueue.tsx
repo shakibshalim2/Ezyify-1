@@ -1,7 +1,7 @@
 import { toast } from 'sonner';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { Search, CheckCircle, XCircle, Clock, Eye, Shield, TrendingUp, Users, Store, AlertTriangle } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Clock, Eye, Shield, TrendingUp, Users, Store, AlertTriangle, FileText } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
@@ -13,6 +13,17 @@ import { Textarea } from '../../../components/ui/textarea';
 import { Label } from '../../../components/ui/label';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
 import { Skeleton } from '../../../components/ui/skeleton';
+
+interface SellerApplication {
+  id: string;
+  name?: string;
+  email: string;
+  status: string;
+  kycStatus?: string;
+  documents: Record<string, { uploaded: boolean; url?: string }>;
+  createdAt?: string;
+  [key: string]: any;
+}
 
 // Skeleton Component
 function SellerApprovalSkeleton() {

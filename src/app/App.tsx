@@ -1,5 +1,10 @@
 import React, { lazy, Suspense, useEffect, useState, memo } from 'react';
-import { BrowserRouter, Routes, Route, Outlet } from 'react-router';
+import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from 'react-router';
+import { AuthProvider } from './contexts/AuthContext';
+import { Toaster } from './components/ui/sonner';
+import { PageTransition } from './components/primitives/PageTransition';
+import { SplashScreen, shouldShowSplash } from './features/splash/SplashScreen';
+import { hasSeenOnboarding } from './features/onboarding/OnboardingPage';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Navigation from './components/Navigation';
 import { Analytics } from './components/Analytics';
@@ -41,6 +46,7 @@ if (typeof window !== 'undefined') {
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/auth/LoginPage';
 import SignupPage from './pages/auth/SignupPage';
+import OnboardingPage from './features/onboarding/OnboardingPage';
 
 // Lazy load all other pages with error handling
 const createLazyComponent = (importFn: () => Promise<any>) => {
@@ -226,20 +232,34 @@ function PageLoader() {
 }
 
 const WithNavigation = memo(function WithNavigation() {
+  const location = useLocation();
   return (
     <>
       <Navigation />
       <div className="min-h-screen bg-background">
-        {/* pt: mobile = nav height (5.5rem) + device safe-area-inset-top; desktop = h-16 (64px) = pt-16 */}
-        <div className="pt-[calc(5.5rem+env(safe-area-inset-top,0px))] md:pt-16 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
-          <Outlet />
+        {/* Top offset = fixed top nav height (+ mobile search row); bottom offset = BottomNav on < lg */}
+        <div className={`pt-[calc(5.75rem+var(--safe-top))] md:pt-[calc(3rem+var(--safe-top))] lg:pt-16 lg:pb-0 ${location.pathname.startsWith('/messages') ? 'pb-[calc(var(--nav-height)+var(--safe-bottom))]' : 'pb-nav'}`}>
+          <PageTransition key={location.pathname}>
+            <Outlet />
+          </PageTransition>
         </div>
       </div>
     </>
   );
 });
 
+/** Redirects first-time visitors on the root route to the onboarding carousel. */
+function FirstRunGate({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  if (location.pathname === '/' && !hasSeenOnboarding()) {
+    return <Navigate to="/welcome" replace />;
+  }
+  return <>{children}</>;
+}
+
 export default function App() {
+  const [splash, setSplash] = useState(() => shouldShowSplash());
+
   useEffect(() => {
     // Ensure viewport-fit=cover so env(safe-area-inset-top) works on iOS/Android
     try {
@@ -286,6 +306,8 @@ export default function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <ThemeProvider>
+          {splash && <SplashScreen onDone={() => setSplash(false)} />}
+          <Toaster />
           {/* Wrapped in error boundaries - never blocks UI */}
           <ErrorBoundary fallback={null}>
             <Analytics />
@@ -300,8 +322,14 @@ export default function App() {
           <ErrorBoundary fallback={null}>
             <WorldClassPerformanceMonitor />
           </ErrorBoundary>
+          <AuthProvider>
           <Suspense fallback={<RouteAwareLoader />}>
             <Routes>
+              <Route path="/welcome" element={<OnboardingPage />} />
+              <Route path="/onboarding" element={<InterestsPage />} />
+              <Route path="/onboarding/interests" element={<InterestsPage />} />
+              <Route path="/onboarding/follow-suggestions" element={<FollowSuggestionsPage />} />
+              <Route path="/onboarding/permissions" element={<PermissionsPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -309,8 +337,9 @@ export default function App() {
               <Route path="/otp-verification" element={<OTPVerificationPage />} />
               <Route path="/landing" element={<LandingPage />} />
               <Route path="/stories/:username" element={<StoriesPage />} />
+              <Route path="/loops" element={<LoopsPage />} />
               <Route element={<WithNavigation />}>
-                <Route path="/" element={<HomePage />} />
+                <Route path="/" element={<FirstRunGate><HomePage /></FirstRunGate>} />
                 <Route path="/platform-overview" element={<PlatformOverviewPage />} />
                 <Route path="/launch-control" element={<LaunchControlCenter />} />
                 <Route path="/api-integration-playground" element={<APIIntegrationPlayground />} />
@@ -320,7 +349,6 @@ export default function App() {
                 <Route path="/real-time-analytics-dashboard" element={<RealTimeAnalyticsDashboard />} />
                 <Route path="/customer-support-admin-panel" element={<CustomerSupportAdminPanel />} />
                 <Route path="/explore" element={<ExplorePage />} />
-                <Route path="/loops" element={<LoopsPage />} />
                 <Route path="/post/:id" element={<PostDetailPage />} />
                 <Route path="/shop" element={<ShopPage />} />
                 <Route path="/product/:id" element={<ProductDetailPage />} />
@@ -391,10 +419,6 @@ export default function App() {
                 <Route path="/settings/security" element={<SecuritySettingsPage />} />
                 <Route path="/settings/notifications" element={<NotificationSettingsPage />} />
                 <Route path="/settings/account-management" element={<AccountManagementPage />} />
-                <Route path="/onboarding" element={<InterestsPage />} />
-                <Route path="/onboarding/interests" element={<InterestsPage />} />
-                <Route path="/onboarding/follow-suggestions" element={<FollowSuggestionsPage />} />
-                <Route path="/onboarding/permissions" element={<PermissionsPage />} />
                 <Route path="/seller/kyc-verification" element={<KYCVerificationPage />} />
                 <Route path="/user/order-tracking" element={<OrderTrackingPage />} />
                 <Route path="/about" element={<AboutPage />} />
@@ -445,6 +469,7 @@ export default function App() {
               </Route>
             </Routes>
           </Suspense>
+          </AuthProvider>
         </ThemeProvider>
       </BrowserRouter>
     </ErrorBoundary>

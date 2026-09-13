@@ -1,7 +1,7 @@
 import { toast } from 'sonner';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { Search, Shield, AlertTriangle, TrendingUp, Ban, CheckCircle, Eye, DollarSign, Users, CreditCard, MapPin, Clock } from 'lucide-react';
+import { Search, Shield, AlertTriangle, TrendingUp, Ban, CheckCircle, Eye, DollarSign, Users, CreditCard, MapPin, Clock, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
@@ -13,6 +13,22 @@ import { Textarea } from '../../../components/ui/textarea';
 import { Label } from '../../../components/ui/label';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
 import { Skeleton } from '../../../components/ui/skeleton';
+import { Progress } from '../../../components/ui/progress';
+
+interface SuspiciousActivity {
+  id: string;
+  type: string;
+  severity: string;
+  title: string;
+  description: string;
+  user: any;
+  riskScore: number;
+  indicators: string[];
+  timestamp: string;
+  status: string;
+  amount?: number;
+  [key: string]: any;
+}
 
 // Skeleton Component
 function FraudDetectionSkeleton() {
@@ -227,7 +243,7 @@ export default function FraudDetectionDashboard() {
 
   const getRiskBgColor = (score: number) => {
     if (score >= 80) return 'bg-error/10';
-    if (score >= 60) return bg-warning/10;
+    if (score >= 60) return 'bg-warning/10';
     if (score >= 40) return 'bg-warning/10';
     return 'bg-success/10';
   };
@@ -419,7 +435,7 @@ export default function FraudDetectionDashboard() {
 
                               {/* Risk Indicators */}
                               <div className="flex flex-wrap gap-2">
-                                {activity.indicators.slice(0, 3).map((indicator, idx) => (
+                                {activity.indicators.slice(0, 3).map((indicator: string, idx: number) => (
                                   <Badge key={idx} variant="outline" className="text-xs">
                                     {indicator}
                                   </Badge>
@@ -517,7 +533,7 @@ export default function FraudDetectionDashboard() {
               <div>
                 <h4 className="font-medium text-foreground mb-2">Risk Indicators</h4>
                 <div className="space-y-2">
-                  {detailDialog.activity.indicators.map((indicator, idx) => (
+                   {detailDialog.activity.indicators.map((indicator: string, idx: number) => (
                     <div key={idx} className="flex items-center gap-2 p-2 bg-error/5 rounded">
                       <AlertTriangle className="w-4 h-4 text-error" />
                       <span className="text-sm text-error">{indicator}</span>

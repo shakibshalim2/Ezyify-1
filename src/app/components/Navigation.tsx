@@ -6,6 +6,7 @@ import {
   Plus, ChevronDown, LogOut, LayoutDashboard, Zap, Wallet
 } from 'lucide-react';
 import { EzyifyLogo } from './EzyifyLogo';
+import { BottomNav } from './BottomNav';
 
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -106,13 +107,6 @@ export default function Navigation() {
     { name: 'Live', path: '/live/1', icon: Zap, isLive: true },
   ], []);
 
-  const mobileNavLinks = useMemo(() => [
-    { name: 'Home', path: '/', icon: Home },
-    { name: 'Loops', path: '/loops', icon: Video },
-    { name: 'Create', path: '/upload', icon: Plus, isPrimary: true },
-    { name: 'Shop', path: '/shop', icon: ShoppingBag },
-    { name: 'Profile', path: '/profile/me', icon: User },
-  ], []);
 
   return (
     <>
@@ -364,58 +358,7 @@ export default function Navigation() {
         </div>
       )}
 
-      {/* ── MOBILE BOTTOM NAV ── */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background/97 backdrop-blur-2xl border-t border-border/60 z-50 lg:hidden pb-safe">
-        <div className="flex items-center justify-around px-2 pt-2 pb-1.5">
-          {mobileNavLinks.map((link) => {
-            const Icon = link.icon;
-            const active = location.pathname === link.path;
-            const isPrimary = (link as any).isPrimary;
-            return (
-              <Link
-                key={link.path}
-                to={link.path}
-                className="relative flex flex-col items-center gap-[3px] group min-w-[54px]"
-              >
-                {/* Active indicator — thin line at top of nav */}
-                {active && !isPrimary && (
-                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-[2.5px] rounded-full bg-primary" />
-                )}
-
-                {/* Icon container */}
-                <div
-                  className={`relative p-2 rounded-[14px] transition-all duration-200 ${
-                    isPrimary
-                      ? '-mt-5 p-3.5 shadow-brand hover:shadow-brand-lg active:scale-[0.94]'
-                      : active
-                      ? 'bg-primary/10'
-                      : 'group-hover:bg-muted/60 active:bg-muted'
-                  }`}
-                  style={isPrimary ? { background: 'var(--brand-gradient)' } : {}}
-                >
-                  <Icon
-                    className={`w-[20px] h-[20px] transition-colors duration-150 ${
-                      isPrimary
-                        ? 'text-white'
-                        : active
-                        ? 'text-primary'
-                        : 'text-muted-foreground/80 group-hover:text-foreground'
-                    }`}
-                  />
-                </div>
-
-                <span
-                  className={`text-[10px] font-medium tracking-tight transition-colors duration-150 ${
-                    isPrimary ? 'text-primary' : active ? 'text-primary' : 'text-muted-foreground/70'
-                  }`}
-                >
-                  {link.name}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
+      <BottomNav />
     </>
   );
 }

@@ -1,7 +1,7 @@
 import { SEO } from '../components/SEO';
 import { AlertTriangle, WifiOff, Wrench, Home, RefreshCw, HelpCircle, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { useNavigate } from 'react-router';
+import { useNavigate, Link } from 'react-router';
 import { EzyifyLogo } from '../components/EzyifyLogo';
 
 interface ErrorPageProps {

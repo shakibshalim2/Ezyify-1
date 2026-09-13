@@ -1,6 +1,7 @@
 import { SEO } from '../../components/SEO';
 import { useState } from 'react';
-import { Shield, Lock, Eye, CreditCard, MapPin, Activity, AlertCircle, CheckCircle2, Info, Clock, ChevronRight } from 'lucide-react';
+import { Shield, Lock, Eye, CreditCard, MapPin, Activity, AlertCircle, CheckCircle2, Info, Clock, ChevronRight, Ban, TrendingUp } from 'lucide-react';
+import { Link } from 'react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';

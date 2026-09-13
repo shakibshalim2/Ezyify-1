@@ -1,5 +1,5 @@
 import React from 'react';
-import logoImage from 'figma:asset/155466a80ca11cc50fc568cb8c3a2cac2c56bdcc.png';
+import logoImage from '../../assets/logo-mark.png';
 
 interface EzyifyLogoProps {
   size?: 'desktop' | 'mobile' | number;

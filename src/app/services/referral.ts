@@ -113,13 +113,13 @@ export const CommissionEngine = {
 
   /** Preview commission for display on product page (not a financial record). */
   preview(productPrice: number, category?: string): { amount: number; rule: CommissionRule } {
-    const rule = (category && PLATFORM_DEFAULTS.categoryRules[category])
+    const rule: CommissionRule = (category ? PLATFORM_DEFAULTS.categoryRules[category] : undefined)
       ?? PLATFORM_DEFAULTS.globalDefault;
     return { amount: this.calculate(productPrice, rule), rule };
   },
 
   getRuleForCategory(category?: string): CommissionRule {
-    return (category && PLATFORM_DEFAULTS.categoryRules[category])
+    return (category ? PLATFORM_DEFAULTS.categoryRules[category] : undefined)
       ?? PLATFORM_DEFAULTS.globalDefault;
   },
 };

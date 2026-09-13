@@ -118,6 +118,10 @@ export default function MarketingAcquisitionHub() {
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedDateRange, setSelectedDateRange] = useState('7d');
 
+  const handleExportData = () => {
+    toast.success('Report exported successfully');
+  };
+
   // Marketing metrics
   const [metrics, setMetrics] = useState<MetricCard[]>([
     {

@@ -93,7 +93,7 @@ DO NOT modify /config/performanceLock.ts without explicit approval.
  * Check if monitoring system is allowed at startup
  */
 export function isAllowedAtStartup(systemName: string): boolean {
-  return !PERFORMANCE_LOCK_CONFIG.forbiddenAtStartup.includes(systemName);
+  return !PERFORMANCE_LOCK_CONFIG.forbiddenAtStartup.includes(systemName as any);
 }
 
 /**
@@ -124,13 +124,13 @@ export function displayLockWarning(): void {
  */
 export function shouldInitializeSystem(systemName: string): boolean {
   // Check if in forbidden list
-  if (PERFORMANCE_LOCK_CONFIG.forbiddenAtStartup.includes(systemName)) {
+  if (PERFORMANCE_LOCK_CONFIG.forbiddenAtStartup.includes(systemName as any)) {
     console.warn(`[Performance Lock] System "${systemName}" is disabled at startup`);
     return false;
   }
   
   // Check if in allowed list
-  if (PERFORMANCE_LOCK_CONFIG.allowedMonitoring.includes(systemName)) {
+  if (PERFORMANCE_LOCK_CONFIG.allowedMonitoring.includes(systemName as any)) {
     return true;
   }
   

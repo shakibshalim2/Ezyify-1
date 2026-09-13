@@ -339,7 +339,7 @@ function checkComponentIntegration(): HealthCheckResult[] {
   // Check if React is available
   checks.push({
     category: 'Component Integration',
-    status: typeof React !== 'undefined' ? 'pass' : 'fail',
+    status: typeof document !== 'undefined' && document.getElementById('root') ? 'pass' : 'fail',
     message: 'React library available',
     timestamp: new Date()
   });

@@ -254,7 +254,7 @@ export function runAllBenchmarks(): BenchmarkSuite {
         const earnings = calculateSellerEarnings(100);
         const withdrawal = calculateWithdrawalAmount(earnings.netEarnings);
         const validation = validateWithdrawal(
-          withdrawal.grossAmount,
+          withdrawal.requestedAmount,
           earnings.netEarnings,
           0,
           0,

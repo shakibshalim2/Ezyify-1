@@ -1,42 +1,35 @@
-import { defineConfig } from 'vite'
-import path from 'path'
-import tailwindcss from '@tailwindcss/vite'
-import react from '@vitejs/plugin-react'
-
-
-function figmaAssetResolver() {
-  return {
-    name: 'figma-asset-resolver',
-    resolveId(id) {
-      if (id.startsWith('figma:asset/')) {
-        const filename = id.replace('figma:asset/', '')
-        return path.resolve(__dirname, 'src/assets', filename)
-      }
-    },
-  }
-}
+import { defineConfig } from 'vite';
+import path from 'node:path';
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  plugins: [
-    figmaAssetResolver(),
-    // The React and Tailwind plugins are both required for Make, even if
-    // Tailwind is not being actively used – do not remove them
-    react(),
-    tailwindcss(),
-  ],
-  define: {
-    // Force React production build so it matches the Figma preview iframe's
-    // bundled React (production mode). Without this, the dev build of React
-    // conflicts with Figma's production React, causing the dual-React error.
-    'process.env.NODE_ENV': JSON.stringify('production'),
-  },
+  plugins: [react(), tailwindcss()],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src/app'),
-    },
+    alias: { '@': path.resolve(__dirname, './src/app') },
     dedupe: ['react', 'react-dom', 'react/jsx-runtime'],
   },
-  optimizeDeps: {
-    include: ['react', 'react-dom', 'react/jsx-runtime'],
+  server: { port: 5173, host: true },
+  build: {
+    target: 'es2020',
+    sourcemap: false,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router'],
+          radix: [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-select',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-tooltip',
+          ],
+          motion: ['motion'],
+          charts: ['recharts'],
+        },
+      },
+    },
   },
-})
+});

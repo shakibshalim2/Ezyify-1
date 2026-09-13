@@ -42,7 +42,7 @@ export const initGoogleAnalytics = (measurementId: string) => {
   // Initialize dataLayer
   (window as any).dataLayer = (window as any).dataLayer || [];
   function gtag(...args: any[]) {
-    (window as any).dataLayer.push(arguments);
+    (window as any).dataLayer.push(args);
   }
   (window as any).gtag = gtag;
 
@@ -58,10 +58,10 @@ export const initMetaPixel = (pixelId: string) => {
   // Skip if pixelId is missing, null, or still the placeholder value
   if (!pixelId || pixelId === 'XXXXXXXXXX') return;
 
-  (window as any).fbq = function() {
-    (window as any).fbq.callMethod ?
-      (window as any).fbq.callMethod.apply((window as any).fbq, arguments) :
-      (window as any).fbq.queue.push(arguments);
+  (window as any).fbq = function (...args: any[]) {
+    (window as any).fbq.callMethod
+      ? (window as any).fbq.callMethod(...args)
+      : (window as any).fbq.queue.push(args);
   };
 
   if (!(window as any)._fbq) (window as any)._fbq = (window as any).fbq;
@@ -92,8 +92,8 @@ export const initTikTokPixel = (pixelId: string) => {
       'page', 'track', 'identify', 'instances', 'debug', 'on', 'off', 'once', 'ready', 'alias', 'group', 'enableCookie', 'disableCookie'
     ];
     ttq.setAndDefer = function(obj: any, method: string) {
-      obj[method] = function() {
-        obj.push([method].concat(Array.prototype.slice.call(arguments, 0)));
+      obj[method] = function (...args: any[]) {
+        obj.push([method].concat(args));
       };
     };
     

@@ -574,7 +574,7 @@ export default function AutomatedLaunchDashboard() {
                   <Alert>
                     <AlertTriangle className="w-4 h-4" />
                     <AlertDescription>
-                      {securityResult.score >= 85 
+                      {(securityResult.score ?? 0) >= 85 
                         ? '✅ Security score meets launch requirements (>85)'
                         : '⚠️ Security score below launch threshold. Fix critical issues before proceeding.'}
                     </AlertDescription>

@@ -28,9 +28,11 @@ interface ArchitectureNode {
   status: 'active' | 'processing' | 'completed';
 }
 
+type FlowType = 'buyer' | 'seller' | 'security' | 'all';
+
 export default function SystemArchitectureVisualizer() {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [activeFlow, setActiveFlow] = useState<'buyer' | 'seller' | 'security' | 'all'>('all');
+  const [activeFlow, setActiveFlow] = useState<FlowType>('all');
 
   // Architecture layers
   const layers = {
@@ -138,10 +140,10 @@ export default function SystemArchitectureVisualizer() {
 
   const renderNode = (node: ArchitectureNode, index: number) => {
     const isSelected = selectedNode === node.id;
-    const isHighlighted = activeFlow === 'all' || 
-      (activeFlow === 'buyer' && ['buyer-ui', 'escrow-engine', 'payment-gateway'].includes(node.id)) ||
-      (activeFlow === 'seller' && ['seller-ui', 'escrow-engine', 'commission', 'fraud-prevention', 'payment-gateway'].includes(node.id)) ||
-      (activeFlow === 'security' && ['fraud-prevention', 'kyc-provider', 'database', 'monitoring'].includes(node.id));
+    const isHighlighted = (activeFlow as string) === 'all' || 
+      ((activeFlow as string) === 'buyer' && ['buyer-ui', 'escrow-engine', 'payment-gateway'].includes(node.id)) ||
+      ((activeFlow as string) === 'seller' && ['seller-ui', 'escrow-engine', 'commission', 'fraud-prevention', 'payment-gateway'].includes(node.id)) ||
+      ((activeFlow as string) === 'security' && ['fraud-prevention', 'kyc-provider', 'database', 'monitoring'].includes(node.id));
 
     return (
       <div

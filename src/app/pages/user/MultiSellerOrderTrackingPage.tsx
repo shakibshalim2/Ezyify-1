@@ -245,7 +245,7 @@ export default function MultiSellerOrderTrackingPage() {
     }
   };
 
-  const totalDelivered = orderData ? orderData.sellerGroups.filter(g => g.status === 'delivered').length : 0;
+  const totalDelivered = orderData ? orderData.sellerGroups.filter((g: any) => g.status === 'delivered').length : 0;
   const totalSellers = orderData ? orderData.sellerGroups.length : 0;
   const overallProgress = totalSellers > 0 ? (totalDelivered / totalSellers) * 100 : 0;
 
@@ -287,7 +287,7 @@ export default function MultiSellerOrderTrackingPage() {
       {/* Seller Tabs */}
       <Tabs value={selectedSeller.toString()} onValueChange={(v) => setSelectedSeller(parseInt(v))}>
         <TabsList className="grid w-full grid-cols-3 mb-6">
-          {orderData ? orderData.sellerGroups.map((seller, index) => (
+          {orderData ? orderData.sellerGroups.map((seller: any, index: number) => (
             <TabsTrigger key={seller.sellerId} value={index.toString()} className="flex items-center gap-2">
               <img
                       loading="lazy" src={seller.sellerAvatar} alt={seller.sellerName} className="w-5 h-5 rounded-full object-cover" />
@@ -299,7 +299,7 @@ export default function MultiSellerOrderTrackingPage() {
           )}
         </TabsList>
 
-        {orderData ? orderData.sellerGroups.map((seller, index) => (
+        {orderData ? orderData.sellerGroups.map((seller: any, index: number) => (
           <TabsContent key={seller.sellerId} value={index.toString()}>
             <div className="grid lg:grid-cols-3 gap-6">
               {/* Left - Tracking Timeline */}
@@ -356,7 +356,7 @@ export default function MultiSellerOrderTrackingPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-6">
-                      {seller.trackingEvents.map((event, idx) => (
+                      {seller.trackingEvents.map((event: any, idx: number) => (
                         <div key={idx} className="flex gap-4">
                           <div className="flex flex-col items-center">
                             <div
@@ -391,7 +391,7 @@ export default function MultiSellerOrderTrackingPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {seller.items.map((item) => (
+                      {seller.items.map((item: any) => (
                         <div key={item.id} className="flex gap-4">
                           <img
                       loading="lazy"

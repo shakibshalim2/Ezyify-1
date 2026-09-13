@@ -25,7 +25,7 @@ interface ProgressiveDataOptions<T> {
   cacheKey?: string;
 }
 
-interface ProgressiveDataReturn<T> {
+interface ProgressiveDataReturn<T = any> {
   data: T | null;
   loading: boolean;
   error: Error | null;
@@ -39,7 +39,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 export function useProgressiveData<T>(
   fetchFn: () => Promise<T> | T,
   options: ProgressiveDataOptions<T> = {}
-): ProgressiveDataReturn<T> {
+): ProgressiveDataReturn<any> {
   const {
     initialData = null,
     delay = 0,

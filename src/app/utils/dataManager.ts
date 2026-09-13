@@ -2,9 +2,9 @@
  * Lazy Data Loading Manager - Prevents loading all data into memory at once
  */
 
-import type { Product } from '../data/products';
-import type { Post } from '../data/posts';
-import type { User } from '../data/users';
+import { products as allProducts, getProductById, type Product } from '../data/products';
+import { posts as allPosts, getPostById, type Post } from '../data/posts';
+import { users as allUsers, type User } from '../data/users';
 
 // Data cache with LRU (Least Recently Used) eviction
 const cache = new Map<string, { data: any; timestamp: number; hits: number }>();
@@ -55,7 +55,6 @@ function getCached<T>(key: string, loader: () => T): T {
 // Lazy load products with pagination
 export function getProducts(page = 1, limit = 15): Product[] {
   return getCached(`products-${page}-${limit}`, () => {
-    const allProducts = require('../data/products').products;
     const start = (page - 1) * limit;
     return allProducts.slice(start, start + limit);
   });
@@ -64,7 +63,6 @@ export function getProducts(page = 1, limit = 15): Product[] {
 // Lazy load posts with pagination
 export function getPosts(page = 1, limit = 15): Post[] {
   return getCached(`posts-${page}-${limit}`, () => {
-    const allPosts = require('../data/posts').posts;
     const start = (page - 1) * limit;
     return allPosts.slice(start, start + limit);
   });
@@ -73,7 +71,6 @@ export function getPosts(page = 1, limit = 15): Post[] {
 // Lazy load users
 export function getUsers(page = 1, limit = 15): User[] {
   return getCached(`users-${page}-${limit}`, () => {
-    const allUsers = require('../data/users').users;
     const start = (page - 1) * limit;
     return allUsers.slice(start, start + limit);
   });
@@ -82,7 +79,6 @@ export function getUsers(page = 1, limit = 15): User[] {
 // Get single product by ID
 export function getProductData(id: string): Product | undefined {
   return getCached(`product-${id}`, () => {
-    const { getProductById } = require('../data/products');
     return getProductById(id);
   });
 }
@@ -90,7 +86,6 @@ export function getProductData(id: string): Product | undefined {
 // Get single post by ID
 export function getPostData(id: string): Post | undefined {
   return getCached(`post-${id}`, () => {
-    const { getPostById } = require('../data/posts');
     return getPostById(id);
   });
 }

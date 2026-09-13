@@ -1,0 +1,105 @@
+# Android release — signed AAB / APK (no Expo Go)
+
+The mobile app is a normal native Android project generated once by
+`expo prebuild` and committed under `apps/mobile/android`. It is built and
+signed with Gradle exactly like a Flutter or plain Android app. Expo Go is
+**not** involved at any point; end users install the signed APK/AAB.
+
+## 1. One‑time: create the upload keystore (never commit it)
+
+```bash
+keytool -genkeypair -v \
+  -keystore ezyify-upload.keystore \
+  -alias ezyify-upload \
+  -keyalg RSA -keysize 4096 -validity 10000 \
+  -storetype PKCS12
+```
+
+Store the file outside the repo (e.g. `~/keys/`). Put credentials in
+`~/.gradle/gradle.properties` (local) or CI secrets:
+
+```properties
+EZYIFY_UPLOAD_STORE_FILE=/home/you/keys/ezyify-upload.keystore
+EZYIFY_UPLOAD_STORE_PASSWORD=********
+EZYIFY_UPLOAD_KEY_ALIAS=ezyify-upload
+EZYIFY_UPLOAD_KEY_PASSWORD=********
+```
+
+Enroll the app in **Play App Signing** on first upload; Google keeps the app
+signing key, you keep only the upload key above.
+
+## 2. Gradle signing config (added in Phase 4.3)
+
+`apps/mobile/android/app/build.gradle`:
+
+```groovy
+signingConfigs {
+    release {
+        if (project.hasProperty('EZYIFY_UPLOAD_STORE_FILE')) {
+            storeFile file(EZYIFY_UPLOAD_STORE_FILE)
+            storePassword EZYIFY_UPLOAD_STORE_PASSWORD
+            keyAlias EZYIFY_UPLOAD_KEY_ALIAS
+            keyPassword EZYIFY_UPLOAD_KEY_PASSWORD
+        }
+    }
+}
+buildTypes {
+    release {
+        signingConfig signingConfigs.release
+        minifyEnabled true
+        shrinkResources true
+        proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+    }
+}
+```
+
+## 3. Build commands
+
+```bash
+cd apps/mobile
+pnpm install
+npx expo prebuild --platform android      # only if native config changed
+cd android
+./gradlew :app:bundleRelease              # → app/build/outputs/bundle/release/app-release.aab (Play Store)
+./gradlew :app:assembleRelease            # → app/build/outputs/apk/release/app-release.apk (sideload/testing)
+```
+
+Equivalent EAS local build (still offline, still no Expo Go):
+
+```bash
+eas build --platform android --profile production --local
+```
+
+## 4. Verify the artifact
+
+```bash
+# signature
+apksigner verify --print-certs app-release.apk
+# bundle contents / 16 KB page alignment of native libs
+bundletool build-apks --bundle app-release.aab --output out.apks --mode=universal
+```
+
+Install on a device: `adb install app-release.apk`.
+
+## 5. Versioning
+
+`android/app/build.gradle` reads `versionCode`/`versionName` from
+`apps/mobile/app.json` via the Expo config plugin; the release workflow bumps
+`versionCode` automatically (`scripts/bump-version.mjs`).
+
+## 6. Play Console requirements (checklist)
+
+- Target SDK 35 now, 36 before 2026‑08‑31 deadline
+- Upload `.aab` only; internal testing track first, then closed → production
+- Data safety form, privacy policy URL, account deletion URL + in‑app flow
+- UGC: report/block/mute, moderation queue, terms of service
+- Content rating questionnaire, ads declaration (none), target audience 18+
+- Physical goods paid via third‑party processor (Stripe) — no Play Billing
+- Store listing: 512 px icon, 1024×500 feature graphic, ≥4 phone screenshots
+
+## 7. CI
+
+`.github/workflows/android-release.yml` decodes the keystore from
+`ANDROID_KEYSTORE_BASE64`, writes `gradle.properties` from secrets, runs
+`bundleRelease`, uploads the `.aab` artifact, and (on tags) pushes it to the
+Play internal track with `r0adkll/upload-google-play`.

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Search, Mic, Upload, ShoppingCart, User, Bell, Globe, Menu, X, Home, Compass, Video, ShoppingBag } from 'lucide-react';
-import logoImage from 'figma:asset/4dfeabb63b9146a1c7993b184576f965eb7f1f71.png';
+import logoImage from '../../assets/logo-full.png';
 
 interface NavbarProps {
   onVoiceClick: () => void;
@@ -10,7 +10,7 @@ interface NavbarProps {
 export function Navbar({ onVoiceClick }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   return (
-    <nav className="sticky top-0 z-40 bg-black/90 backdrop-blur-xl border-b border-white/10">
+    <nav className="sticky top-0 z-40 bg-background/90 backdrop-blur-xl border-b border-border/60">
       <div className="max-w-[1920px] mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -26,15 +26,15 @@ export function Navbar({ onVoiceClick }: NavbarProps) {
 
             {/* Main Navigation */}
             <nav className="hidden lg:flex items-center gap-5">
-              <Link to="/" className="text-white text-sm hover:text-white/80 transition">Home</Link>
-              <Link to="/explore" className="text-white/70 text-sm hover:text-white transition">Explore</Link>
-              <Link to="/loops" className="text-white/70 text-sm hover:text-white transition">Loops</Link>
-              <Link to="/live/1" className="text-white/70 text-sm hover:text-white transition flex items-center gap-1.5">
+              <Link to="/" className="text-foreground text-sm hover:text-foreground-secondary transition">Home</Link>
+              <Link to="/explore" className="text-foreground-secondary text-sm hover:text-foreground transition">Explore</Link>
+              <Link to="/loops" className="text-foreground-secondary text-sm hover:text-foreground transition">Loops</Link>
+              <Link to="/live/1" className="text-foreground-secondary text-sm hover:text-foreground transition flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 bg-error rounded-full animate-pulse" />
                 Live
               </Link>
-              <Link to="/shop" className="text-white/70 text-sm hover:text-white transition">Marketplace</Link>
-              <Link to="/explore" className="text-white/70 text-sm hover:text-white transition">Creators</Link>
+              <Link to="/shop" className="text-foreground-secondary text-sm hover:text-foreground transition">Marketplace</Link>
+              <Link to="/explore" className="text-foreground-secondary text-sm hover:text-foreground transition">Creators</Link>
             </nav>
           </div>
 
@@ -44,18 +44,18 @@ export function Navbar({ onVoiceClick }: NavbarProps) {
               <input
                 type="text"
                 placeholder="Search products, loops, creators, stores..."
-                className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-2.5 pr-24 rounded-full border border-white/20 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
+                className="w-full bg-muted text-foreground placeholder:text-foreground-tertiary px-4 py-2.5 pr-24 rounded-full border border-border-strong focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 <button
                   onClick={onVoiceClick}
                   aria-label="Voice search"
-                  className="p-2 hover:bg-white/10 rounded-full transition group"
+                  className="p-2 hover:bg-muted rounded-full transition group"
                 >
-                  <Mic className="w-4 h-4 text-white/60 group-hover:text-white" />
+                  <Mic className="w-4 h-4 text-foreground-secondary group-hover:text-foreground" />
                 </button>
-                <button aria-label="Search" className="p-2 hover:bg-white/10 rounded-full transition">
-                  <Search className="w-4 h-4 text-white/60 hover:text-white" />
+                <button aria-label="Search" className="p-2 hover:bg-muted rounded-full transition">
+                  <Search className="w-4 h-4 text-foreground-secondary hover:text-foreground" />
                 </button>
               </div>
             </div>
@@ -65,37 +65,37 @@ export function Navbar({ onVoiceClick }: NavbarProps) {
           <div className="flex items-center gap-3">
             <Link
               to="/upload"
-              className="hidden md:flex items-center gap-2 px-4 py-2 text-white rounded-full hover:shadow-brand-lg transition shadow-brand"
+              className="hidden md:flex items-center gap-2 px-4 py-2 text-foreground rounded-full hover:shadow-brand-lg transition shadow-brand"
               style={{ background: 'var(--brand-gradient)' }}
             >
               <Upload className="w-4 h-4" />
               <span className="hidden lg:inline text-sm font-medium">Upload</span>
             </Link>
 
-            <Link to="/notifications" aria-label="Notifications" className="relative p-2 hover:bg-white/10 rounded-full transition">
-              <Bell className="w-5 h-5 text-white/70" />
+            <Link to="/notifications" aria-label="Notifications" className="relative p-2 hover:bg-muted rounded-full transition">
+              <Bell className="w-5 h-5 text-foreground-secondary" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-error rounded-full" />
             </Link>
 
-            <Link to="/cart" aria-label="Cart" className="relative p-2 hover:bg-white/10 rounded-full transition">
-              <ShoppingCart className="w-5 h-5 text-white/70" />
+            <Link to="/cart" aria-label="Cart" className="relative p-2 hover:bg-muted rounded-full transition">
+              <ShoppingCart className="w-5 h-5 text-foreground-secondary" />
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary rounded-full flex items-center justify-center text-[10px] font-bold text-white">3</span>
             </Link>
 
-            <button aria-label="Change language" className="hidden md:block p-2 hover:bg-white/10 rounded-full transition">
-              <Globe className="w-5 h-5 text-white/70" />
+            <button aria-label="Change language" className="hidden md:block p-2 hover:bg-muted rounded-full transition">
+              <Globe className="w-5 h-5 text-foreground-secondary" />
             </button>
 
             <Link
               to="/login"
-              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full transition text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-border rounded-full transition text-sm"
             >
-              <User className="w-4 h-4 text-white/70" />
-              <span className="hidden lg:inline text-white/70">Login</span>
+              <User className="w-4 h-4 text-foreground-secondary" />
+              <span className="hidden lg:inline text-foreground-secondary">Login</span>
             </Link>
 
-            <button aria-label="Open menu" onClick={() => setMobileMenuOpen(true)} className="md:hidden p-2 hover:bg-white/10 rounded-full transition">
-              <Menu className="w-5 h-5 text-white/70" />
+            <button aria-label="Open menu" onClick={() => setMobileMenuOpen(true)} className="md:hidden p-2 hover:bg-muted rounded-full transition">
+              <Menu className="w-5 h-5 text-foreground-secondary" />
             </button>
           </div>
         </div>
@@ -105,11 +105,11 @@ export function Navbar({ onVoiceClick }: NavbarProps) {
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden" onClick={() => setMobileMenuOpen(false)}>
           <div className="absolute inset-0 bg-black/60" />
-          <div className="absolute top-0 right-0 bottom-0 w-72 bg-black/95 backdrop-blur-xl border-l border-white/10 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-              <span className="text-base font-semibold text-white">Menu</span>
-              <button onClick={() => setMobileMenuOpen(false)} aria-label="Close menu" className="p-1.5 rounded-full hover:bg-white/10 transition">
-                <X className="w-5 h-5 text-white/70" />
+          <div className="absolute top-0 right-0 bottom-0 w-72 bg-black/95 backdrop-blur-xl border-l border-border shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <span className="text-base font-semibold text-foreground">Menu</span>
+              <button onClick={() => setMobileMenuOpen(false)} aria-label="Close menu" className="p-1.5 rounded-full hover:bg-muted transition">
+                <X className="w-5 h-5 text-foreground-secondary" />
               </button>
             </div>
             <div className="p-4 space-y-1">
@@ -124,7 +124,7 @@ export function Navbar({ onVoiceClick }: NavbarProps) {
                 { to: '/login', label: 'Login', icon: User },
               ].map(({ to, label, icon: Icon }) => (
                 <Link key={to} to={to} onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/80 hover:bg-white/10 hover:text-white transition-colors">
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground-secondary hover:bg-muted hover:text-foreground transition-colors">
                   <Icon className="w-4 h-4 shrink-0" />
                   {label}
                 </Link>

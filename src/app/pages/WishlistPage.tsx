@@ -1,5 +1,6 @@
 import { useState, useEffect, type MouseEvent } from 'react';
 import { Link } from 'react-router';
+import { EmptyWishlist } from '../components/EmptyStates';
 import { Heart, ShoppingCart, Trash2, ArrowLeft } from 'lucide-react';
 import { products } from '../data/products';
 import { ProductCard } from '../components/shop/ProductCard';
@@ -198,20 +199,7 @@ export default function WishlistPage() {
         </div>
 
         {wishlistProducts.length === 0 ? (
-          <div className="bg-card border border-border rounded-3xl p-12 text-center">
-            <Heart className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-foreground mb-2">Your wishlist is empty</h2>
-            <p className="text-muted-foreground mb-6">
-              Start adding products you love to save them for later!
-            </p>
-            <Link
-              to="/shop"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold text-white shadow-brand hover:shadow-brand-lg transition-all hover:scale-[1.02]"
-              style={{ background: 'var(--brand-gradient)' }}
-            >
-              Browse Products
-            </Link>
-          </div>
+          <EmptyWishlist />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {wishlistProducts.map(product => (

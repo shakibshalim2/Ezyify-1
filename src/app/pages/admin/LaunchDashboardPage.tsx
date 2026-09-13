@@ -112,12 +112,13 @@ export default function LaunchDashboardPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  const [currentDate] = useState(new Date('2026-01-21'));
+
   // Show skeleton while loading
   if (isLoading) {
     return <LaunchDashboardSkeleton />;
   }
 
-  const [currentDate] = useState(new Date('2026-01-21'));
   const launchDate = new Date('2026-02-25');
   const daysUntilLaunch = Math.ceil((launchDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
 

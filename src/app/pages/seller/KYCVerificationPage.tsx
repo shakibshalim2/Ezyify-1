@@ -2,6 +2,13 @@ import { SEO } from '../../components/SEO';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { useState } from 'react';
 import { SellerLayout } from '../../components/SellerLayout';
+import { Alert, AlertDescription } from '../../components/ui/alert';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { AlertTriangle, Building, CheckCircle, CreditCard, FileText, Shield, Upload, User } from 'lucide-react';
 
 export default function KYCVerificationPage() {
   const [currentStep, setCurrentStep] = useState(1);
