@@ -81,7 +81,9 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         className={cn(buttonVariants({ variant, size, fullWidth }), className)}
         {...props}
       >
-        {loading ? (
+        {asChild ? (
+          children
+        ) : loading ? (
           <>
             <Loader2 className="animate-spin" aria-hidden />
             <span>{loadingText ?? children}</span>

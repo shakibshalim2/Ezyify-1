@@ -425,358 +425,6 @@ export default function HomePage() {
   const renderPost = (post: any, key: string, delay: number) => (
     <PostCard key={key} post={post} animationDelay={delay} />
   );
-  // ── dead code below kept to avoid cascading ref errors ───────────────────────
-  const _unused_renderPost = (post: any, key: string, delay: number) => {
-    const isLiked     = likedPosts.has(post.id) || post.isLiked;
-    const isSaved     = savedPosts.has(post.id) || post.isSaved;
-    const isFollowing = followedUsers.has(post.user.username);
-    const isReposted  = repostedPosts.has(post.id);
-    const popHeart    = justLiked.has(post.id);
-    const isLoop      = post.type === 'loop';
-    const hasShop     = post.taggedProducts?.length > 0;
-    const repostCount = repostCounts[post.id] ?? Math.round((post.shares ?? 0) * 0.4);
-
-    return (
-      <article
-        key={key}
-        className="bg-card border border-border/60 rounded-xl sm:rounded-2xl overflow-hidden animate-feed-in"
-        style={{ animationDelay: `${delay}ms` }}
-      >
-        {/* Reposted-by-you attribution bar */}
-        {isReposted && (
-          <div className="flex items-center gap-1.5 px-3.5 pt-2.5 pb-0">
-            <Repeat2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-            <span className="text-[11px] font-semibold text-emerald-600">You reposted</span>
-          </div>
-        )}
-        {/* Header */}
-        <div className="flex items-center justify-between gap-2.5 px-3.5 pt-3 pb-2.5">
-          <Link to={`/profile/${post.user.username}`} className="flex items-center gap-2.5 min-w-0 flex-1 group">
-            <div className="relative shrink-0">
-              {LIVE_USERNAMES.has(post.user.username) ? (
-                <div className="p-[2.5px] rounded-full" style={{ background: 'linear-gradient(135deg,#ef4444,#f97316)' }}>
-                  <div className="bg-card p-[2px] rounded-full">
-                    <img loading="lazy" src={post.user.avatar} alt={post.user.name} className="w-9 h-9 rounded-full object-cover" />
-                  </div>
-                </div>
-              ) : (
-                <img loading="lazy" src={post.user.avatar} alt={post.user.name} className="w-9 h-9 rounded-full object-cover ring-[1.5px] ring-border/60 group-hover:ring-2 group-hover:ring-primary/30 transition-all" />
-              )}
-              {LIVE_USERNAMES.has(post.user.username) && (
-                <span className="absolute -bottom-0.5 -right-0.5 px-1 py-px rounded-full text-[8px] font-black text-white leading-none bg-red-500 border border-card">
-                  LIVE
-                </span>
-              )}
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1 mb-px">
-                <span className="font-semibold text-[13px] text-foreground truncate leading-tight">{post.user.name}</span>
-                {post.user.verified && <VerifiedBadge size="sm" />}
-              </div>
-              <p className="text-[11px] text-muted-foreground/70 leading-none">{post.timestamp}</p>
-            </div>
-          </Link>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={e => toggleFollow(e, post.user.username)}
-              aria-label={isFollowing ? 'Unfollow' : 'Follow'}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all duration-150 active:scale-[0.92] ${
-                isFollowing
-                  ? 'bg-muted text-foreground/70 border border-border/70'
-                  : 'text-white shadow-sm hover:opacity-90'
-              }`}
-              style={isFollowing ? {} : { background: 'var(--brand-gradient)' }}
-            >
-              {isFollowing
-                ? <><UserCheck className="w-3 h-3" /><span className="ml-0.5">Following</span></>
-                : <><UserPlus className="w-3 h-3" /><span className="ml-0.5">Follow</span></>}
-            </button>
-            <button type="button" aria-label="More" className="p-1.5 rounded-xl text-muted-foreground/60 hover:text-foreground hover:bg-muted/80 transition-all">
-              <MoreVertical className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Media — swipeable carousel */}
-        {(() => {
-          const images = (post.content.images ?? []) as string[];
-          const activeIdx  = carouselIdx[post.id] ?? 0;
-          const hasMultiple = images.length > 1;
-
-          const goPrev = (e: React.MouseEvent) => {
-            e.preventDefault(); e.stopPropagation();
-            setCarouselIdx(prev => ({ ...prev, [post.id]: Math.max((prev[post.id] ?? 0) - 1, 0) }));
-          };
-          const goNext = (e: React.MouseEvent) => {
-            e.preventDefault(); e.stopPropagation();
-            setCarouselIdx(prev => ({ ...prev, [post.id]: Math.min((prev[post.id] ?? 0) + 1, images.length - 1) }));
-          };
-
-          return (
-            <div
-              className="block relative overflow-hidden group bg-muted/40"
-              onClick={e => handleDoubleTap(e, post)}
-            >
-              <div
-                className="aspect-[4/5] sm:aspect-[4/3] relative overflow-hidden"
-                onTouchStart={hasMultiple ? e => {
-                  const t = e.touches[0];
-                  touchStartXRef.current[post.id] = t.clientX;
-                  touchStartYRef.current[post.id] = t.clientY;
-                } : undefined}
-                onTouchEnd={hasMultiple ? e => {
-                  const t = e.changedTouches[0];
-                  const startX = touchStartXRef.current[post.id] ?? t.clientX;
-                  const startY = touchStartYRef.current[post.id] ?? t.clientY;
-                  const dx = t.clientX - startX;
-                  const dy = t.clientY - startY;
-                  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 28) {
-                    e.stopPropagation();
-                    setCarouselIdx(prev => {
-                      const cur = prev[post.id] ?? 0;
-                      return {
-                        ...prev,
-                        [post.id]: dx < 0
-                          ? Math.min(cur + 1, images.length - 1)
-                          : Math.max(cur - 1, 0),
-                      };
-                    });
-                  }
-                } : undefined}
-              >
-                {/* Image track — all slides side by side, translate to active */}
-                {images.length > 0 && (
-                  <div
-                    className="absolute inset-0 flex transition-transform duration-300 ease-out will-change-transform"
-                    style={{ transform: `translateX(-${activeIdx * 100}%)` }}
-                  >
-                    {images.map((src, i) => (
-                      <div key={i} className="min-w-full h-full flex-shrink-0">
-                        <img
-                          loading={i === 0 ? 'eager' : 'lazy'}
-                          src={src}
-                          alt={i === 0 ? (post.content.text || '') : ''}
-                          className={`w-full h-full object-cover ${!hasMultiple ? 'transition-transform duration-500 ease-out group-hover:scale-[1.025]' : ''}`}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Loop badge + play overlay */}
-                {isLoop && (
-                  <>
-                    <div
-                      className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold text-white"
-                      style={{ background: 'var(--brand-gradient)' }}
-                    >
-                      <Zap className="w-3 h-3 fill-current" /> Loop
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(10px)' }}>
-                        <Play className="w-6 h-6 text-white fill-white ml-0.5" />
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* Views */}
-                {post.views && (
-                  <div className="absolute bottom-3 left-3 z-10 text-white text-[11px] font-medium px-2 py-1 rounded-full tabular-nums" style={{ background: 'rgba(0,0,0,0.48)', backdropFilter: 'blur(6px)' }}>
-                    {fmtCount(post.views)} views
-                  </div>
-                )}
-
-                {/* Shop chip — raised above dots when multi-image */}
-                {hasShop && !isLoop && (
-                  <div
-                    className={`absolute right-3 z-10 flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold text-white transition-all ${hasMultiple ? 'bottom-9' : 'bottom-3'}`}
-                    style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
-                  >
-                    <ShoppingBag className="w-3 h-3" />
-                    <span>{post.taggedProducts.length} {post.taggedProducts.length === 1 ? 'item' : 'items'}</span>
-                  </div>
-                )}
-
-                {/* Carousel dots — active dot is wider pill, inactive is small circle */}
-                {hasMultiple && (
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 pointer-events-none">
-                    {images.map((_: string, i: number) => (
-                      <div
-                        key={i}
-                        className={`rounded-full transition-all duration-250 ${
-                          i === activeIdx
-                            ? 'w-[18px] h-[6px] bg-white shadow-sm'
-                            : 'w-[6px] h-[6px] bg-white/50'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {/* Desktop prev / next arrows — show on hover, hidden on mobile */}
-                {hasMultiple && activeIdx > 0 && (
-                  <button
-                    type="button"
-                    aria-label="Previous image"
-                    onClick={goPrev}
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-black/70 hidden sm:flex"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                )}
-                {hasMultiple && activeIdx < images.length - 1 && (
-                  <button
-                    type="button"
-                    aria-label="Next image"
-                    onClick={goNext}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-black/70 hidden sm:flex"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                )}
-
-                {/* Double-tap heart pop */}
-                {popHeart && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
-                    <Heart className="w-20 h-20 text-like fill-current animate-heart-pop drop-shadow-xl" />
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Body */}
-        <div className="px-3.5 pt-2.5 pb-3">
-          {/* Caption */}
-          {post.content.text && (() => {
-            const isExpanded = expandedCaptions.has(post.id);
-            const isLong = post.content.text.length > 120;
-            return (
-              <div className="mb-2.5">
-                <p className={`text-[13px] text-foreground/90 leading-[1.55] ${!isExpanded && isLong ? 'line-clamp-2' : ''}`}>
-                  {parseCaption(post.content.text, (href, label, key) => (
-                    <Link key={key} to={href} onClick={e => e.stopPropagation()} className="text-primary/75 hover:text-primary font-medium transition-colors">{label}</Link>
-                  ))}
-                </p>
-                {isLong && (
-                  <button
-                    type="button"
-                    onClick={e => {
-                      e.preventDefault(); e.stopPropagation();
-                      setExpandedCaptions(prev => {
-                        const next = new Set(prev);
-                        isExpanded ? next.delete(post.id) : next.add(post.id);
-                        return next;
-                      });
-                    }}
-                    className="text-[12px] text-muted-foreground hover:text-foreground mt-0.5 transition-colors"
-                  >
-                    {isExpanded ? 'Less' : '... More'}
-                  </button>
-                )}
-              </div>
-            );
-          })()}
-
-          {/* Tagged products */}
-          {hasShop && (
-            <div className="mb-2.5 flex flex-wrap gap-1.5">
-              {post.taggedProducts.slice(0, 2).map((pid: string) => {
-                const product = getProductById(pid);
-                if (!product) return null;
-                const inCart = cartItems.has(pid);
-                return (
-                  <div key={pid} className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-muted/30 overflow-hidden">
-                    <Link
-                      to={`/product/${pid}`}
-                      onClick={e => e.stopPropagation()}
-                      className="flex items-center gap-1.5 pl-2 pr-1 py-1.5 hover:bg-muted/60 transition-colors"
-                    >
-                      <ShoppingBag className="w-3 h-3 text-primary/70 shrink-0" />
-                      <span className="text-[11px] font-medium text-foreground/80 truncate max-w-[90px]">{product.name}</span>
-                      <span className="text-[11px] font-bold text-primary shrink-0">${product.price}</span>
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={e => addToCart(e, pid, product.name)}
-                      aria-label="Add to cart"
-                      className={`mr-1 p-1 rounded-lg transition-all duration-200 ${inCart ? 'bg-emerald-500/15 text-emerald-600' : 'hover:bg-primary/10 text-muted-foreground hover:text-primary'}`}
-                    >
-                      {inCart ? <Check className="w-3.5 h-3.5" /> : <ShoppingCart className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Action bar */}
-          <div className="flex items-center gap-0.5 -mx-1 pt-2 border-t border-border/40">
-            <button
-              type="button"
-              onClick={e => toggleLike(e, post.id)}
-              aria-label={isLiked ? 'Unlike' : 'Like'}
-              aria-pressed={isLiked}
-              className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 active:scale-[0.88] ${
-                isLiked ? 'text-like' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
-              }`}
-            >
-              <Heart className={`w-[18px] h-[18px] shrink-0 transition-colors ${isLiked ? 'fill-current' : ''} ${popHeart ? 'animate-heart-pop' : ''}`} />
-              <span className="tabular-nums text-[12px]">{fmtCount(post.likes)}</span>
-            </button>
-            <button
-              type="button"
-              onClick={e => openComments(e, post)}
-              aria-label="Comment"
-              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150 active:scale-[0.88]"
-            >
-              <MessageCircle className="w-[18px] h-[18px] shrink-0" />
-              <span className="tabular-nums text-[12px]">{fmtCount(post.comments)}</span>
-            </button>
-            <button
-              type="button"
-              onClick={e => openRepostSheet(e, post)}
-              aria-label={isReposted ? 'Undo repost' : 'Repost'}
-              aria-pressed={isReposted}
-              className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 active:scale-[0.88] ${
-                isReposted
-                  ? 'text-emerald-500 hover:bg-emerald-500/10'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
-              }`}
-            >
-              <Repeat2 className="w-[18px] h-[18px] shrink-0" />
-              <span className="tabular-nums text-[12px]">{fmtCount(repostCount)}</span>
-            </button>
-            <button
-              type="button"
-              onClick={e => handleShare(e, post.id)}
-              aria-label="Share"
-              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150 active:scale-[0.88]"
-            >
-              <Share2 className="w-[18px] h-[18px] shrink-0" />
-              <span className="tabular-nums text-[12px]">{fmtCount(post.shares)}</span>
-            </button>
-            <button
-              type="button"
-              onClick={e => toggleSave(e, post.id)}
-              aria-label={isSaved ? 'Unsave' : 'Save'}
-              aria-pressed={isSaved}
-              className={`ml-auto p-2 rounded-xl transition-all duration-150 active:scale-[0.88] ${
-                isSaved ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
-              }`}
-            >
-              <BookmarkPlus className={`w-[18px] h-[18px] transition-colors ${isSaved ? 'fill-current' : ''}`} />
-            </button>
-          </div>
-        </div>
-      </article>
-    );
-  };
-
   // ── Render: Loop spotlight card ────────────────────────────────────────────────
   const renderLoopCard = (loop: any, key: string, delay: number) => (
     <Link
@@ -791,7 +439,7 @@ export default function HomePage() {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
 
-        <div className="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold text-white" style={{ background: 'var(--brand-gradient)' }}>
+        <div className="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold text-white bg-brand-gradient">
           <Zap className="w-3 h-3 fill-current" />Loops
         </div>
 
@@ -840,18 +488,18 @@ export default function HomePage() {
     >
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/50">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
-            <Radio className="w-[15px] h-[15px] text-red-500" />
+          <div className="w-8 h-8 rounded-xl bg-error-subtle flex items-center justify-center shrink-0">
+            <Radio className="w-[15px] h-[15px] text-error" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <p className="text-[13px] font-semibold text-foreground leading-tight">Live Now</p>
               <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-[10px] font-semibold text-red-500">{streams.length} LIVE</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-error animate-pulse" />
+                <span className="text-[10px] font-semibold text-error">{streams.length} LIVE</span>
               </span>
             </div>
-            <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-none">Watch live streams from creators &amp; stores</p>
+            <p className="text-[11px] text-foreground-secondary/70 mt-0.5 leading-none">Watch live streams from creators &amp; stores</p>
           </div>
         </div>
         <Link to="/live-shopping" className="text-[12px] font-semibold text-primary hover:text-primary/75 transition-colors flex items-center gap-0.5">
@@ -872,7 +520,7 @@ export default function HomePage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
                 {/* Live badge */}
-                <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full bg-red-500 text-white text-[10px] font-black">
+                <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full bg-error text-white text-[10px] font-black">
                   <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                   LIVE
                 </div>
@@ -935,7 +583,7 @@ export default function HomePage() {
             >
               <Tag className="w-3 h-3 text-primary/70 shrink-0 group-hover:text-primary transition-colors" />
               <span className="text-[12px] font-medium text-foreground/80 group-hover:text-foreground transition-colors">{tag.slice(1)}</span>
-              <span className="text-[10px] text-muted-foreground/60 font-medium">{cnt}</span>
+              <span className="text-[10px] text-foreground-secondary/60 font-medium">{cnt}</span>
             </Link>
           ))}
         </div>
@@ -957,7 +605,7 @@ export default function HomePage() {
           </div>
           <div>
             <p className="text-[13px] font-semibold text-foreground leading-tight">Trending Products</p>
-            <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-none">Picked for you today</p>
+            <p className="text-[11px] text-foreground-secondary/70 mt-0.5 leading-none">Picked for you today</p>
           </div>
         </div>
         <Link to="/shop" className="text-[12px] font-semibold text-primary hover:text-primary/75 transition-colors flex items-center gap-0.5">
@@ -997,12 +645,12 @@ export default function HomePage() {
                 <h4 className="text-[12px] font-medium text-foreground line-clamp-2 mb-1.5 leading-snug">{product.name}</h4>
                 <div className="flex items-baseline gap-1.5 mb-1">
                   <span className="text-[13px] font-bold text-foreground">${product.price}</span>
-                  {product.originalPrice && <span className="text-[11px] text-muted-foreground/60 line-through">${product.originalPrice}</span>}
+                  {product.originalPrice && <span className="text-[11px] text-foreground-secondary/60 line-through">${product.originalPrice}</span>}
                 </div>
                 <div className="flex items-center gap-1">
                   <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
                   <span className="text-[11px] font-medium text-foreground/70">{product.rating}</span>
-                  {product.sold && <span className="text-[11px] text-muted-foreground/55">· {fmtCount(product.sold)} sold</span>}
+                  {product.sold && <span className="text-[11px] text-foreground-secondary/55">· {fmtCount(product.sold)} sold</span>}
                 </div>
               </div>
             </Link>
@@ -1035,8 +683,8 @@ export default function HomePage() {
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-600">HOT</span>
               </div>
               <div className="flex items-center gap-1 mt-0.5">
-                <Clock className="w-3 h-3 text-muted-foreground/60 shrink-0" />
-                <span className="text-[11px] text-muted-foreground/70 tabular-nums">
+                <Clock className="w-3 h-3 text-foreground-secondary/60 shrink-0" />
+                <span className="text-[11px] text-foreground-secondary/70 tabular-nums">
                   Ends in <span className="font-semibold text-orange-600">{countdown || '—'}</span>
                 </span>
               </div>
@@ -1079,12 +727,12 @@ export default function HomePage() {
                   <h4 className="text-[12px] font-medium text-foreground line-clamp-2 mb-1 leading-snug">{product.name}</h4>
                   <div className="flex items-baseline gap-1.5 mb-1">
                     <span className="text-[13px] font-bold text-orange-600">${product.price}</span>
-                    {product.originalPrice && <span className="text-[11px] text-muted-foreground/55 line-through">${product.originalPrice}</span>}
+                    {product.originalPrice && <span className="text-[11px] text-foreground-secondary/55 line-through">${product.originalPrice}</span>}
                   </div>
                   <div className="flex items-center gap-1">
                     <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
                     <span className="text-[11px] font-medium text-foreground/70">{product.rating}</span>
-                    {product.sold && <span className="text-[11px] text-muted-foreground/55">· {fmtCount(product.sold)} sold</span>}
+                    {product.sold && <span className="text-[11px] text-foreground-secondary/55">· {fmtCount(product.sold)} sold</span>}
                   </div>
                 </div>
               </Link>
@@ -1133,9 +781,9 @@ export default function HomePage() {
                 <span className="text-[9px] font-bold px-1.5 py-[2px] rounded-full bg-primary/10 text-primary leading-none">Creator</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] text-muted-foreground/80">{user.followers} followers</span>
-                <span className="text-muted-foreground/35 text-[10px]">·</span>
-                <span className="text-[11px] text-muted-foreground/70">{user.bio}</span>
+                <span className="text-[11px] text-foreground-secondary/80">{user.followers} followers</span>
+                <span className="text-foreground-secondary/35 text-[10px]">·</span>
+                <span className="text-[11px] text-foreground-secondary/70">{user.bio}</span>
               </div>
             </div>
           </Link>
@@ -1183,7 +831,7 @@ export default function HomePage() {
                     <h4 className="text-[12px] font-medium text-foreground line-clamp-2 mb-1 leading-snug">{product.name}</h4>
                     <div className="flex items-baseline gap-1 mb-1">
                       <span className="text-[13px] font-bold text-foreground">${product.price}</span>
-                      {product.originalPrice && <span className="text-[10px] text-muted-foreground/60 line-through">${product.originalPrice}</span>}
+                      {product.originalPrice && <span className="text-[10px] text-foreground-secondary/60 line-through">${product.originalPrice}</span>}
                     </div>
                     <div className="flex items-center gap-1">
                       <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400 shrink-0" />
@@ -1222,7 +870,7 @@ export default function HomePage() {
           </div>
           <div>
             <p className="text-[13px] font-semibold text-foreground leading-tight">Trending Loops</p>
-            <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-none">Short videos picked for you</p>
+            <p className="text-[11px] text-foreground-secondary/70 mt-0.5 leading-none">Short videos picked for you</p>
           </div>
         </div>
         <Link to="/loops" className="text-[12px] font-semibold text-primary hover:text-primary/75 transition-colors flex items-center gap-0.5">
@@ -1279,7 +927,7 @@ export default function HomePage() {
             <img key={c.id} src={c.avatar} alt={c.name} className="w-6 h-6 rounded-full object-cover ring-2 ring-background" />
           ))}
         </div>
-        <span className="text-[12px] text-muted-foreground/80">Posts from people you follow</span>
+        <span className="text-[12px] text-foreground-secondary/80">Posts from people you follow</span>
       </div>
       <Link to="/explore" className="text-[12px] font-semibold text-primary hover:text-primary/75 transition-colors flex items-center gap-0.5">
         Discover <ChevronRight className="w-3.5 h-3.5" />
@@ -1318,7 +966,7 @@ export default function HomePage() {
               </div>
               <div className="text-center">
                 <p className="text-[10px] font-semibold text-foreground/80 group-hover:text-foreground transition-colors leading-tight">{label}</p>
-                <p className="text-[9px] text-muted-foreground/50 tabular-nums">{count}</p>
+                <p className="text-[9px] text-foreground-secondary/50 tabular-nums">{count}</p>
               </div>
             </Link>
           ))}
@@ -1341,7 +989,7 @@ export default function HomePage() {
           </div>
           <div>
             <p className="text-[13px] font-semibold text-foreground leading-tight">Community</p>
-            <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-none">Real reviews &amp; discussions</p>
+            <p className="text-[11px] text-foreground-secondary/70 mt-0.5 leading-none">Real reviews &amp; discussions</p>
           </div>
         </div>
         <Link to="/explore" className="text-[12px] font-semibold text-primary hover:text-primary/75 transition-colors flex items-center gap-0.5">
@@ -1378,11 +1026,11 @@ export default function HomePage() {
               )}
               <p className="text-[12px] text-foreground/80 leading-snug">{review.text}</p>
               <div className="flex items-center gap-3 mt-1.5">
-                <button type="button" className="flex items-center gap-1 text-[11px] text-muted-foreground/60 hover:text-like transition-colors">
+                <button type="button" className="flex items-center gap-1 text-[11px] text-foreground-secondary/60 hover:text-like transition-colors">
                   <Heart className="w-3 h-3" /><span>{review.likes}</span>
                 </button>
                 {review.replies !== undefined && review.replies !== null && (
-                  <button type="button" className="flex items-center gap-1 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors">
+                  <button type="button" className="flex items-center gap-1 text-[11px] text-foreground-secondary/60 hover:text-foreground transition-colors">
                     <MessageCircle className="w-3 h-3" /><span>{review.replies} replies</span>
                   </button>
                 )}
@@ -1412,7 +1060,7 @@ export default function HomePage() {
           </div>
           <div>
             <p className="text-[13px] font-semibold text-foreground leading-tight">Recommended For You</p>
-            <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-none">Based on your interests</p>
+            <p className="text-[11px] text-foreground-secondary/70 mt-0.5 leading-none">Based on your interests</p>
           </div>
         </div>
         <Link to="/explore" className="text-[12px] font-semibold text-primary hover:text-primary/75 transition-colors flex items-center gap-0.5">
@@ -1430,7 +1078,7 @@ export default function HomePage() {
             className={`px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-all duration-150 ${
               activeRecTab === tab
                 ? 'text-white shadow-sm'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                : 'bg-muted text-foreground-secondary hover:bg-muted/80 hover:text-foreground'
             }`}
             style={activeRecTab === tab ? { background: 'var(--brand-gradient)' } : {}}
           >
@@ -1459,8 +1107,8 @@ export default function HomePage() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="text-[11px] text-primary font-medium">{creator.category}</span>
-                      <span className="text-muted-foreground/40 text-[10px]">·</span>
-                      <span className="text-[11px] text-muted-foreground/75">{fmtCount(creator.followers)} followers</span>
+                      <span className="text-foreground-secondary/40 text-[10px]">·</span>
+                      <span className="text-[11px] text-foreground-secondary/75">{fmtCount(creator.followers)} followers</span>
                     </div>
                   </div>
                 </Link>
@@ -1496,19 +1144,18 @@ export default function HomePage() {
                     {store.verified && <VerifiedBadge variant="seller" size="sm" />}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-muted-foreground/75">{store.category}</span>
-                    <span className="text-muted-foreground/35 text-[10px]">·</span>
+                    <span className="text-[11px] text-foreground-secondary/75">{store.category}</span>
+                    <span className="text-foreground-secondary/35 text-[10px]">·</span>
                     <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400 shrink-0" />
                     <span className="text-[11px] text-foreground/65 font-medium">{store.rating}</span>
-                    <span className="text-muted-foreground/35 text-[10px]">·</span>
-                    <span className="text-[11px] text-muted-foreground/65">{store.products} products</span>
+                    <span className="text-foreground-secondary/35 text-[10px]">·</span>
+                    <span className="text-[11px] text-foreground-secondary/65">{store.products} products</span>
                   </div>
                 </div>
               </Link>
               <Link
                 to={`/seller/${store.username}`}
-                className="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold text-white shadow-sm hover:opacity-90 transition-all duration-150 active:scale-[0.92]"
-                style={{ background: 'var(--brand-gradient)' }}
+                className="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold text-white shadow-sm hover:opacity-90 transition-all duration-150 active:scale-[0.92] bg-brand-gradient"
               >
                 Visit
               </Link>
@@ -1553,7 +1200,7 @@ export default function HomePage() {
                     ? ''
                     : 'story-ring-gradient'
                 }`}
-                style={story.isLive ? { background: 'linear-gradient(135deg, #ef4444 0%, #f97316 100%)' } : {}}
+                style={story.isLive ? { background: 'linear-gradient(135deg, var(--error) 0%, var(--orange-500) 100%)' } : {}}
                 >
                   <div className="bg-card p-[2px] rounded-full">
                     <img
@@ -1564,15 +1211,12 @@ export default function HomePage() {
                     />
                   </div>
                   {story.isYou && (
-                    <div
-                      className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] rounded-full flex items-center justify-center border-[2px] border-card"
-                      style={{ background: 'var(--brand-gradient)' }}
-                    >
+                    <div className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] rounded-full flex items-center justify-center border-[2px] border-card bg-brand-gradient">
                       <Camera className="w-2.5 h-2.5 text-white" />
                     </div>
                   )}
                   {story.isLive && !story.isYou && (
-                    <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 px-1.5 py-px rounded-full bg-red-500 text-white text-[8px] font-black leading-none whitespace-nowrap border border-card">
+                    <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 px-1.5 py-px rounded-full bg-error text-white text-[8px] font-black leading-none whitespace-nowrap border border-card">
                       LIVE
                     </div>
                   )}
@@ -1581,8 +1225,8 @@ export default function HomePage() {
                   story.isYou
                     ? 'font-semibold text-primary'
                     : story.isLive
-                    ? 'font-semibold text-red-500'
-                    : 'font-medium text-muted-foreground group-hover:text-foreground'
+                    ? 'font-semibold text-error'
+                    : 'font-medium text-foreground-secondary group-hover:text-foreground'
                 }`}>
                   {story.isYou ? 'Add Story' : story.name.split(' ')[0]}
                 </span>
@@ -1594,29 +1238,34 @@ export default function HomePage() {
         {/* ─── Feed filter tabs ──────────────────────────────────────────────── */}
         <div ref={feedTopRef} className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide px-3.5 sm:px-0 mb-3 sm:mb-4">
           {([
-            { id: 'foryou',    label: '✨ For You' },
-            { id: 'following', label: '👥 Following' },
-            { id: 'trending',  label: '🔥 Trending' },
-          ] as { id: FeedFilter; label: string }[]).map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => { setActiveFilter(tab.id); setNewPostsAvailable(false); }}
-              className={`shrink-0 px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all duration-150 active:scale-[0.95] ${
-                activeFilter === tab.id
-                  ? 'text-white shadow-sm'
-                  : 'bg-card border border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
-              }`}
-              style={activeFilter === tab.id ? { background: 'var(--brand-gradient)' } : {}}
-            >
-              {tab.label}
-            </button>
-          ))}
+            { id: 'foryou',    label: 'For You',   icon: Sparkles },
+            { id: 'following', label: 'Following', icon: Users },
+            { id: 'trending',  label: 'Trending',  icon: Flame },
+          ] as { id: FeedFilter; label: string; icon: typeof Sparkles }[]).map(tab => {
+            const active = activeFilter === tab.id;
+            const TabIcon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => { setActiveFilter(tab.id); setNewPostsAvailable(false); }}
+                className={`shrink-0 inline-flex h-9 items-center gap-1.5 px-4 rounded-full text-[13px] font-semibold transition-all duration-150 active:scale-[0.95] tap-highlight-none ${
+                  active
+                    ? 'bg-brand-gradient text-white shadow-brand'
+                    : 'bg-card border border-border/60 text-foreground-secondary hover:text-foreground hover:border-border'
+                }`}
+              >
+                <TabIcon className="w-3.5 h-3.5" />
+                {tab.label}
+              </button>
+            );
+          })}
           <Link
             to="/live-shopping"
-            className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-semibold bg-red-500/10 border border-red-500/20 text-red-600 hover:bg-red-500/15 transition-all duration-150"
+            className="shrink-0 inline-flex h-9 items-center gap-1.5 px-4 rounded-full text-[13px] font-semibold bg-error-subtle border border-error/20 text-error hover:bg-error/15 transition-all duration-150"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-error live-badge shrink-0" />
             Live
           </Link>
         </div>
@@ -1630,8 +1279,7 @@ export default function HomePage() {
               setRefreshKey(k => k + 1);
               feedTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }}
-            className="w-full mb-3 sm:mb-4 py-2.5 rounded-2xl text-[13px] font-semibold text-white flex items-center justify-center gap-2 shadow-md hover:opacity-90 active:scale-[0.98] transition-all duration-150"
-            style={{ background: 'var(--brand-gradient)' }}
+            className="w-full mb-3 sm:mb-4 py-2.5 rounded-2xl text-[13px] font-semibold text-white flex items-center justify-center gap-2 shadow-md hover:opacity-90 active:scale-[0.98] transition-all duration-150 bg-brand-gradient"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
             New posts available — tap to refresh
@@ -1675,7 +1323,7 @@ export default function HomePage() {
             {isLoading ? (
               <><span className="w-3.5 h-3.5 border-2 border-muted-foreground/30 border-t-foreground/70 rounded-full animate-spin" />Loading…</>
             ) : (
-              <>Load more posts<span className="text-muted-foreground/45 group-hover:text-muted-foreground transition-colors">↓</span></>
+              <>Load more posts<span className="text-foreground-secondary/45 group-hover:text-foreground-secondary transition-colors">↓</span></>
             )}
           </button>
         </div>

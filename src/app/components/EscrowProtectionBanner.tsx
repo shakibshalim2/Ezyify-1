@@ -76,7 +76,7 @@ export const EscrowProtectionBanner = memo(function EscrowProtectionBanner({
             <Shield className="w-6 h-6 text-info flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <h4 className="font-semibold text-info mb-2">
-                🔒 Your Money is Protected
+                Your Money is Protected
               </h4>
               <p className="text-sm text-info mb-3">
                 {amount

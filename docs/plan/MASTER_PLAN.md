@@ -175,4 +175,5 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 | 2026‑09‑13 | Research + audits + master plan | d8e1cf3 |
 | 2026‑09‑13 | Phase 0 tooling (tsconfig/eslint/vitest/CI), 312 TS errors fixed, dep cleanup | (step 2) |
 | 2026‑09‑13 | Phase 1: brand tokens, primitives, splash, onboarding, auth redesign + 14 unit tests | b3ab500 |
-| 2026‑09‑13 | Phase 1 remainder: setup steps re‑skin, BottomNav, Card/Skeleton/EmptyState, page transitions | (step 3) |
+| 2026‑09‑13 | Phase 1 remainder: setup steps re‑skin, BottomNav, Card/Skeleton/EmptyState, page transitions | 32067e6 |
+| 2026‑09‑13 | Phase 2a: Design guide; Cart, Checkout, Product detail, Shop, Explore redesigned; Home tokens | (step 4) |

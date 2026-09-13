@@ -148,7 +148,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
         <Link to={`/profile/${post.user.username}`} className="flex items-center gap-2.5 min-w-0 flex-1 group">
           <div className="relative shrink-0">
             {isLive ? (
-              <div className="p-[2.5px] rounded-full" style={{ background: 'linear-gradient(135deg,#ef4444,#f97316)' }}>
+              <div className="p-[2.5px] rounded-full" style={{ background: 'linear-gradient(135deg, var(--error), var(--orange-500))' }}>
                 <div className="bg-card p-[2px] rounded-full">
                   <img loading="lazy" src={post.user.avatar} alt={post.user.name} className="w-9 h-9 rounded-full object-cover" />
                 </div>
@@ -157,7 +157,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
               <img loading="lazy" src={post.user.avatar} alt={post.user.name} className="w-9 h-9 rounded-full object-cover ring-[1.5px] ring-border/60 group-hover:ring-2 group-hover:ring-primary/30 transition-all" />
             )}
             {isLive && (
-              <span className="absolute -bottom-0.5 -right-0.5 px-1 py-px rounded-full text-[8px] font-black text-white leading-none bg-red-500 border border-card">
+              <span className="absolute -bottom-0.5 -right-0.5 px-1 py-px rounded-full text-[8px] font-black text-white leading-none bg-error border border-card">
                 LIVE
               </span>
             )}
@@ -167,7 +167,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
               <span className="font-semibold text-[13px] text-foreground truncate leading-tight">{post.user.name}</span>
               {post.user.verified && <VerifiedBadge size="sm" />}
             </div>
-            <p className="text-[11px] text-muted-foreground/70 leading-none">{post.timestamp}</p>
+            <p className="text-[11px] text-foreground-secondary/70 leading-none">{post.timestamp}</p>
           </div>
         </Link>
 
@@ -187,7 +187,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
               ? <><UserCheck className="w-3 h-3" /><span className="ml-0.5">Following</span></>
               : <><UserPlus className="w-3 h-3" /><span className="ml-0.5">Follow</span></>}
           </button>
-          <button type="button" aria-label="More" className="p-1.5 rounded-xl text-muted-foreground/60 hover:text-foreground hover:bg-muted/80 transition-all">
+          <button type="button" aria-label="More" className="p-1.5 rounded-xl text-foreground-secondary/60 hover:text-foreground hover:bg-muted/80 transition-all">
             <MoreVertical className="w-4 h-4" />
           </button>
         </div>
@@ -240,8 +240,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
           {isLoop && (
             <>
               <div
-                className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold text-white"
-                style={{ background: 'var(--brand-gradient)' }}
+                className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold text-white bg-brand-gradient"
               >
                 <Zap className="w-3 h-3 fill-current" /> Loop
               </div>
@@ -332,7 +331,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
                 <button
                   type="button"
                   onClick={e => { e.preventDefault(); e.stopPropagation(); setExpandedCaption(p => !p); }}
-                  className="text-[12px] text-muted-foreground hover:text-foreground mt-0.5 transition-colors"
+                  className="text-[12px] text-foreground-secondary hover:text-foreground mt-0.5 transition-colors"
                 >
                   {expandedCaption ? 'Less' : '... More'}
                 </button>
@@ -363,7 +362,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
                     type="button"
                     onClick={e => handleAddToCart(e, pid, product.name)}
                     aria-label="Add to cart"
-                    className={`mr-1 p-1 rounded-lg transition-all duration-200 ${inCart ? 'bg-emerald-500/15 text-emerald-600' : 'hover:bg-primary/10 text-muted-foreground hover:text-primary'}`}
+                    className={`mr-1 p-1 rounded-lg transition-all duration-200 ${inCart ? 'bg-emerald-500/15 text-emerald-600' : 'hover:bg-primary/10 text-foreground-secondary hover:text-primary'}`}
                   >
                     {inCart ? <Check className="w-3.5 h-3.5" /> : <ShoppingCart className="w-3.5 h-3.5" />}
                   </button>
@@ -381,7 +380,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
             aria-label={isLiked ? 'Unlike' : 'Like'}
             aria-pressed={isLiked}
             className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 active:scale-[0.88] ${
-              isLiked ? 'text-like' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+              isLiked ? 'text-like' : 'text-foreground-secondary hover:text-foreground hover:bg-muted/60'
             }`}
           >
             <Heart className={`w-[18px] h-[18px] shrink-0 transition-colors ${isLiked ? 'fill-current' : ''} ${justLiked ? 'animate-heart-pop' : ''}`} />
@@ -391,7 +390,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
             type="button"
             onClick={e => { e.preventDefault(); e.stopPropagation(); setCommentSheetOpen(true); }}
             aria-label="Comment"
-            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150 active:scale-[0.88]"
+            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[13px] font-medium text-foreground-secondary hover:text-foreground hover:bg-muted/60 transition-all duration-150 active:scale-[0.88]"
           >
             <MessageCircle className="w-[18px] h-[18px] shrink-0" />
             <span className="tabular-nums text-[12px]">{fmtCount(post.comments)}</span>
@@ -402,7 +401,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
             aria-label={isReposted ? 'Undo repost' : 'Repost'}
             aria-pressed={isReposted}
             className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 active:scale-[0.88] ${
-              isReposted ? 'text-emerald-500 hover:bg-emerald-500/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+              isReposted ? 'text-emerald-500 hover:bg-emerald-500/10' : 'text-foreground-secondary hover:text-foreground hover:bg-muted/60'
             }`}
           >
             <Repeat2 className="w-[18px] h-[18px] shrink-0" />
@@ -412,7 +411,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
             type="button"
             onClick={handleShare}
             aria-label="Share"
-            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150 active:scale-[0.88]"
+            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[13px] font-medium text-foreground-secondary hover:text-foreground hover:bg-muted/60 transition-all duration-150 active:scale-[0.88]"
           >
             <Share2 className="w-[18px] h-[18px] shrink-0" />
             <span className="tabular-nums text-[12px]">{fmtCount(post.shares)}</span>
@@ -423,7 +422,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
             aria-label={isSaved ? 'Unsave' : 'Save'}
             aria-pressed={isSaved}
             className={`ml-auto p-2 rounded-xl transition-all duration-150 active:scale-[0.88] ${
-              isSaved ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+              isSaved ? 'text-primary hover:bg-primary/10' : 'text-foreground-secondary hover:text-foreground hover:bg-muted/60'
             }`}
           >
             <BookmarkPlus className={`w-[18px] h-[18px] transition-colors ${isSaved ? 'fill-current' : ''}`} />
