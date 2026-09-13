@@ -29,7 +29,7 @@ export default function TabsLayout() {
         },
       }}
     >
-      <Tabs.Screen name="index" options={tab('home-outline', 'home', 'Home')} />
+      <Tabs.Screen name="home" options={tab('home-outline', 'home', 'Home')} />
       <Tabs.Screen name="explore" options={tab('compass-outline', 'compass', 'Explore')} />
       <Tabs.Screen name="shop" options={tab('bag-handle-outline', 'bag-handle', 'Shop')} />
       <Tabs.Screen name="profile" options={tab('person-outline', 'person', 'Profile')} />
