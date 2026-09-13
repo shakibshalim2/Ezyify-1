@@ -11,6 +11,7 @@ import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Card } from '@/components/Card';
 import { products, posts } from '@/lib/mock';
+import { captureWithCamera, pickFromLibrary } from '@/lib/media';
 import { fontFamily, useTheme } from '@/theme';
 
 const KINDS = [{ id: 'post', label: 'Post', icon: 'image-outline' }, { id: 'loop', label: 'Loop', icon: 'play-circle-outline' }, { id: 'story', label: 'Story', icon: 'ellipse-outline' }, { id: 'live', label: 'Go live', icon: 'videocam-outline' }] as const;
@@ -30,6 +31,14 @@ export default function CreateScreen() {
 
   const canNext = step === 0 ? picked.length > 0 : step === 1 ? caption.trim().length > 0 : true;
   const togglePick = (u: string) => setPicked(p => (p.includes(u) ? p.filter(x => x !== u) : kind === 'post' ? [...p, u].slice(0, 10) : [u]));
+  const openCamera = async () => {
+    const shot = await captureWithCamera(kind === 'live' ? 'story' : kind);
+    if (shot) setPicked(kind === 'post' ? p => [...p, shot.uri].slice(0, 10) : [shot.uri]);
+  };
+  const openLibrary = async () => {
+    const assets = await pickFromLibrary(kind === 'live' ? 'story' : kind);
+    if (assets.length) setPicked(kind === 'post' ? p => [...p, ...assets.map(a => a.uri)].slice(0, 10) : [assets[0].uri]);
+  };
   const publish = async () => {
     setPublishing(true);
     await new Promise(r => setTimeout(r, 1000));
@@ -64,11 +73,26 @@ export default function CreateScreen() {
               </Card>
             ) : (
               <>
-                <Pressable accessibilityRole="button" accessibilityLabel="Open camera" style={{ height: 120, borderRadius: radius.card, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.card }}>
-                  <Ionicons name="camera-outline" size={28} color={colors.primary} />
-                  <Text variant="label" tone="brand">{kind === 'loop' ? 'Record a loop (up to 60s)' : 'Take a photo or video'}</Text>
-                </Pressable>
-                <Text variant="heading">Recent</Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Open camera" onPress={openCamera} style={{ flex: 1, height: 110, borderRadius: radius.card, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.card }}>
+                    <Ionicons name="camera-outline" size={26} color={colors.primary} />
+                    <Text variant="label" tone="brand" style={{ textAlign: 'center' }}>{kind === 'loop' ? 'Record loop\n(up to 60s)' : 'Camera'}</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Choose from library" onPress={openLibrary} style={{ flex: 1, height: 110, borderRadius: radius.card, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.card }}>
+                    <Ionicons name="images-outline" size={26} color={colors.primary} />
+                    <Text variant="label" tone="brand" style={{ textAlign: 'center' }}>Photo library</Text>
+                  </Pressable>
+                </View>
+                {picked.some(u => !LIBRARY.some(m => m.url === u)) && (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {picked.filter(u => !LIBRARY.some(m => m.url === u)).map((u, i) => (
+                      <Pressable key={u} accessibilityRole="button" accessibilityLabel={`Remove selected media ${i + 1}`} onPress={() => togglePick(u)} style={{ width: '31.5%', aspectRatio: 1, borderRadius: radius.sm, overflow: 'hidden', borderWidth: 3, borderColor: colors.primary }}>
+                        <Image source={{ uri: u }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+                <Text variant="heading">Suggested</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {LIBRARY.map(m => {
                     const idx = picked.indexOf(m.url);

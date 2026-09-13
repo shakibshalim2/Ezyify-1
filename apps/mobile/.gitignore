@@ -45,3 +45,4 @@ example
 android/app/*.keystore
 android/keystore.properties
 !android/app/debug.keystore
+google-services.json

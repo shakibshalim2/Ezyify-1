@@ -27,16 +27,32 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     predictiveBackGestureEnabled: true,
     softwareKeyboardLayoutMode: 'pan',
     allowBackup: false,
-    permissions: ['android.permission.CAMERA', 'android.permission.RECORD_AUDIO', 'android.permission.POST_NOTIFICATIONS'],
-    blockedPermissions: ['android.permission.READ_PHONE_STATE', 'android.permission.ACCESS_FINE_LOCATION'],
+    permissions: ['android.permission.CAMERA', 'android.permission.RECORD_AUDIO', 'android.permission.POST_NOTIFICATIONS', 'android.permission.USE_BIOMETRIC'],
+    // Photo Picker (API 33+) replaces broad media access; Play rejects READ_MEDIA_* without a core-use justification.
+    blockedPermissions: [
+      'android.permission.READ_PHONE_STATE',
+      'android.permission.ACCESS_FINE_LOCATION',
+      'android.permission.ACCESS_COARSE_LOCATION',
+      'android.permission.READ_MEDIA_IMAGES',
+      'android.permission.READ_MEDIA_VIDEO',
+      'android.permission.READ_EXTERNAL_STORAGE',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+      'android.permission.SYSTEM_ALERT_WINDOW',
+    ],
+    // App Links: verified against https://ezyify.app/.well-known/assetlinks.json (apps/web/public). `www` alias included.
     intentFilters: [
       {
         action: 'VIEW',
         autoVerify: true,
-        data: [{ scheme: 'https', host: 'ezyify.app', pathPrefix: '/' }],
+        data: [
+          { scheme: 'https', host: 'ezyify.app', pathPrefix: '/' },
+          { scheme: 'https', host: 'www.ezyify.app', pathPrefix: '/' },
+        ],
         category: ['BROWSABLE', 'DEFAULT'],
       },
     ],
+    // Play Console → App content → "Notification" & "Photos and videos" declarations are driven by these.
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
   },
   ios: {
     bundleIdentifier: IS_DEV ? 'com.ezyify.app.dev' : 'com.ezyify.app',
@@ -47,6 +63,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     './plugins/withReleaseSigning',
     'expo-router',
     'expo-secure-store',
+    ['expo-notifications', { icon: './assets/images/notification-icon.png', color: '#0f66c7', defaultChannel: 'orders' }],
+    ['expo-image-picker', { photosPermission: 'Ezyify uses your photos and videos to create posts, loops and stories.', cameraPermission: 'Ezyify uses the camera to capture posts, loops and go live.', microphonePermission: 'Ezyify uses the microphone to record loops and live audio.' }],
+    ['expo-local-authentication', { faceIDPermission: 'Ezyify uses Face ID to protect your wallet and account.' }],
     [
       'expo-splash-screen',
       { backgroundColor: '#0f66c7', image: './assets/images/splash-icon.png', imageWidth: 140 },
@@ -61,6 +80,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           enableProguardInReleaseBuilds: true,
           enableShrinkResourcesInReleaseBuilds: true,
           useLegacyPackaging: false,
+          // 16 KB page-size compliance (Play requirement for API 35+ targets since Nov 2025): AGP 8.5.1+ aligns
+          // uncompressed native libs; Expo SDK 57 ships AGP 8.13 + NDK r27 so all bundled .so files are 16 KB aligned.
+          buildToolsVersion: '36.0.0',
         },
       },
     ],

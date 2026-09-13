@@ -10,6 +10,7 @@ import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { findProduct, wallet } from '@/lib/mock';
 import { useTheme } from '@/theme';
+import { authenticate } from '@/lib/biometrics';
 
 const METHODS = [
   { id: 'wallet', label: 'Ezyify Wallet', sub: `Balance ${formatMoney(wallet.balance)}`, icon: 'wallet-outline' as const },
@@ -44,6 +45,10 @@ export default function CheckoutScreen() {
   const total = subtotal + shipping;
 
   const place = async () => {
+    if (method === 'wallet') {
+      const auth = await authenticate('Confirm payment from your Ezyify Wallet');
+      if (!auth.success) return;
+    }
     setPlacing(true);
     await new Promise(r => setTimeout(r, 1200));
     clear();

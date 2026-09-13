@@ -122,3 +122,21 @@ files); bump `version` by hand for user‑visible releases.
 `ANDROID_KEYSTORE_BASE64`, writes `gradle.properties` from secrets, runs
 `bundleRelease`, uploads the `.aab` artifact, and (on tags) pushes it to the
 Play internal track with `r0adkll/upload-google-play`.
+
+## 6. Push notifications (FCM) — `google-services.json`
+
+`expo-notifications` uses Firebase Cloud Messaging on Android. Download
+`google-services.json` from Firebase Console → Project settings → *Your apps* →
+`com.ezyify.app` and place it at `apps/mobile/google-services.json` (git‑ignored;
+a placeholder `google-services.json.example` keeps `expo prebuild` working). In
+CI the file is written from the `GOOGLE_SERVICES_JSON` secret. Upload the FCM
+**service account JSON** to the backend (`apps/api`) — the app itself only needs
+the client config.
+
+## 7. Before the first Play upload
+
+1. Follow `docs/plan/PLAY_STORE_CHECKLIST.md` end‑to‑end (Data safety, permissions, account deletion URL, content rating).
+2. Enrol in Play App Signing, then copy the **App signing key certificate SHA‑256** into
+   `apps/web/public/.well-known/assetlinks.json` and redeploy the web app so App Links verify.
+3. Run the 16 KB check locally if you built outside CI:
+   `$ANDROID_HOME/build-tools/36.0.0/../../` → `check_elf_alignment.sh app-release.apk`.

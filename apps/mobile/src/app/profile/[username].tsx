@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dimensions, FlatList, Pressable, View } from 'react-native';
+import { Alert, Dimensions, FlatList, Pressable, Share, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ProductCard } from '@/components/ProductCard';
 import { loops, me, posts, products, users } from '@/lib/mock';
 import { useAppStore } from '@/store/app';
+import { shareUrl } from '@/lib/links';
 import { useTheme } from '@/theme';
 
 const W = Dimensions.get('window').width;
@@ -32,6 +33,8 @@ export default function ProfileScreen() {
   const followed = useAppStore(s => (user ? s.followedIds.includes(user.id) : false));
   const toggleFollow = useAppStore(s => s.toggleFollow);
   const savedIds = useAppStore(s => s.savedPostIds);
+  const isBlocked = useAppStore(s => (user ? s.blockedIds.includes(user.id) : false));
+  const toggleBlock = useAppStore(s => s.toggleBlock);
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('posts');
 
   if (!user) {
@@ -65,7 +68,14 @@ export default function ProfileScreen() {
                 {!isMe ? <IconButton icon="chevron-back" label="Back" variant="overlay" onPress={() => router.back()} /> : <View style={{ width: 44 }} />}
                 <View style={{ flexDirection: 'row' }}>
                   {isMe && <IconButton icon="settings-outline" label="Settings" variant="overlay" onPress={() => router.push('/settings')} />}
-                  <IconButton icon="share-outline" label="Share profile" variant="overlay" />
+                  <IconButton icon="share-outline" label="Share profile" variant="overlay" onPress={() => Share.share({ message: `${user.name} on Ezyify`, url: shareUrl(`/profile/${user.username}`) })} />
+                  {!isMe && (
+                    <IconButton icon="ellipsis-horizontal" label="More options" variant="overlay" onPress={() => Alert.alert(`@${user.username}`, undefined, [
+                      { text: 'Report user', style: 'destructive', onPress: () => router.push({ pathname: '/report', params: { type: 'user', id: user.id, user: user.id } }) },
+                      { text: isBlocked ? 'Unblock' : 'Block', style: 'destructive', onPress: () => toggleBlock(user.id) },
+                      { text: 'Cancel', style: 'cancel' },
+                    ])} />
+                  )}
                 </View>
               </View>
             </View>

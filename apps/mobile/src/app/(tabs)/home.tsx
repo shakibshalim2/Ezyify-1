@@ -10,6 +10,7 @@ import { StoriesRail } from '@/components/StoriesRail';
 import { PostCard } from '@/components/PostCard';
 import { Skeleton } from '@/components/Skeleton';
 import { posts } from '@/lib/mock';
+import { useAppStore } from '@/store/app';
 import { useTheme } from '@/theme';
 
 function PostSkeleton() {
@@ -33,6 +34,8 @@ export default function HomeScreen() {
   const cartCount = useCartCount();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const blocked = useAppStore(s => s.blockedIds);
+  const feed = posts.filter(p => !blocked.includes(p.author.id));
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -57,7 +60,7 @@ export default function HomeScreen() {
         </View>
       </View>
       <FlatList
-        data={loading ? [] : posts}
+        data={loading ? [] : feed}
         keyExtractor={p => p.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
         ListHeaderComponent={<View style={{ paddingVertical: 8 }}><StoriesRail /></View>}

@@ -7,7 +7,7 @@ import { Text } from './Text';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-type Variant = 'primary' | 'gradient' | 'secondary' | 'ghost' | 'accent';
+type Variant = 'primary' | 'gradient' | 'secondary' | 'ghost' | 'accent' | 'destructive';
 type Size = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends Omit<PressableProps, 'style' | 'children'> {
@@ -34,6 +34,7 @@ export function Button({ label, variant = 'primary', size = 'md', loading, fullW
     secondary: colors.muted,
     ghost: 'transparent',
     accent: colors.accent,
+    destructive: colors.error,
   }[variant];
   let fg = {
     primary: colors.primaryForeground,
@@ -41,6 +42,7 @@ export function Button({ label, variant = 'primary', size = 'md', loading, fullW
     secondary: colors.foreground,
     ghost: colors.primary,
     accent: colors.accentForeground,
+    destructive: '#ffffff',
   }[variant];
   if (textColor) fg = textColor;
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dimensions, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Dimensions, Pressable, ScrollView, Share, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -10,6 +10,7 @@ import { Avatar } from './Avatar';
 import { Text } from './Text';
 import { IconButton } from './IconButton';
 import { findProduct } from '@/lib/mock';
+import { shareUrl } from '@/lib/links';
 import { useAppStore } from '@/store/app';
 import { useTheme } from '@/theme';
 
@@ -33,6 +34,14 @@ export function PostCard({ post }: { post: Post }) {
   };
   const likes = post.engagement.likes + (liked && !post.engagement.isLiked ? 1 : 0) - (!liked && post.engagement.isLiked ? 1 : 0);
   const product = post.taggedProductIds[0] ? findProduct(post.taggedProductIds[0]) : undefined;
+  const toggleBlock = useAppStore(s => s.toggleBlock);
+  const more = () =>
+    Alert.alert(post.author.name, undefined, [
+      { text: 'Report post', style: 'destructive', onPress: () => router.push({ pathname: '/report', params: { type: 'post', id: post.id, user: post.author.id } }) },
+      { text: `Block @${post.author.username}`, style: 'destructive', onPress: () => toggleBlock(post.author.id) },
+      { text: 'Copy link', onPress: () => Share.share({ message: shareUrl(`/post/${post.id}`) }) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
 
   return (
     <View style={{ backgroundColor: colors.card, borderRadius: radius.card, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderSubtle }}>
@@ -46,7 +55,7 @@ export function PostCard({ post }: { post: Post }) {
             </Text>
           </View>
         </Pressable>
-        <IconButton icon="ellipsis-horizontal" label="More options" />
+        <IconButton icon="ellipsis-horizontal" label="More options" onPress={more} />
       </View>
 
       <View>
@@ -83,7 +92,7 @@ export function PostCard({ post }: { post: Post }) {
           <Ionicons name="chatbubble-outline" size={22} color={colors.foreground} />
           <Text variant="label">{formatCompactNumber(post.engagement.comments)}</Text>
         </Pressable>
-        <IconButton icon="paper-plane-outline" label="Share" />
+        <IconButton icon="paper-plane-outline" label="Share" onPress={() => Share.share({ message: `${post.author.name} on Ezyify`, url: shareUrl(`/post/${post.id}`) })} />
         <View style={{ flex: 1 }} />
         <IconButton icon={saved ? 'bookmark' : 'bookmark-outline'} label={saved ? 'Unsave' : 'Save'} color={saved ? colors.primary : undefined} onPress={() => toggleSave(post.id)} />
       </View>

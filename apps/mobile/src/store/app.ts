@@ -9,7 +9,11 @@ interface AppState {
   likedPostIds: string[];
   savedPostIds: string[];
   followedIds: string[];
+  blockedIds: string[];
+  pushAsked: boolean;
   markOnboardingSeen(): void;
+  toggleBlock(id: string): void;
+  setPushAsked(): void;
   setInterests(ids: string[]): void;
   toggleLike(id: string): void;
   toggleSave(id: string): void;
@@ -37,7 +41,11 @@ export const useAppStore = create<AppState>()(
       likedPostIds: [],
       savedPostIds: [],
       followedIds: [],
+      blockedIds: [],
+      pushAsked: false,
       markOnboardingSeen: () => set({ onboardingSeen: true }),
+      toggleBlock: id => set(s => ({ blockedIds: toggle(s.blockedIds, id), followedIds: s.followedIds.filter(x => x !== id) })),
+      setPushAsked: () => set({ pushAsked: true }),
       setInterests: interests => set({ interests }),
       toggleLike: id => set(s => ({ likedPostIds: toggle(s.likedPostIds, id) })),
       toggleSave: id => set(s => ({ savedPostIds: toggle(s.savedPostIds, id) })),
@@ -46,7 +54,7 @@ export const useAppStore = create<AppState>()(
     {
       name: 'ezyify.app',
       storage: createJSONStorage(() => storage),
-      partialize: s => ({ onboardingSeen: s.onboardingSeen, interests: s.interests, likedPostIds: s.likedPostIds, savedPostIds: s.savedPostIds, followedIds: s.followedIds }) as Partial<AppState>,
+      partialize: s => ({ onboardingSeen: s.onboardingSeen, interests: s.interests, likedPostIds: s.likedPostIds, savedPostIds: s.savedPostIds, followedIds: s.followedIds, blockedIds: s.blockedIds, pushAsked: s.pushAsked }) as Partial<AppState>,
       onRehydrateStorage: () => () => {
         useAppStore.setState({ hydrated: true });
       },

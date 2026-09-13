@@ -5,6 +5,9 @@ import {
   CategorySchema,
   CheckoutRequestSchema,
   ConversationSchema,
+  DeleteAccountRequestSchema,
+  RegisterDeviceRequestSchema,
+  ReportRequestSchema,
   ForgotPasswordRequestSchema,
   LoginRequestSchema,
   LoginResponseSchema,
@@ -26,7 +29,10 @@ import {
   WalletSchema,
   paginated,
   type CheckoutRequest,
+  type DeleteAccountRequest,
   type LoginRequest,
+  type RegisterDeviceRequest,
+  type ReportRequest,
   type SignupRequest,
   type VerifyOtpRequest,
 } from '../schemas';
@@ -99,6 +105,20 @@ export function createEndpoints(api: ApiClient) {
       list: (query: PageQuery = {}) => api.get('/notifications', paginated(NotificationSchema), { query }),
       markRead: (id: string) => api.post(`/notifications/${encodeURIComponent(id)}/read`, {}, Ok),
       markAllRead: () => api.post('/notifications/read-all', {}, Ok),
+      /** Register/refresh this device's push token (FCM on Android, APNs on iOS, web push). */
+      registerDevice: (body: RegisterDeviceRequest) => api.post('/devices', RegisterDeviceRequestSchema.parse(body), Ok),
+      unregisterDevice: (token: string) => api.delete(`/devices/${encodeURIComponent(token)}`, Ok),
+    },
+    account: {
+      /** Play policy: in-app account deletion must exist and match the web URL. */
+      requestDeletion: (body: DeleteAccountRequest) => api.post('/account/delete', DeleteAccountRequestSchema.parse(body), Ok),
+      exportData: () => api.post('/account/export', {}, Ok),
+    },
+    moderation: {
+      /** UGC policy: users must be able to report and block. */
+      report: (body: ReportRequest) => api.post('/reports', ReportRequestSchema.parse(body), Ok),
+      block: (userId: string) => api.post(`/users/${encodeURIComponent(userId)}/block`, {}, Ok),
+      unblock: (userId: string) => api.delete(`/users/${encodeURIComponent(userId)}/block`, Ok),
     },
   };
 }

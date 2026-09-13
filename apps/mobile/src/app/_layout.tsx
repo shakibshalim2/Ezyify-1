@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from 'react';
-import { Stack } from 'expo-router';
+import { Platform } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
@@ -11,12 +13,31 @@ import { EzyifyContext } from '@ezyify/core';
 
 import { ThemeProvider, useTheme } from '@/theme';
 import { createMobileRuntime } from '@/lib/runtime';
+import { notificationUrl } from '@/lib/push';
+import { pathFromUrl } from '@/lib/links';
 
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 400, fade: true });
 
+/** Routes notification taps (cold start + background) to the deep link in the payload. */
+function useNotificationRouting() {
+  const router = useRouter();
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const go = (n: Notifications.Notification | null | undefined) => {
+      const url = notificationUrl(n);
+      const path = url ? pathFromUrl(url) : null;
+      if (path) router.push(path as never);
+    };
+    Notifications.getLastNotificationResponseAsync().then(r => go(r?.notification));
+    const sub = Notifications.addNotificationResponseReceivedListener(r => go(r.notification));
+    return () => sub.remove();
+  }, [router]);
+}
+
 function RootStack() {
   const theme = useTheme();
+  useNotificationRouting();
   return (
     <>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
@@ -38,6 +59,8 @@ function RootStack() {
         <Stack.Screen name="cart" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="checkout" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="order-success" options={{ animation: 'fade', gestureEnabled: false }} />
+        <Stack.Screen name="settings/delete-account" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="report" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       </Stack>
     </>
   );

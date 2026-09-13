@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SignupRequestSchema, PasswordSchema, envelope, ProductSummarySchema } from './index';
+import { SignupRequestSchema, PasswordSchema, envelope, ProductSummarySchema, RegisterDeviceRequestSchema, DeleteAccountRequestSchema, ReportRequestSchema } from './index';
 import { z } from 'zod';
 
 describe('schemas', () => {
@@ -27,5 +27,18 @@ describe('schemas', () => {
       seller: { id: 's1', username: 'shop', name: 'Shop' }, badge: null, inStock: true,
     });
     expect(p.seller.verified).toBe(false);
+  });
+});
+
+describe('policy schemas', () => {
+  it('accepts a valid device registration and rejects unknown providers', () => {
+    expect(RegisterDeviceRequestSchema.safeParse({ token: 'fcm-abc', platform: 'android', provider: 'fcm', appVersion: '0.1.0' }).success).toBe(true);
+    expect(RegisterDeviceRequestSchema.safeParse({ token: 'x', platform: 'android', provider: 'sms', appVersion: '1' }).success).toBe(false);
+  });
+  it('requires a reason for account deletion and a target for reports', () => {
+    expect(DeleteAccountRequestSchema.safeParse({ reason: 'privacy' }).success).toBe(true);
+    expect(DeleteAccountRequestSchema.safeParse({}).success).toBe(false);
+    expect(ReportRequestSchema.safeParse({ targetType: 'post', targetId: 'post-1', reason: 'spam' }).success).toBe(true);
+    expect(ReportRequestSchema.safeParse({ targetType: 'post', reason: 'spam' }).success).toBe(false);
   });
 });
