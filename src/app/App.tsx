@@ -317,6 +317,7 @@ export default function App() {
               <Route path="/landing" element={<LandingPage />} />
               <Route path="/stories/:username" element={<StoriesPage />} />
               <Route path="/loops" element={<LoopsPage />} />
+              <Route path="/live/:id" element={<LivePage />} />
               <Route element={<WithNavigation />}>
                 <Route path="/" element={<FirstRunGate><HomePage /></FirstRunGate>} />
                 <Route path="/explore" element={<ExplorePage />} />
@@ -325,7 +326,6 @@ export default function App() {
                 <Route path="/product/:id" element={<ProductDetailPage />} />
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/search" element={<SearchPage />} />
-                <Route path="/live/:id" element={<LivePage />} />
                 <Route path="/profile/:username" element={<ProfilePage />} />
                 <Route path="/profile/me" element={<ProfilePage />} />
                 <Route path="/seller/:storeName" element={<SellerStorePage />} />
