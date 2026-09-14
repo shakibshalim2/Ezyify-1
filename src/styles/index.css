@@ -1,8 +1,0 @@
-@import 'tailwindcss' source(none);
-@source '../../**/*.{js,ts,jsx,tsx}';
-@import 'tw-animate-css';
-@import '@fontsource-variable/inter';
-@import '@fontsource-variable/plus-jakarta-sans';
-@import './default_theme.css';
-@import './globals.css';
-@import './tokens.css';

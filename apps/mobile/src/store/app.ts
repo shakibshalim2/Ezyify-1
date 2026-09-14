@@ -1,0 +1,63 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
+
+interface AppState {
+  hydrated: boolean;
+  onboardingSeen: boolean;
+  interests: string[];
+  likedPostIds: string[];
+  savedPostIds: string[];
+  followedIds: string[];
+  blockedIds: string[];
+  pushAsked: boolean;
+  markOnboardingSeen(): void;
+  toggleBlock(id: string): void;
+  setPushAsked(): void;
+  setInterests(ids: string[]): void;
+  toggleLike(id: string): void;
+  toggleSave(id: string): void;
+  toggleFollow(id: string): void;
+}
+
+const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter(x => x !== id) : [...list, id]);
+
+// Web static rendering evaluates this module on node where AsyncStorage's localStorage shim has no `window`;
+// swallow storage failures there instead of crashing the render.
+const safe = <T,>(fn: () => Promise<T>, fallback: T) => fn().catch(() => fallback);
+const storage = {
+  getItem: (k: string) => safe(() => AsyncStorage.getItem(k), null),
+  setItem: (k: string, v: string) => safe(() => AsyncStorage.setItem(k, v), undefined),
+  removeItem: (k: string) => safe(() => AsyncStorage.removeItem(k), undefined),
+};
+
+/** Non-sensitive UI preferences; session/cart live in the SecureStore-backed core stores. */
+export const useAppStore = create<AppState>()(
+  persist(
+    set => ({
+      hydrated: false,
+      onboardingSeen: false,
+      interests: [],
+      likedPostIds: [],
+      savedPostIds: [],
+      followedIds: [],
+      blockedIds: [],
+      pushAsked: false,
+      markOnboardingSeen: () => set({ onboardingSeen: true }),
+      toggleBlock: id => set(s => ({ blockedIds: toggle(s.blockedIds, id), followedIds: s.followedIds.filter(x => x !== id) })),
+      setPushAsked: () => set({ pushAsked: true }),
+      setInterests: interests => set({ interests }),
+      toggleLike: id => set(s => ({ likedPostIds: toggle(s.likedPostIds, id) })),
+      toggleSave: id => set(s => ({ savedPostIds: toggle(s.savedPostIds, id) })),
+      toggleFollow: id => set(s => ({ followedIds: toggle(s.followedIds, id) })),
+    }),
+    {
+      name: 'ezyify.app',
+      storage: createJSONStorage(() => storage),
+      partialize: s => ({ onboardingSeen: s.onboardingSeen, interests: s.interests, likedPostIds: s.likedPostIds, savedPostIds: s.savedPostIds, followedIds: s.followedIds, blockedIds: s.blockedIds, pushAsked: s.pushAsked }) as Partial<AppState>,
+      onRehydrateStorage: () => () => {
+        useAppStore.setState({ hydrated: true });
+      },
+    },
+  ),
+);

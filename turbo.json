@@ -1,0 +1,112 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
+  "globalDependencies": [
+    ".nvmrc",
+    "pnpm-workspace.yaml"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*",
+        "!android/**"
+      ],
+      "outputs": [
+        "dist/**",
+        "build/**"
+      ]
+    },
+    "typecheck": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!android/**"
+      ]
+    },
+    "lint": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!android/**"
+      ]
+    },
+    "test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
+    },
+    "e2e": {
+      "dependsOn": [
+        "build"
+      ],
+      "cache": false,
+      "outputs": [
+        "playwright-report/**"
+      ]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "@ezyify/tokens#test": {
+      "dependsOn": [
+        "build"
+      ]
+    },
+    "@ezyify/api#test": {
+      "dependsOn": [
+        "^build",
+        "@ezyify/api#prisma:generate"
+      ],
+      "cache": false
+    },
+    "@ezyify/api#prisma:generate": {
+      "inputs": [
+        "prisma/schema.prisma",
+        "prisma.config.ts"
+      ],
+      "outputs": [
+        "src/generated/**"
+      ]
+    },
+    "@ezyify/api#build": {
+      "dependsOn": [
+        "^build",
+        "@ezyify/api#prisma:generate"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
+    },
+    "@ezyify/api#typecheck": {
+      "dependsOn": [
+        "^build",
+        "@ezyify/api#prisma:generate"
+      ]
+    },
+    "@ezyify/api#lint": {
+      "dependsOn": [
+        "^build",
+        "@ezyify/api#prisma:generate"
+      ]
+    }
+  },
+  "globalPassThroughEnv": [
+    "DATABASE_URL",
+    "JWT_ACCESS_SECRET",
+    "JWT_REFRESH_SECRET",
+    "NODE_ENV",
+    "CI"
+  ]
+}

@@ -1,0 +1,88 @@
+name: Android release (signed AAB/APK)
+
+# Standalone native build — no Expo Go, no EAS cloud. Produces a Play-ready .aab and a sideloadable .apk.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['mobile-v*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EZYIFY_UPLOAD_STORE_FILE: ${{ github.workspace }}/apps/mobile/android/app/ezyify-upload.keystore
+      EZYIFY_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      EZYIFY_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      EZYIFY_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build --filter=@ezyify/core --filter=@ezyify/tokens
+
+      # `secrets` is not available in step `if:` expressions, so both steps branch on env vars instead.
+      - name: Decode upload keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$EZYIFY_UPLOAD_STORE_FILE"
+          else
+            echo "::error::ANDROID_KEYSTORE_BASE64 secret missing — release signing is required (see docs/plan/ANDROID_RELEASE.md)"
+            exit 1
+          fi
+
+      - name: Write google-services.json (FCM)
+        working-directory: apps/mobile
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
+          else
+            echo "::warning::GOOGLE_SERVICES_JSON secret missing — using placeholder; push notifications will not work in this build"
+            cp google-services.json.example google-services.json
+          fi
+
+      - name: Regenerate android/ from app.config.ts
+        working-directory: apps/mobile
+        run: pnpm exec expo prebuild --platform android --no-install
+
+      - name: Build release AAB + APK
+        working-directory: apps/mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:bundleRelease :app:assembleRelease --no-daemon
+
+      - name: 16 KB page-size alignment check (Play requirement for API 35+)
+        working-directory: apps/mobile/android/app/build/outputs/apk/release
+        run: |
+          APK=$(ls *.apk | head -1)
+          mkdir -p /tmp/apk && unzip -o -q "$APK" 'lib/*' -d /tmp/apk || true
+          BAD=0
+          for so in $(find /tmp/apk/lib -name '*.so' 2>/dev/null); do
+            ALIGN=$(objdump -p "$so" | awk '/LOAD/ && /align/ {print $NF; exit}')
+            case "$ALIGN" in 2**14|2**16) ;; *) echo "::error::$so LOAD align=$ALIGN (needs 2**14)"; BAD=1;; esac
+          done
+          [ "$BAD" = 0 ] && echo "All native libs are 16 KB aligned"
+          exit $BAD
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ezyify-android-release
+          path: |
+            apps/mobile/android/app/build/outputs/bundle/release/*.aab
+            apps/mobile/android/app/build/outputs/apk/release/*.apk
+          retention-days: 30

@@ -1,0 +1,10 @@
+{
+  "extends": "@ezyify/config/tsconfig.library.json",
+  "include": [
+    "src"
+  ],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src"
+  }
+}
