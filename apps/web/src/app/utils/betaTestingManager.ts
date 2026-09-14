@@ -414,7 +414,8 @@ class BetaTestingManager {
         id: this.generateId(),
         userId: user.id,
         type: template.type as Feedback['type'],
-        priority: priorities[(crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) % priorities.length],
+        // Demo fixture data — rotate deterministically instead of drawing a random priority.
+        priority: priorities[i % priorities.length],
         title: template.title,
         description: template.description,
         page: pages[Math.floor(Math.random() * pages.length)],
