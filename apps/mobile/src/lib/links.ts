@@ -52,3 +52,9 @@ export function pathFromUrl(url: string): string | null {
 }
 
 export const shareUrl = (path: string) => `${WEB_ORIGIN}${path.startsWith('/') ? path : `/${path}`}`;
+
+/** Deep links and cold starts land on screens with no history; fall back instead of a no-op back. */
+export function goBack(router: { canGoBack: () => boolean; back: () => void; replace: (href: never) => void }, fallback = '/(tabs)/home') {
+  if (router.canGoBack()) router.back();
+  else router.replace(fallback as never);
+}

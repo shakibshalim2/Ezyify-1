@@ -10,6 +10,7 @@ import { SocialButton } from '../../components/primitives/SocialButton';
 import { PasswordStrength, isStrongPassword } from '../../components/primitives/PasswordStrength';
 import { AuthDivider, AuthLayout } from '../../features/auth/AuthLayout';
 import { useAuth } from '../../contexts/AuthContext';
+import { formErrors } from '../../lib/apiErrors';
 import { fadeUp } from '../../lib/motion';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -73,12 +74,16 @@ export default function SignupPage() {
     if (!validateAll()) return;
     setSubmitting(true);
     try {
-      await signup(form.email.trim(), form.password, form.name.trim());
+      const { userId } = await signup(form.email.trim(), form.password, form.name.trim());
       navigate('/otp-verification', {
-        state: { channel: 'email', destination: form.email.trim(), next: '/onboarding/interests' },
+        state: { channel: 'email', destination: form.email.trim(), next: '/onboarding/interests', userId },
       });
-    } catch {
-      toast.error('We couldn’t create your account. Please try again.');
+    } catch (err) {
+      const { fields, message } = formErrors(err, 'We couldn’t create your account. Please try again.');
+      if (Object.keys(fields).length) {
+        setErrors(e => ({ ...e, ...fields }));
+        setTouched(t => ({ ...t, ...Object.fromEntries(Object.keys(fields).map(k => [k, true])) }));
+      } else toast.error(message ?? 'We couldn’t create your account. Please try again.');
     } finally {
       setSubmitting(false);
     }

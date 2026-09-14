@@ -8,15 +8,19 @@ import { Button } from '../../components/primitives/Button';
 import { OTPInput } from '../../components/primitives/OTPInput';
 import { AuthLayout } from '../../features/auth/AuthLayout';
 import { fadeUp, springSoft } from '../../lib/motion';
+import { useAuth } from '../../contexts/AuthContext';
+import { formErrors } from '../../lib/apiErrors';
 
 interface OTPState {
   channel?: 'email' | 'sms';
   destination?: string;
   next?: string;
+  /** Set by signup: the code is verified against `/auth/verify-otp` for this account. */
+  userId?: string;
 }
 
 const RESEND_SECONDS = 45;
-/** Demo-only: any code ending in 0 is accepted until the API is wired. */
+/** Phone sign-in has no backend route yet; until then any code ending in 0 is accepted for that path only. */
 const DEMO_VALID = (code: string) => code.endsWith('0') || code === '123456';
 
 function maskDestination(value: string, channel: 'email' | 'sms') {
@@ -30,13 +34,15 @@ function maskDestination(value: string, channel: 'email' | 'sms') {
 
 export default function OTPVerificationPage() {
   const navigate = useNavigate();
+  const { verifyOtp } = useAuth();
   const { state } = useLocation() as { state: OTPState | null };
   const channel = state?.channel ?? 'email';
   const destination = state?.destination ?? 'your email';
   const next = state?.next ?? '/onboarding/interests';
+  const userId = state?.userId;
 
   const [code, setCode] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | false>(false);
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
   const [seconds, setSeconds] = useState(RESEND_SECONDS);
@@ -52,12 +58,25 @@ export default function OTPVerificationPage() {
     if (verifying || verified) return;
     setVerifying(true);
     setError(false);
-    await new Promise((r) => setTimeout(r, 600));
-    if (DEMO_VALID(value)) {
+    let ok = false;
+    let message = 'That code isn’t right. Check the digits and try again.';
+    if (userId) {
+      try {
+        await verifyOtp(userId, value, channel === 'sms' ? 'phone' : 'email');
+        ok = true;
+      } catch (err) {
+        const e = formErrors(err, message);
+        message = e.fields.otp ?? e.message ?? message;
+      }
+    } else {
+      await new Promise((r) => setTimeout(r, 600));
+      ok = DEMO_VALID(value);
+    }
+    if (ok) {
       setVerified(true);
       window.setTimeout(() => navigate(next, { replace: true }), 900);
     } else {
-      setError(true);
+      setError(message);
       setAttempts((a) => a + 1);
       setCode('');
       setVerifying(false);
@@ -130,7 +149,7 @@ export default function OTPVerificationPage() {
                   if (error) setError(false);
                 }}
                 onComplete={verify}
-                error={error}
+                error={!!error}
                 disabled={verifying}
               />
               <AnimatePresence>
@@ -142,7 +161,7 @@ export default function OTPVerificationPage() {
                     exit={{ opacity: 0 }}
                     className="text-center text-sm text-error"
                   >
-                    That code isn’t right. {attempts >= 3 ? 'Request a new one below.' : 'Please try again.'}
+                    {error} {attempts >= 3 ? 'Request a new one below.' : ''}
                   </motion.p>
                 )}
               </AnimatePresence>

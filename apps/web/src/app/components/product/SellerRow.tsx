@@ -1,4 +1,5 @@
 import { UserPlus, UserCheck } from 'lucide-react';
+import { Link } from 'react-router';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import { VerifiedBadge } from '../VerifiedBadge';
 import { Button } from '../primitives/Button';
@@ -11,6 +12,7 @@ interface SellerRowProps {
     name: string;
     avatar: string;
     verified?: boolean;
+    username?: string;
   };
   isFollowing: boolean;
   onToggleFollow: () => void;
@@ -32,10 +34,14 @@ export function SellerRow({ seller, isFollowing, onToggleFollow }: SellerRowProp
         </Avatar>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 gap-y-0">
-            <h3 className="font-semibold text-foreground truncate">{seller.name}</h3>
+            {seller.username ? (
+              <Link to={`/profile/${seller.username}`} className="font-semibold text-foreground truncate hover:underline">{seller.name}</Link>
+            ) : (
+              <h3 className="font-semibold text-foreground truncate">{seller.name}</h3>
+            )}
             {seller.verified && <VerifiedBadge size="sm" />}
           </div>
-          <p className="text-xs text-foreground-secondary">Trusted seller</p>
+          <p className="text-xs text-foreground-secondary">{seller.verified ? 'Verified seller' : 'Seller'}</p>
         </div>
       </div>
       <motion.div

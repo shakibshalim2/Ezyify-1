@@ -1,46 +1,71 @@
 import { useState } from 'react';
-import { Alert, Dimensions, Pressable, ScrollView, Share, View } from 'react-native';
+import { Dimensions, Pressable, ScrollView, Share, View } from 'react-native';
+import { choose } from '@/lib/confirm';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
-import { formatCompactNumber, formatMoney, formatRelativeTime, type Post } from '@ezyify/core';
+import { formatCompactNumber, formatMoney, formatRelativeTime, useAuth, useBlockUser, useProduct, useToggleLike, useToggleSave, type Post } from '@ezyify/core';
 import { Avatar } from './Avatar';
 import { Text } from './Text';
 import { IconButton } from './IconButton';
-import { findProduct } from '@/lib/mock';
 import { shareUrl } from '@/lib/links';
-import { useAppStore } from '@/store/app';
 import { useTheme } from '@/theme';
 
 const W = Dimensions.get('window').width;
 
+/** Tagged-product chip; fetched lazily so a feed page never blocks on the catalog. */
+function ProductTag({ productId }: { productId: string }) {
+  const router = useRouter();
+  const { colors, radius } = useTheme();
+  const { data: product } = useProduct(productId);
+  if (!product) return null;
+  return (
+    <Pressable accessibilityRole="link" accessibilityLabel={`Shop ${product.name}`} onPress={() => router.push({ pathname: '/product/[id]', params: { id: product.id } })} style={{ position: 'absolute', left: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(10,13,20,0.72)', borderRadius: radius.pill, paddingRight: 12, paddingLeft: 4, height: 40 }}>
+      <Image source={{ uri: product.imageUrl }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+      <View>
+        <Text variant="caption" style={{ color: '#fff' }} numberOfLines={1}>{product.name.length > 22 ? product.name.slice(0, 22) + '…' : product.name}</Text>
+        <Text variant="caption" style={{ color: colors.accent, fontFamily: 'Inter_600SemiBold' }}>{formatMoney(product.price)}</Text>
+      </View>
+      <Ionicons name="bag-handle" size={14} color="#fff" />
+    </Pressable>
+  );
+}
+
 export function PostCard({ post }: { post: Post }) {
   const router = useRouter();
   const { colors, radius } = useTheme();
-  const liked = useAppStore(s => s.likedPostIds.includes(post.id)) || (post.engagement.isLiked && !useAppStore.getState().likedPostIds.includes(post.id));
-  const saved = useAppStore(s => s.savedPostIds.includes(post.id));
-  const toggleLike = useAppStore(s => s.toggleLike);
-  const toggleSave = useAppStore(s => s.toggleSave);
+  const authed = useAuth(s => s.status === 'authenticated');
+  const toggleLike = useToggleLike();
+  const toggleSave = useToggleSave();
+  const block = useBlockUser();
+  const liked = post.engagement.isLiked;
+  const saved = post.engagement.isSaved;
   const [page, setPage] = useState(0);
   const heart = useSharedValue(1);
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heart.get() }] }));
 
+  const requireAuth = () => {
+    if (authed) return true;
+    router.push('/(auth)/login');
+    return false;
+  };
   const like = () => {
+    if (!requireAuth()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     heart.set(withSequence(withSpring(1.35, { stiffness: 500, damping: 12 }), withSpring(1)));
-    toggleLike(post.id);
+    toggleLike.mutate({ id: post.id, liked });
   };
-  const likes = post.engagement.likes + (liked && !post.engagement.isLiked ? 1 : 0) - (!liked && post.engagement.isLiked ? 1 : 0);
-  const product = post.taggedProductIds[0] ? findProduct(post.taggedProductIds[0]) : undefined;
-  const toggleBlock = useAppStore(s => s.toggleBlock);
+  const save = () => {
+    if (!requireAuth()) return;
+    toggleSave.mutate({ id: post.id, saved });
+  };
   const more = () =>
-    Alert.alert(post.author.name, undefined, [
-      { text: 'Report post', style: 'destructive', onPress: () => router.push({ pathname: '/report', params: { type: 'post', id: post.id, user: post.author.id } }) },
-      { text: `Block @${post.author.username}`, style: 'destructive', onPress: () => toggleBlock(post.author.id) },
-      { text: 'Copy link', onPress: () => Share.share({ message: shareUrl(`/post/${post.id}`) }) },
-      { text: 'Cancel', style: 'cancel' },
+    choose(post.author.name, [
+      { label: 'Report post', destructive: true, onPress: () => router.push({ pathname: '/report', params: { type: 'post', id: post.id, user: post.author.id } }) },
+      { label: `Block @${post.author.username}`, destructive: true, onPress: () => requireAuth() && block.mutate({ userId: post.author.id, blocked: false }) },
+      { label: 'Copy link', onPress: () => Share.share({ message: shareUrl(`/post/${post.id}`) }) },
     ]);
 
   return (
@@ -62,7 +87,7 @@ export function PostCard({ post }: { post: Post }) {
         <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={e => setPage(Math.round(e.nativeEvent.contentOffset.x / (W - 32)))}>
           {post.media.map(m => (
             <Pressable key={m.url} onPress={() => router.push({ pathname: '/post/[id]', params: { id: post.id } })} style={{ width: W - 32, aspectRatio: 4 / 5 }}>
-              <Image source={{ uri: m.url }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={200} />
+              <Image source={{ uri: m.thumbnailUrl && m.type === 'video' ? m.thumbnailUrl : m.url }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={200} />
             </Pressable>
           ))}
         </ScrollView>
@@ -71,22 +96,13 @@ export function PostCard({ post }: { post: Post }) {
             {post.media.map((m, i) => <View key={m.url} style={{ width: i === page ? 14 : 6, height: 6, borderRadius: 3, backgroundColor: i === page ? '#fff' : 'rgba(255,255,255,0.6)' }} />)}
           </View>
         )}
-        {product && (
-          <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/product/[id]', params: { id: product.id } })} style={{ position: 'absolute', left: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(10,13,20,0.72)', borderRadius: radius.pill, paddingRight: 12, paddingLeft: 4, height: 40 }}>
-            <Image source={{ uri: product.imageUrl }} style={{ width: 32, height: 32, borderRadius: 16 }} />
-            <View>
-              <Text variant="caption" style={{ color: '#fff' }} numberOfLines={1}>{product.name.length > 22 ? product.name.slice(0, 22) + '…' : product.name}</Text>
-              <Text variant="caption" style={{ color: colors.accent, fontFamily: 'Inter_600SemiBold' }}>{formatMoney(product.price)}</Text>
-            </View>
-            <Ionicons name="bag-handle" size={14} color="#fff" />
-          </Pressable>
-        )}
+        {post.taggedProductIds[0] && <ProductTag productId={post.taggedProductIds[0]} />}
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, paddingTop: 2 }}>
-        <Pressable accessibilityRole="button" accessibilityLabel={liked ? 'Unlike' : 'Like'} onPress={like} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 44, paddingHorizontal: 10 }}>
+        <Pressable accessibilityRole="button" accessibilityLabel={liked ? 'Unlike' : 'Like'} aria-selected={liked} onPress={like} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 44, paddingHorizontal: 10 }}>
           <Animated.View style={heartStyle}><Ionicons name={liked ? 'heart' : 'heart-outline'} size={24} color={liked ? colors.error : colors.foreground} /></Animated.View>
-          <Text variant="label">{formatCompactNumber(likes)}</Text>
+          <Text variant="label">{formatCompactNumber(post.engagement.likes)}</Text>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Comments" onPress={() => router.push({ pathname: '/post/[id]', params: { id: post.id } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 44, paddingHorizontal: 10 }}>
           <Ionicons name="chatbubble-outline" size={22} color={colors.foreground} />
@@ -94,7 +110,7 @@ export function PostCard({ post }: { post: Post }) {
         </Pressable>
         <IconButton icon="paper-plane-outline" label="Share" onPress={() => Share.share({ message: `${post.author.name} on Ezyify`, url: shareUrl(`/post/${post.id}`) })} />
         <View style={{ flex: 1 }} />
-        <IconButton icon={saved ? 'bookmark' : 'bookmark-outline'} label={saved ? 'Unsave' : 'Save'} color={saved ? colors.primary : undefined} onPress={() => toggleSave(post.id)} />
+        <IconButton icon={saved ? 'bookmark' : 'bookmark-outline'} label={saved ? 'Unsave' : 'Save'} color={saved ? colors.primary : undefined} onPress={save} />
       </View>
 
       <View style={{ paddingHorizontal: 14, paddingBottom: 14, gap: 4 }}>

@@ -27,11 +27,36 @@ export const UserProfileSchema = UserSummarySchema.extend({
 });
 export type UserProfile = z.infer<typeof UserProfileSchema>;
 
+export const UpdateProfileRequestSchema = z.object({
+  name: z.string().min(1).max(50).optional(),
+  username: z.string().regex(/^[a-z0-9._]{2,30}$/, 'Lowercase letters, numbers, dots and underscores only').optional(),
+  bio: z.string().max(160).nullable().optional(),
+  website: z.string().url().nullable().optional(),
+  location: z.string().max(80).nullable().optional(),
+  avatarUrl: z.string().url().nullable().optional(),
+  coverUrl: z.string().url().nullable().optional(),
+  interests: z.array(z.string()).max(20).optional(),
+});
+export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequestSchema>;
+
+/** One refresh session (device) as listed by GET /auth/sessions. */
+export const DeviceSessionSchema = z.object({
+  id: IdSchema,
+  userAgent: z.string().nullable(),
+  ip: z.string().nullable(),
+  createdAt: IsoDateSchema,
+  expiresAt: IsoDateSchema,
+  current: z.boolean(),
+});
+export type DeviceSession = z.infer<typeof DeviceSessionSchema>;
+
 export const SessionSchema = z.object({
   accessToken: z.string().min(1),
   /** Seconds until access token expiry; refresh token travels in an httpOnly cookie on web and SecureStore on native. */
   expiresIn: z.number().int().positive(),
   user: UserSummarySchema,
+  /** Only present for `X-Client: native` callers; web never sees it (httpOnly cookie). */
+  refreshToken: z.string().min(1).optional(),
 });
 export type Session = z.infer<typeof SessionSchema>;
 

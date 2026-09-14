@@ -35,6 +35,19 @@ export function formatRelativeTime(iso: string, now = Date.now()): string {
   return new Date(iso).toLocaleDateString('en', { month: 'short', day: 'numeric' });
 }
 
+/** Future-facing counterpart of `formatRelativeTime` ("in 6d", "in 3h", "in 12m"). */
+export function formatTimeUntil(iso: string, now = Date.now()): string {
+  const diff = new Date(iso).getTime() - now;
+  if (diff <= 0) return 'now';
+  const m = Math.floor(diff / 60_000);
+  if (m < 60) return `in ${Math.max(1, m)}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `in ${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `in ${d}d`;
+  return `on ${new Date(iso).toLocaleDateString('en', { month: 'short', day: 'numeric' })}`;
+}
+
 export function discountPercent(price: Money, compareAt: Money | null): number | null {
   if (!compareAt || compareAt.amount <= price.amount) return null;
   return Math.round((1 - price.amount / compareAt.amount) * 100);

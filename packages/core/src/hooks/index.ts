@@ -34,16 +34,4 @@ export function useCartCount() {
   return useMemo(() => lines.reduce((n, l) => n + l.quantity, 0), [lines]);
 }
 
-export const queryKeys = {
-  me: ['me'] as const,
-  profile: (username: string) => ['profile', username] as const,
-  products: (params: Record<string, unknown> = {}) => ['products', params] as const,
-  product: (id: string) => ['product', id] as const,
-  cart: ['cart'] as const,
-  orders: (params: Record<string, unknown> = {}) => ['orders', params] as const,
-  order: (id: string) => ['order', id] as const,
-  wallet: ['wallet'] as const,
-  feed: ['feed'] as const,
-  notifications: ['notifications'] as const,
-  conversations: ['conversations'] as const,
-};
+export * from './queries.js';

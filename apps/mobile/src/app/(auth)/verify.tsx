@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '@ezyify/core';
 import { AuthShell } from '@/components/AuthShell';
 import { Button } from '@/components/Button';
 import { Text } from '@/components/Text';
-import { mockLogin } from '@/lib/auth';
+import { formErrors, useMobileRuntime } from '@/lib/auth';
 import { useAppStore } from '@/store/app';
 import { fontFamily, useTheme } from '@/theme';
 
@@ -13,9 +12,9 @@ const LEN = 6;
 
 export default function VerifyScreen() {
   const router = useRouter();
-  const { email } = useLocalSearchParams<{ email?: string }>();
+  const { email, userId } = useLocalSearchParams<{ email?: string; userId?: string }>();
   const { colors, radius } = useTheme();
-  const setSession = useAuth(s => s.setSession);
+  const { api, commitSession } = useMobileRuntime();
   const markSeen = useAppStore(s => s.markOnboardingSeen);
   const [code, setCode] = useState('');
   const [seconds, setSeconds] = useState(45);
@@ -31,18 +30,23 @@ export default function VerifyScreen() {
 
   const submit = async (value = code) => {
     if (value.length !== LEN) return;
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 500));
-    if (value === '000000') {
-      setError('That code is not valid. Try again.');
-      setCode('');
-      setLoading(false);
+    if (!userId) {
+      setError('This link has expired. Please sign up again.');
       return;
     }
-    setSession(await mockLogin(email ?? 'you'));
-    markSeen();
-    setLoading(false);
-    router.replace('/(onboarding)/interests');
+    setLoading(true);
+    try {
+      const session = await api.auth.verifyOtp({ userId, otp: value, type: 'email' });
+      await commitSession(session);
+      markSeen();
+      router.replace('/(onboarding)/interests');
+    } catch (err) {
+      const { fields, message } = formErrors(err);
+      setError(fields.otp ?? message ?? 'That code is not valid. Try again.');
+      setCode('');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

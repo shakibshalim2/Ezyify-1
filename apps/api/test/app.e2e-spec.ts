@@ -151,6 +151,13 @@ describe('social + policy', () => {
     const mine = json(await inject('GET', '/posts/post-001', { token: buyer })).data;
     expect(mine.engagement.isLiked).toBe(true);
     await inject('DELETE', '/posts/post-001/like', { token: buyer });
+    await inject('POST', '/posts/post-001/save', { token: buyer });
+    const saved = json(await inject('GET', '/posts/saved', { token: buyer })).data;
+    expect(saved.items.map((p: { id: string }) => p.id)).toContain('post-001');
+    expect(saved.items[0].engagement.isSaved).toBe(true);
+    await inject('DELETE', '/posts/post-001/save', { token: buyer });
+    expect(json(await inject('GET', '/posts/saved', { token: buyer })).data.items).toHaveLength(0);
+    expect((await inject('GET', '/posts/saved')).statusCode).toBe(401);
   });
   it('blocking hides the author from the feed and reports are accepted', async () => {
     await inject('POST', '/users/u_jules/block', { token: buyer });

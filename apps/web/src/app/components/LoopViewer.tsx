@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router';
 import { getProductById } from '../data/products';
 import { VerifiedBadge } from './VerifiedBadge';
 import { CommentSheet } from './CommentSheet';
+import { toCorePost } from '../data/posts';
 import { RepostSheet } from './RepostSheet';
 import { ReferralService } from '../services/referral';
 import { toast } from 'sonner';
@@ -365,7 +366,7 @@ export function LoopViewer({ loop, onClose }: LoopViewerProps) {
         key={loop.id}
         open={commentOpen}
         onOpenChange={setCommentOpen}
-        post={loop}
+        post={toCorePost(loop)}
       />
 
       {/* ── REPOST SHEET ────────────────────────────────────────────────── */}

@@ -12,6 +12,7 @@ import { Skeleton } from '../components/primitives/Skeleton';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { ProductCard } from '../components/shop/ProductCard';
+import { toProductSummary } from '../data/products';
 import {
   EmptyPosts, EmptyContent, EmptyProducts, EmptySearchResults,
 } from '../components/EmptyStates';
@@ -296,13 +297,7 @@ export default function ProfilePage() {
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
             {state.userProducts.map(product => (
               <motion.div key={product.id} variants={fadeUp}>
-                <ProductCard
-                  product={product}
-                  isLiked={state.cartItems.has(product.id)}
-                  inCart={state.cartItems.has(product.id)}
-                  onToggleLike={() => toggleLike(product.id)}
-                  onAddToCart={() => toggleCart(product.id)}
-                />
+                <ProductCard product={toProductSummary(product)} />
               </motion.div>
             ))}
           </div>

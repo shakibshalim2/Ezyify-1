@@ -7,11 +7,13 @@ import { AuthShell } from '@/components/AuthShell';
 import { Field } from '@/components/Field';
 import { Button } from '@/components/Button';
 import { Text } from '@/components/Text';
+import { formErrors, useMobileRuntime } from '@/lib/auth';
 import { useTheme } from '@/theme';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const { colors, radius } = useTheme();
+  const { api } = useMobileRuntime();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string>();
   const [sent, setSent] = useState(false);
@@ -21,9 +23,15 @@ export default function ForgotPasswordScreen() {
     if (!z.string().email().safeParse(email).success) return setError('Enter a valid email address');
     setError(undefined);
     setLoading(true);
-    await new Promise(r => setTimeout(r, 600));
-    setLoading(false);
-    setSent(true);
+    try {
+      await api.auth.forgotPassword(email.trim().toLowerCase());
+      setSent(true);
+    } catch (err) {
+      const { fields, message } = formErrors(err);
+      setError(fields.email ?? message ?? undefined);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (sent) {

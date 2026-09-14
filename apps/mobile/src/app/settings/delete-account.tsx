@@ -3,7 +3,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { DeleteAccountRequestSchema, useAuth, useCart, type DeleteAccountRequest } from '@ezyify/core';
+import { DeleteAccountRequestSchema, type DeleteAccountRequest } from '@ezyify/core';
 import { Header } from '@/components/Header';
 import { Text } from '@/components/Text';
 import { Button } from '@/components/Button';
@@ -11,7 +11,9 @@ import { Field } from '@/components/Field';
 import { Card } from '@/components/Card';
 import { authenticate } from '@/lib/biometrics';
 import { useAppStore } from '@/store/app';
+import { formErrors, useMobileRuntime } from '@/lib/auth';
 import { useTheme } from '@/theme';
+import { goBack } from '@/lib/links';
 
 const REASONS: { id: DeleteAccountRequest['reason']; label: string }[] = [
   { id: 'not_useful', label: "I don't find it useful" },
@@ -29,8 +31,7 @@ export default function DeleteAccountScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, radius } = useTheme();
-  const clearAuth = useAuth(s => s.clear);
-  const clearCart = useCart(s => s.clear);
+  const { api, signOut } = useMobileRuntime();
   const [reason, setReason] = useState<DeleteAccountRequest['reason'] | null>(null);
   const [feedback, setFeedback] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -44,9 +45,13 @@ export default function DeleteAccountScreen() {
     const auth = await authenticate('Confirm it’s you to delete your account');
     if (!auth.success) return setError('Authentication was cancelled.');
     setBusy(true);
-    await new Promise(r => setTimeout(r, 900)); // → endpoints.account.requestDeletion(body.data) once apps/api ships
-    clearCart();
-    clearAuth();
+    try {
+      await api.account.requestDeletion(body.data);
+    } catch (err) {
+      setBusy(false);
+      return setError(formErrors(err).message ?? 'Could not delete your account right now.');
+    }
+    await signOut();
     useAppStore.setState({ onboardingSeen: true, interests: [], likedPostIds: [], savedPostIds: [], followedIds: [] });
     setBusy(false);
     router.replace('/(auth)/login');
@@ -80,7 +85,7 @@ export default function DeleteAccountScreen() {
           {REASONS.map(r => {
             const on = reason === r.id;
             return (
-              <Pressable key={r.id} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setReason(r.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.card, borderWidth: on ? 2 : 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primarySubtle : colors.card }}>
+              <Pressable key={r.id} accessibilityRole="radio" aria-checked={on} onPress={() => setReason(r.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.card, borderWidth: on ? 2 : 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primarySubtle : colors.card }}>
                 <Ionicons name={on ? 'radio-button-on' : 'radio-button-off'} size={20} color={on ? colors.primary : colors.borderStrong} />
                 <Text style={{ flex: 1 }}>{r.label}</Text>
               </Pressable>
@@ -93,7 +98,7 @@ export default function DeleteAccountScreen() {
       </ScrollView>
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 16, paddingBottom: insets.bottom + 16, backgroundColor: colors.backgroundElevated, borderTopWidth: 1, borderTopColor: colors.border, gap: 8 }}>
         <Button label="Delete my account" variant="destructive" size="lg" fullWidth disabled={!ready} loading={busy} onPress={submit} />
-        <Button label="Keep my account" variant="ghost" size="md" fullWidth onPress={() => router.back()} />
+        <Button label="Keep my account" variant="ghost" size="md" fullWidth onPress={() => goBack(router, '/settings')} />
       </View>
     </View>
   );

@@ -35,7 +35,6 @@
       "@tailwindcss/oxide",
       "argon2",
       "esbuild",
-      "msw",
       "prisma",
       "unrs-resolver"
     ],
