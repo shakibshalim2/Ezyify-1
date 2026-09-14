@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, Switch, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Switch, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
@@ -6,7 +6,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { requestPush } from '@/lib/push';
 import { biometricsAvailable } from '@/lib/biometrics';
-import { useAuth } from '@ezyify/core';
+import { useAddresses, useApi, useAuth, useBlockedUsers } from '@ezyify/core';
 import { Header } from '@/components/Header';
 import { Text } from '@/components/Text';
 import { Avatar } from '@/components/Avatar';
@@ -24,7 +24,9 @@ export default function SettingsScreen() {
   const { signOut } = useMobileRuntime();
   const [signingOut, setSigningOut] = useState(false);
   const interests = useAppStore(s => s.interests);
-  const blocked = useAppStore(s => s.blockedIds);
+  const blocked = useBlockedUsers();
+  const addresses = useAddresses();
+  const api = useApi();
   const setPushAsked = useAppStore(s => s.setPushAsked);
   const [pushOn, setPushOn] = useState(false);
   const [bioOk, setBioOk] = useState(false);
@@ -41,10 +43,11 @@ export default function SettingsScreen() {
 
   const groups: { title: string; rows: Row[] }[] = [
     { title: 'Account', rows: [
-      { icon: 'person-outline', label: 'Edit profile' },
+      { icon: 'person-outline', label: 'Edit profile', onPress: () => router.push('/settings/edit-profile') },
       { icon: 'heart-outline', label: 'Interests', value: `${interests.length} topics`, onPress: () => router.push('/(onboarding)/interests') },
-      { icon: 'location-outline', label: 'Addresses', value: '1 saved' },
-      { icon: 'card-outline', label: 'Payment methods', value: 'Visa •••• 4242' },
+      { icon: 'location-outline', label: 'Addresses', value: addresses.data ? `${addresses.data.length} saved` : '—', onPress: () => router.push('/settings/addresses') },
+      { icon: 'wallet-outline', label: 'Wallet', onPress: () => router.push('/wallet') },
+      { icon: 'receipt-outline', label: 'Orders', onPress: () => router.push('/orders') },
     ]},
     { title: 'Preferences', rows: [
       { icon: 'notifications-outline', label: 'Push notifications', toggle: true, toggleValue: pushOn, onToggle: enablePush },
@@ -54,9 +57,9 @@ export default function SettingsScreen() {
     { title: 'Privacy & security', rows: [
       { icon: 'lock-closed-outline', label: 'Private account', toggle: true, toggleValue: privateAcct, onToggle: setPrivateAcct },
       { icon: 'finger-print-outline', label: 'Biometric unlock', value: bioOk ? 'Available' : 'Not set up on device' },
-      { icon: 'shield-checkmark-outline', label: 'Two-factor authentication', value: 'Off' },
-      { icon: 'download-outline', label: 'Download your data' },
-      { icon: 'ban-outline', label: 'Blocked accounts', value: `${blocked.length}` },
+      { icon: 'phone-portrait-outline', label: 'Devices & sessions', onPress: () => router.push('/settings/sessions') },
+      { icon: 'download-outline', label: 'Download your data', onPress: () => Alert.alert('Export your data', "We'll email you a download link within 24 hours.", [{ text: 'Cancel', style: 'cancel' }, { text: 'Request export', onPress: () => api.account.exportData().then(() => Alert.alert('Request received', 'Check your inbox soon.')).catch(() => Alert.alert('Something went wrong', 'Please try again later.')) }]) },
+      { icon: 'ban-outline', label: 'Blocked accounts', value: `${blocked.data?.length ?? 0}`, onPress: () => router.push('/settings/blocked') },
     ]},
     { title: 'Support', rows: [
       { icon: 'help-circle-outline', label: 'Help center', onPress: () => WebBrowser.openBrowserAsync('https://ezyify.app/help') },

@@ -76,6 +76,16 @@ export class FeedService {
     return rows.map(r => toPost(r, liked, saved));
   }
 
+  async saved(viewerId: string, q: z.infer<typeof PageQuerySchema>) {
+    const where: Prisma.PostWhereInput = { deletedAt: null, saves: { some: { userId: viewerId } } };
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.post.findMany({ where, include: postInclude, orderBy: [{ createdAt: 'desc' }], ...skipTake(q) }),
+      this.prisma.post.count({ where }),
+    ]);
+    const { liked, saved } = await this.viewerState(viewerId, rows.map(r => r.id));
+    return page(rows.map(r => toPost(r, liked, saved)), total, q);
+  }
+
   async get(id: string, viewerId?: string) {
     const row = await this.prisma.post.findFirst({ where: { id, deletedAt: null }, include: postInclude });
     if (!row) throw notFound('Post');

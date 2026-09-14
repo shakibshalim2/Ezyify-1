@@ -57,7 +57,7 @@ const Ok = z.object({ ok: z.literal(true) }).or(z.null());
 const Count = z.object({ count: z.number().int().min(0) });
 type PageQuery = { page?: number; pageSize?: number };
 export type FeedQuery = PageQuery & { kind?: 'post' | 'loop' | 'story'; author?: string; hashtag?: string };
-export type ProductQuery = PageQuery & { category?: string; q?: string; sort?: string };
+export type ProductQuery = PageQuery & { category?: string; q?: string; sort?: 'popular' | 'newest' | 'price_asc' | 'price_desc' | 'rating'; seller?: string };
 
 const enc = encodeURIComponent;
 
@@ -126,6 +126,8 @@ export function createEndpoints(api: ApiClient) {
       home: (query: FeedQuery = {}) => api.get('/feed', paginated(PostSchema), { query }),
       loops: (query: FeedQuery = {}) => api.get('/loops', paginated(PostSchema), { query }),
       stories: () => api.get('/stories', z.array(PostSchema)),
+      /** Posts the viewer bookmarked, newest first. */
+      saved: (query: PageQuery = {}) => api.get('/posts/saved', paginated(PostSchema), { query }),
       post: (id: string) => api.get(`/posts/${enc(id)}`, PostSchema),
       create: (body: CreatePostRequest) => api.post('/posts', CreatePostRequestSchema.parse(body), PostSchema),
       remove: (id: string) => api.delete(`/posts/${enc(id)}`, Ok),

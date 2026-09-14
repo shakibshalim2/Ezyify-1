@@ -60,6 +60,10 @@ function RootStack() {
         <Stack.Screen name="checkout" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="order-success" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="settings/delete-account" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="settings/edit-profile" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="settings/addresses" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="settings/blocked" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="settings/sessions" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="report" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       </Stack>
     </>

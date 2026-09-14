@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { Alert, Dimensions, FlatList, Pressable, Share, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Dimensions, FlatList, Pressable, Share, View } from 'react-native';
+import { choose } from '@/lib/confirm';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { formatCompactNumber, useAuth } from '@ezyify/core';
+import { formatCompactNumber, useAuth, useBlockUser, useBlockedUsers, useFeed, useLoops, useMe, useProducts, useProfile, useSavedPosts, useToggleFollow, type Post, type ProductSummary } from '@ezyify/core';
 import { Text } from '@/components/Text';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
@@ -13,69 +14,116 @@ import { IconButton } from '@/components/IconButton';
 import { Badge } from '@/components/Badge';
 import { EmptyState } from '@/components/EmptyState';
 import { ProductCard } from '@/components/ProductCard';
-import { loops, me, posts, products, users } from '@/lib/mock';
-import { useAppStore } from '@/store/app';
+import { Skeleton } from '@/components/Skeleton';
+import { ErrorState } from '@/components/QueryState';
+import { useMobileRuntime } from '@/lib/auth';
+import { useInfiniteList, useRefresh } from '@/lib/data';
 import { shareUrl } from '@/lib/links';
 import { useTheme } from '@/theme';
 
 const W = Dimensions.get('window').width;
 const TABS = [{ id: 'posts', icon: 'grid-outline' }, { id: 'loops', icon: 'play-outline' }, { id: 'shop', icon: 'bag-handle-outline' }, { id: 'saved', icon: 'bookmark-outline' }] as const;
+type Tab = (typeof TABS)[number]['id'];
+
+function HeaderSkeleton() {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{ paddingTop: insets.top + 110, paddingHorizontal: 16, gap: 12 }}>
+      <Skeleton width={80} height={80} radius={40} />
+      <Skeleton width={160} height={24} />
+      <Skeleton width={100} height={14} />
+      <Skeleton height={64} radius={16} />
+    </View>
+  );
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, radius, gradients } = useTheme();
-  const { username } = useLocalSearchParams<{ username: string }>();
+  const { username: param } = useLocalSearchParams<{ username: string }>();
   const authUser = useAuth(s => s.user);
-  const clear = useAuth(s => s.clear);
-  const isMe = username === 'me' || username === authUser?.username;
-  const user = isMe ? { ...me, ...(authUser ?? {}) } : users.find(u => u.username === username);
-  const followed = useAppStore(s => (user ? s.followedIds.includes(user.id) : false));
-  const toggleFollow = useAppStore(s => s.toggleFollow);
-  const savedIds = useAppStore(s => s.savedPostIds);
-  const isBlocked = useAppStore(s => (user ? s.blockedIds.includes(user.id) : false));
-  const toggleBlock = useAppStore(s => s.toggleBlock);
-  const [tab, setTab] = useState<(typeof TABS)[number]['id']>('posts');
+  const authed = useAuth(s => s.status === 'authenticated');
+  const { signOut } = useMobileRuntime();
+  const isMe = param === 'me' || (!!authUser && param === authUser.username);
+  const username = isMe ? authUser?.username : param;
 
-  if (!user) {
+  const me = useMe();
+  const other = useProfile(isMe ? undefined : username);
+  const profile = isMe ? me : other;
+  const user = profile.data;
+
+  const [tab, setTab] = useState<Tab>('posts');
+  const posts = useFeed(username ? { author: username } : {});
+  const loops = useLoops(username ? { author: username } : {});
+  const saved = useSavedPosts();
+  const shop = useProducts(username ? { seller: username, pageSize: 20 } : {});
+  const postList = useInfiniteList<Post>(posts);
+  const loopList = useInfiniteList<Post>(loops);
+  const savedList = useInfiniteList<Post>(saved);
+  const shopList = useInfiniteList<ProductSummary>(shop);
+  const follow = useToggleFollow();
+  const block = useBlockUser();
+  const blocked = useBlockedUsers();
+  const isBlocked = !!user && (blocked.data ?? []).some(b => b.id === user.id);
+  const { refreshing, onRefresh } = useRefresh(async () => Promise.all([profile.refetch(), posts.refetch(), loops.refetch()]));
+
+  const active = tab === 'posts' ? postList : tab === 'loops' ? loopList : tab === 'saved' ? savedList : null;
+  const activeQuery = tab === 'posts' ? posts : tab === 'loops' ? loops : tab === 'saved' ? saved : shop;
+  const gridData = useMemo(() => (tab === 'shop' ? [] : active?.items ?? []), [tab, active?.items]);
+  const showShopTab = shopList.items.length > 0 || user?.role === 'seller';
+
+  if (isMe && !authed) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
-        <EmptyState icon="person-outline" title="Profile not found" body={`@${username} doesn't exist or was removed.`} actionLabel="Go back" onAction={() => router.back()} />
+        <EmptyState icon="person-circle-outline" title="Your profile lives here" body="Sign in to see your posts, saved items and orders." actionLabel="Sign in" onAction={() => router.push('/(auth)/login')} />
+      </View>
+    );
+  }
+  if (profile.isLoading && !user) return <View style={{ flex: 1, backgroundColor: colors.background }}><HeaderSkeleton /></View>;
+  if (profile.error || !user) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+        <View style={{ paddingHorizontal: 8 }}><IconButton icon="chevron-back" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/home'))} /></View>
+        <ErrorState error={profile.error ?? new Error('not found')} onRetry={() => profile.refetch()} />
       </View>
     );
   }
 
-  const userPosts = isMe ? posts.slice(0, 2) : posts.filter(p => p.author.id === user.id);
-  const userLoops = isMe ? [] : loops.filter(l => l.author.id === user.id);
-  const saved = posts.filter(p => savedIds.includes(p.id) || p.engagement.isSaved);
-  const gridData = tab === 'posts' ? userPosts : tab === 'loops' ? userLoops : tab === 'saved' ? saved : [];
-  const stats = [{ label: 'Posts', value: userPosts.length }, { label: 'Loops', value: userLoops.length }, { label: 'Followers', value: isMe ? 128 : 48200 + (followed ? 1 : 0) }];
+  const stats = [
+    { label: 'Posts', value: user.posts },
+    { label: 'Followers', value: user.followers },
+    { label: 'Following', value: user.following },
+  ];
+  const more = () =>
+    choose(`@${user.username}`, [
+      { label: 'Report user', destructive: true, onPress: () => router.push({ pathname: '/report', params: { type: 'user', id: user.id, user: user.id } }) },
+      { label: isBlocked ? 'Unblock' : 'Block', destructive: true, onPress: () => (authed ? block.mutate({ userId: user.id, blocked: isBlocked }) : router.push('/(auth)/login')) },
+    ]);
+  const onFollow = () => (authed ? follow.mutate({ username: user.username, following: !!user.isFollowing }) : router.push('/(auth)/login'));
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <FlatList
         key={tab}
-        data={tab === 'shop' ? [] : gridData}
+        data={gridData}
         keyExtractor={p => p.id}
         numColumns={3}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        onEndReached={() => active?.loadMore()}
         contentContainerStyle={{ paddingBottom: 24 }}
         columnWrapperStyle={{ gap: 2 }}
         ListHeaderComponent={
           <View>
             <View style={{ height: 150 }}>
-              <LinearGradient colors={[gradients.vivid[0], gradients.vivid[1], gradients.vivid[2]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', inset: 0 }} />
+              {user.coverUrl ? <Image source={{ uri: user.coverUrl }} style={{ position: 'absolute', inset: 0 }} contentFit="cover" /> : <LinearGradient colors={[gradients.vivid[0], gradients.vivid[1], gradients.vivid[2]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', inset: 0 }} />}
               <View style={{ paddingTop: insets.top, flexDirection: 'row', paddingHorizontal: 8, justifyContent: 'space-between' }}>
-                {!isMe ? <IconButton icon="chevron-back" label="Back" variant="overlay" onPress={() => router.back()} /> : <View style={{ width: 44 }} />}
+                {!isMe ? <IconButton icon="chevron-back" label="Back" variant="overlay" onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/home'))} /> : <View style={{ width: 44 }} />}
                 <View style={{ flexDirection: 'row' }}>
                   {isMe && <IconButton icon="settings-outline" label="Settings" variant="overlay" onPress={() => router.push('/settings')} />}
                   <IconButton icon="share-outline" label="Share profile" variant="overlay" onPress={() => Share.share({ message: `${user.name} on Ezyify`, url: shareUrl(`/profile/${user.username}`) })} />
-                  {!isMe && (
-                    <IconButton icon="ellipsis-horizontal" label="More options" variant="overlay" onPress={() => Alert.alert(`@${user.username}`, undefined, [
-                      { text: 'Report user', style: 'destructive', onPress: () => router.push({ pathname: '/report', params: { type: 'user', id: user.id, user: user.id } }) },
-                      { text: isBlocked ? 'Unblock' : 'Block', style: 'destructive', onPress: () => toggleBlock(user.id) },
-                      { text: 'Cancel', style: 'cancel' },
-                    ])} />
-                  )}
+                  {!isMe && <IconButton icon="ellipsis-horizontal" label="More options" variant="overlay" onPress={more} />}
                 </View>
               </View>
             </View>
@@ -87,13 +135,13 @@ export default function ProfileScreen() {
                 <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
                   {isMe ? (
                     <>
-                      <Button label="Edit profile" variant="secondary" size="sm" onPress={() => router.push('/settings')} />
-                      <Button label="Sign out" variant="ghost" size="sm" onPress={() => { clear(); router.replace('/(auth)/login'); }} />
+                      <Button label="Edit profile" variant="secondary" size="sm" onPress={() => router.push('/settings/edit-profile')} />
+                      <Button label="Sign out" variant="ghost" size="sm" onPress={() => signOut().then(() => router.replace('/(auth)/login'))} />
                     </>
                   ) : (
                     <>
-                      <Button label={followed ? 'Following' : 'Follow'} variant={followed ? 'secondary' : 'primary'} size="sm" onPress={() => toggleFollow(user.id)} />
-                      <Button label="Message" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/messages/[id]', params: { id: 'c1' } })} />
+                      <Button label={user.isFollowing ? 'Following' : 'Follow'} variant={user.isFollowing ? 'secondary' : 'primary'} size="sm" loading={follow.isPending} onPress={onFollow} />
+                      <Button label="Message" variant="secondary" size="sm" onPress={() => (authed ? router.push({ pathname: '/messages/[id]', params: { id: 'new', username: user.username } }) : router.push('/(auth)/login'))} />
                     </>
                   )}
                 </View>
@@ -101,11 +149,19 @@ export default function ProfileScreen() {
               <View style={{ gap: 2 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text variant="title">{user.name}</Text>
-                  {user.role !== 'user' && <Badge label={user.role === 'seller' ? 'Seller' : 'Creator'} tone="primary" />}
+                  {user.role !== 'user' && <Badge label={user.role === 'seller' ? 'Seller' : user.role === 'admin' ? 'Team' : 'Creator'} tone="primary" />}
                 </View>
-                <Text tone="secondary">@{user.username}</Text>
+                <Text tone="secondary">@{user.username}{user.location ? ` · ${user.location}` : ''}</Text>
               </View>
-              <Text>{isMe ? 'Add a bio to tell people what you love.' : 'Sharing honest reviews and everyday finds ✨ Links in every post are escrow-protected.'}</Text>
+              {user.bio ? <Text>{user.bio}</Text> : isMe ? <Pressable accessibilityRole="button" onPress={() => router.push('/settings/edit-profile')}><Text tone="secondary">Add a bio to tell people what you love.</Text></Pressable> : null}
+              {user.website && <Text variant="label" tone="brand">{user.website.replace(/^https?:\/\//, '')}</Text>}
+              {isBlocked && (
+                <View accessibilityRole="alert" style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: radius.md, backgroundColor: colors.errorSubtle }}>
+                  <Ionicons name="ban" size={18} color={colors.error} />
+                  <Text variant="caption" style={{ flex: 1, color: colors.error }}>You blocked @{user.username}. They can&apos;t see your content or message you.</Text>
+                  <Button label="Unblock" size="sm" variant="secondary" loading={block.isPending} onPress={() => block.mutate({ userId: user.id, blocked: true })} />
+                </View>
+              )}
               <View style={{ flexDirection: 'row', backgroundColor: colors.card, borderRadius: radius.card, borderWidth: 1, borderColor: colors.borderSubtle, paddingVertical: 12 }}>
                 {stats.map((s, i) => (
                   <View key={s.label} style={{ flex: 1, alignItems: 'center', borderLeftWidth: i ? 1 : 0, borderLeftColor: colors.borderSubtle }}>
@@ -116,27 +172,41 @@ export default function ProfileScreen() {
               </View>
             </View>
             <View style={{ flexDirection: 'row', marginTop: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-              {TABS.filter(t => isMe || t.id !== 'saved').map(t => (
-                <Pressable key={t.id} accessibilityRole="tab" accessibilityState={{ selected: tab === t.id }} onPress={() => setTab(t.id)} style={{ flex: 1, height: 48, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: tab === t.id ? colors.primary : 'transparent' }}>
+              {TABS.filter(t => (t.id === 'saved' ? isMe : t.id === 'shop' ? showShopTab : true)).map(t => (
+                <Pressable key={t.id} accessibilityRole="tab" accessibilityLabel={t.id} accessibilityState={{ selected: tab === t.id }} onPress={() => setTab(t.id)} style={{ flex: 1, height: 48, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: tab === t.id ? colors.primary : 'transparent' }}>
                   <Ionicons name={t.icon} size={22} color={tab === t.id ? colors.primary : colors.foregroundTertiary} />
                 </Pressable>
               ))}
             </View>
             {tab === 'shop' && (
               <View style={{ padding: 16, gap: 12 }}>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                  {products.slice(0, 4).map(p => <View key={p.id} style={{ width: (W - 44) / 2 }}><ProductCard product={p} /></View>)}
-                </View>
+                {shop.isLoading ? (
+                  <View style={{ flexDirection: 'row', gap: 12 }}><Skeleton height={250} radius={16} style={{ flex: 1 }} /><Skeleton height={250} radius={16} style={{ flex: 1 }} /></View>
+                ) : shopList.items.length ? (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                    {shopList.items.map(p => <View key={p.id} style={{ width: (W - 44) / 2 }}><ProductCard product={p} /></View>)}
+                  </View>
+                ) : (
+                  <EmptyState icon="storefront-outline" title="No products listed" body={isMe ? 'Open your shop from Settings to start selling.' : 'This seller has nothing listed right now.'} />
+                )}
               </View>
             )}
           </View>
         }
-        ListEmptyComponent={tab === 'shop' ? null : <EmptyState icon={tab === 'saved' ? 'bookmark-outline' : 'camera-outline'} title={tab === 'saved' ? 'Nothing saved yet' : 'No posts yet'} body={tab === 'saved' ? 'Tap the bookmark on any post to keep it here.' : isMe ? 'Share your first post or loop to get started.' : 'Check back soon.'} actionLabel={isMe && tab !== 'saved' ? 'Create' : undefined} onAction={() => router.push('/create')} />}
+        ListEmptyComponent={
+          tab === 'shop' ? null : activeQuery.isLoading ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingTop: 2 }}>{[0, 1, 2, 3, 4, 5].map(i => <Skeleton key={i} width={(W - 4) / 3} height={(W - 4) / 3} radius={0} />)}</View>
+          ) : activeQuery.error ? (
+            <ErrorState error={activeQuery.error} onRetry={() => activeQuery.refetch()} />
+          ) : (
+            <EmptyState icon={tab === 'saved' ? 'bookmark-outline' : tab === 'loops' ? 'play-outline' : 'camera-outline'} title={tab === 'saved' ? 'Nothing saved yet' : tab === 'loops' ? 'No loops yet' : 'No posts yet'} body={tab === 'saved' ? 'Tap the bookmark on any post to keep it here.' : isMe ? 'Share your first post or loop to get started.' : 'Check back soon.'} actionLabel={isMe && tab !== 'saved' ? 'Create' : undefined} onAction={() => router.push('/create')} />
+          )
+        }
         renderItem={({ item }) => (
-          <Pressable accessibilityRole="link" onPress={() => router.push(item.kind === 'loop' ? { pathname: '/loops', params: { id: item.id } } : { pathname: '/post/[id]', params: { id: item.id } })} style={{ width: (W - 4) / 3, aspectRatio: item.kind === 'loop' ? 9 / 16 : 1, marginBottom: 2 }}>
+          <Pressable accessibilityRole="link" accessibilityLabel={item.caption || item.kind} onPress={() => router.push(item.kind === 'loop' ? { pathname: '/loops', params: { id: item.id } } : { pathname: '/post/[id]', params: { id: item.id } })} style={{ width: (W - 4) / 3, aspectRatio: item.kind === 'loop' ? 9 / 16 : 1, marginBottom: 2 }}>
             <Image source={{ uri: item.media[0].thumbnailUrl ?? item.media[0].url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
             {item.kind === 'loop' && <Ionicons name="play" size={16} color="#fff" style={{ position: 'absolute', top: 6, right: 6 }} />}
-            {item.media.length > 1 && <Ionicons name="copy-outline" size={14} color="#fff" style={{ position: 'absolute', top: 6, right: 6 }} />}
+            {item.kind !== 'loop' && item.media.length > 1 && <Ionicons name="copy-outline" size={14} color="#fff" style={{ position: 'absolute', top: 6, right: 6 }} />}
           </Pressable>
         )}
       />

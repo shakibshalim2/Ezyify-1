@@ -247,6 +247,8 @@ export function createMockFetch(options: MockServerOptions = {}, state: MockStat
       const cat = c.query.get('category');
       const q = c.query.get('q')?.toLowerCase();
       if (cat) list = list.filter(p => fx.findProduct(p.id)!.category === cat);
+      const seller = c.query.get('seller');
+      if (seller) list = list.filter(p => p.seller.username === seller);
       if (q) list = list.filter(p => p.name.toLowerCase().includes(q) || fx.findProduct(p.id)!.tags.some(t => t.includes(q)));
       const sort = c.query.get('sort');
       if (sort === 'price_asc') list.sort((a, b) => a.price.amount - b.price.amount);
@@ -477,7 +479,8 @@ export function createMockFetch(options: MockServerOptions = {}, state: MockStat
 
     // ---- feed
     ['GET', '/feed', c => {
-      let list = visiblePosts(c.user, c.query.get('kind') ?? undefined);
+      // Matches the API: the home feed is posts only unless `kind` is asked for explicitly.
+      let list = visiblePosts(c.user, c.query.get('kind') ?? 'post');
       const author = c.query.get('author');
       const tag = c.query.get('hashtag')?.replace(/^#/, '').toLowerCase();
       if (author) list = list.filter(p => p.author.username === author);
@@ -491,6 +494,11 @@ export function createMockFetch(options: MockServerOptions = {}, state: MockStat
       return paginate(list, c.query);
     }],
     ['GET', '/stories', c => visiblePosts(c.user, 'story').filter(p => now() - +new Date(p.createdAt) < 24 * 3600_000)],
+    ['GET', '/posts/saved', c => {
+      const u = requireUser(c);
+      const saved = set(state.saves, u.id);
+      return paginate(visiblePosts(u, undefined).filter(p => saved.has(p.id)), c.query);
+    }],
     ['GET', '/posts/:id', c => {
       const p = state.posts.find(x => x.id === c.params.id);
       if (!p) throw notFound('Post');

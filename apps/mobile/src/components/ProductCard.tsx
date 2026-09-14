@@ -2,15 +2,15 @@ import { Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import { formatMoney, discountPercent, useCart, type ProductSummary } from '@ezyify/core';
+import { formatMoney, discountPercent, type ProductSummary } from '@ezyify/core';
+import { useAddLine } from '@/lib/data';
 import { useTheme } from '@/theme';
 import { Text } from './Text';
 
 export function ProductCard({ product }: { product: ProductSummary }) {
   const { colors, radius } = useTheme();
   const off = discountPercent(product.price, product.compareAtPrice);
-  const add = useCart(s => s.add);
+  const { add, pending } = useAddLine();
 
   return (
     <View style={{ flex: 1, borderRadius: radius.card, overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
@@ -51,11 +51,9 @@ export function ProductCard({ product }: { product: ProductSummary }) {
           accessibilityRole="button"
           accessibilityLabel={`Add ${product.name} to cart`}
           hitSlop={6}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            add(product.id, 1);
-          }}
-          style={({ pressed }) => ({ width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.92 : 1 }] })}
+          disabled={pending || !product.inStock}
+          onPress={() => add(product.id, 1)}
+          style={({ pressed }) => ({ width: 30, height: 30, borderRadius: 15, backgroundColor: product.inStock ? colors.primary : colors.muted, alignItems: 'center', justifyContent: 'center', opacity: pending ? 0.6 : 1, transform: [{ scale: pressed ? 0.92 : 1 }] })}
         >
           <Ionicons name="add" size={18} color={colors.primaryForeground} />
         </Pressable>

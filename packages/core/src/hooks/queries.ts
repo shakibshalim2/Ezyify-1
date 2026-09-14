@@ -27,6 +27,7 @@ export const queryKeys = {
   feed: (params: Record<string, unknown> = {}) => ['feed', params] as const,
   loops: (params: Record<string, unknown> = {}) => ['loops', params] as const,
   stories: ['stories'] as const,
+  saved: ['posts', 'saved'] as const,
   post: (id: string) => ['post', id] as const,
   comments: (id: string) => ['post', id, 'comments'] as const,
   conversations: ['conversations'] as const,
@@ -96,6 +97,18 @@ export function useStories() {
   return useQuery({ queryKey: queryKeys.stories, queryFn: () => api.feed.stories() });
 }
 
+export function useSavedPosts() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useInfiniteQuery({
+    queryKey: queryKeys.saved,
+    queryFn: ({ pageParam }) => api.feed.saved({ page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
+    enabled: authed,
+  });
+}
+
 export function usePost(id: string | undefined) {
   const api = useApi();
   return useQuery({ queryKey: queryKeys.post(id ?? ''), queryFn: () => api.feed.post(id!), enabled: !!id });
@@ -117,6 +130,8 @@ function patchPost(qc: ReturnType<typeof useQueryClient>, id: string, patch: (p:
   qc.setQueriesData<{ pages: Page<Post>[] }>({ queryKey: ['feed'] }, old => old && { ...old, pages: old.pages.map(pg => ({ ...pg, items: pg.items.map(p => (p.id === id ? patch(p) : p)) })) });
   qc.setQueriesData<{ pages: Page<Post>[] }>({ queryKey: ['loops'] }, old => old && { ...old, pages: old.pages.map(pg => ({ ...pg, items: pg.items.map(p => (p.id === id ? patch(p) : p)) })) });
   qc.setQueryData<Post>(queryKeys.post(id), old => old && patch(old));
+  qc.setQueryData<Post[]>(queryKeys.stories, old => old && old.map(p => (p.id === id ? patch(p) : p)));
+  qc.setQueriesData<{ pages: Page<Post>[] }>({ queryKey: queryKeys.saved }, old => old && { ...old, pages: old.pages.map(pg => ({ ...pg, items: pg.items.map(p => (p.id === id ? patch(p) : p)) })) });
 }
 
 export function useToggleLike() {
@@ -138,6 +153,7 @@ export function useToggleSave() {
     mutationFn: ({ id, saved }: { id: string; saved: boolean }) => (saved ? api.feed.unsave(id) : api.feed.save(id)),
     onMutate: ({ id, saved }) => patchPost(qc, id, p => ({ ...p, engagement: { ...p.engagement, isSaved: !saved, saves: Math.max(0, p.engagement.saves + (saved ? -1 : 1)) } })),
     onError: (_e, { id, saved }) => patchPost(qc, id, p => ({ ...p, engagement: { ...p.engagement, isSaved: saved, saves: Math.max(0, p.engagement.saves + (saved ? 1 : -1)) } })),
+    onSettled: () => qc.invalidateQueries({ queryKey: queryKeys.saved }),
   });
 }
 
@@ -192,6 +208,7 @@ export function useFollowers(username: string | undefined, kind: 'followers' | '
 export function useToggleFollow() {
   const api = useApi();
   const qc = useQueryClient();
+  const me = useAuth(s => s.user);
   return useMutation({
     mutationFn: ({ username, following }: { username: string; following: boolean }) => (following ? api.users.unfollow(username) : api.users.follow(username)),
     onMutate: ({ username, following }) =>
@@ -200,6 +217,7 @@ export function useToggleFollow() {
       qc.invalidateQueries({ queryKey: queryKeys.profile(username) });
       qc.invalidateQueries({ queryKey: queryKeys.me });
       qc.invalidateQueries({ queryKey: queryKeys.stories });
+      if (me) qc.invalidateQueries({ queryKey: queryKeys.following(me.username) });
     },
   });
 }
@@ -328,6 +346,21 @@ export function useWallet() {
   const authed = useAuthed();
   return useQuery({ queryKey: queryKeys.wallet, queryFn: () => api.wallet.get(), enabled: authed });
 }
+
+function useWalletMutation<TVars>(fn: (api: ReturnType<typeof useApi>, vars: TVars) => Promise<unknown>) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: TVars) => fn(api, vars),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.wallet });
+      qc.invalidateQueries({ queryKey: queryKeys.transactions });
+    },
+  });
+}
+/** Amounts are minor units (cents). */
+export const useTopUp = () => useWalletMutation<{ amount: number; method: 'card' | 'bank_transfer' }>((api, v) => api.wallet.topup(v.amount, v.method));
+export const useWithdraw = () => useWalletMutation<{ amount: number; payoutMethodId: string }>((api, v) => api.wallet.withdraw(v.amount, v.payoutMethodId));
 
 export function useTransactions() {
   const api = useApi();

@@ -30,6 +30,11 @@ export class FeedController {
     return this.feed.stories(user?.sub);
   }
 
+  @Get('posts/saved')
+  saved(@CurrentUser() user: AccessClaims, @Query(zod(PageQuerySchema)) q: z.infer<typeof PageQuerySchema>) {
+    return this.feed.saved(user.sub, q);
+  }
+
   @Get('posts/:id')
   @Public()
   get(@Param('id') id: string, @CurrentUser() user?: AccessClaims) {

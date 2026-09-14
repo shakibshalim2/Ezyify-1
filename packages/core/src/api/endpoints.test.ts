@@ -128,6 +128,7 @@ describe('createEndpoints — every endpoint is wired to a path', () => {
       () => api.addresses.create({ label: 'Home', recipient: 'A', phone: '0812345', line1: 'Jl. 1', city: 'Jakarta', postal: '12345', country: 'ID' }),
       () => api.addresses.remove('a1'),
       () => api.feed.stories(),
+      () => api.feed.saved(),
       () => api.feed.create({ media: [{ type: 'image', url: 'https://img.test/a.jpg', thumbnailUrl: null, width: null, height: null, durationMs: null }] }),
       () => api.feed.remove('post-1'),
       () => api.feed.save('post-1'),
@@ -149,6 +150,7 @@ describe('createEndpoints — every endpoint is wired to a path', () => {
     expect(urls).toContain('/v1/wallet/withdraw');
     expect(urls).toContain('/v1/devices/tok');
     expect(urls).toContain('/v1/stories');
+    expect(urls).toContain('/v1/posts/saved');
     expect(urls).toContain('/v1/uploads/sign');
     expect(urls).toContain('/v1/users/me/blocked');
   });

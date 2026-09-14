@@ -132,6 +132,10 @@ describe('mock API server', () => {
     await api.feed.save(first.id);
     const after = await api.feed.post(first.id);
     expect(after.engagement).toMatchObject({ isLiked: true, isSaved: true, likes: first.engagement.likes + 1 });
+    expect((await api.feed.saved()).items.map(p => p.id)).toEqual([first.id]);
+    await api.feed.unsave(first.id);
+    expect((await api.feed.saved()).items).toHaveLength(0);
+    expect((await api.catalog.products({ seller: 'techstore' })).items.every(p => p.seller.username === 'techstore')).toBe(true);
     await api.feed.unlike(first.id);
     expect((await api.feed.post(first.id)).engagement.likes).toBe(first.engagement.likes);
     const c = await api.feed.comment(first.id, 'Love this');
