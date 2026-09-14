@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
@@ -68,6 +68,7 @@ function RootStack() {
 
 export default function RootLayout() {
   const runtime = useMemo(() => createMobileRuntime(), []);
+  const [sessionReady, setSessionReady] = useState(false);
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -76,11 +77,20 @@ export default function RootLayout() {
     PlusJakartaSans_700Bold,
   });
 
+  // Silent refresh from the Keystore-held refresh token so a returning user never sees the login screen.
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync();
-  }, [fontsLoaded]);
+    let alive = true;
+    runtime.restoreSession().finally(() => alive && setSessionReady(true));
+    return () => {
+      alive = false;
+    };
+  }, [runtime]);
 
-  if (!fontsLoaded) return null;
+  useEffect(() => {
+    if (fontsLoaded && sessionReady) SplashScreen.hideAsync();
+  }, [fontsLoaded, sessionReady]);
+
+  if (!fontsLoaded || !sessionReady) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

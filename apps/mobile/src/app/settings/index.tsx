@@ -11,7 +11,7 @@ import { Header } from '@/components/Header';
 import { Text } from '@/components/Text';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
-import { me } from '@/lib/mock';
+import { useMobileRuntime } from '@/lib/auth';
 import { useAppStore } from '@/store/app';
 import { useTheme } from '@/theme';
 
@@ -20,8 +20,9 @@ type Row = { icon: keyof typeof Ionicons.glyphMap; label: string; value?: string
 export default function SettingsScreen() {
   const router = useRouter();
   const { colors, radius } = useTheme();
-  const user = useAuth(s => s.user) ?? me;
-  const clear = useAuth(s => s.clear);
+  const user = useAuth(s => s.user);
+  const { signOut } = useMobileRuntime();
+  const [signingOut, setSigningOut] = useState(false);
   const interests = useAppStore(s => s.interests);
   const blocked = useAppStore(s => s.blockedIds);
   const setPushAsked = useAppStore(s => s.setPushAsked);
@@ -70,14 +71,14 @@ export default function SettingsScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Header title="Settings" />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 24, paddingBottom: 40 }}>
-        <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/profile/[username]', params: { username: user.username } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, backgroundColor: colors.card, borderRadius: radius.card, borderWidth: 1, borderColor: colors.borderSubtle }}>
+        {user && <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/profile/[username]', params: { username: user.username } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, backgroundColor: colors.card, borderRadius: radius.card, borderWidth: 1, borderColor: colors.borderSubtle }}>
           <Avatar uri={user.avatarUrl} size={56} verified={user.verified} />
           <View style={{ flex: 1 }}>
             <Text variant="heading">{user.name}</Text>
             <Text variant="caption" tone="secondary">@{user.username}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.foregroundTertiary} />
-        </Pressable>
+        </Pressable>}
 
         {groups.map(g => (
           <View key={g.title} style={{ gap: 8 }}>
@@ -99,7 +100,7 @@ export default function SettingsScreen() {
           </View>
         ))}
 
-        <Button label="Sign out" variant="secondary" size="lg" fullWidth onPress={() => { clear(); router.replace('/(auth)/login'); }} />
+        <Button label="Sign out" variant="secondary" size="lg" fullWidth loading={signingOut} onPress={async () => { setSigningOut(true); await signOut(); router.replace('/(auth)/login'); }} />
         <Text variant="caption" tone="tertiary" style={{ textAlign: 'center' }}>Ezyify v{Constants.expoConfig?.version} · {Constants.expoConfig?.android?.package}</Text>
       </ScrollView>
     </View>

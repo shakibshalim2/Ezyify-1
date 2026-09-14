@@ -8,6 +8,7 @@ import { SocialRow } from '@/components/SocialButton';
 import { Field } from '@/components/Field';
 import { Button } from '@/components/Button';
 import { Text } from '@/components/Text';
+import { formErrors, useMobileRuntime } from '@/lib/auth';
 import { useTheme } from '@/theme';
 
 function strength(pw: string) {
@@ -22,6 +23,8 @@ function strength(pw: string) {
 export default function SignupScreen() {
   const router = useRouter();
   const { colors, radius } = useTheme();
+  const { api } = useMobileRuntime();
+  const [banner, setBanner] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [terms, setTerms] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -40,10 +43,18 @@ export default function SignupScreen() {
       return;
     }
     setErrors({});
+    setBanner(null);
     setLoading(true);
-    await new Promise(res => setTimeout(res, 600));
-    setLoading(false);
-    router.push({ pathname: '/(auth)/verify', params: { email: form.email } });
+    try {
+      const res = await api.auth.signup({ ...r.data, email: form.email.trim().toLowerCase() });
+      router.push({ pathname: '/(auth)/verify', params: { email: res.email, userId: res.userId } });
+    } catch (err) {
+      const { fields, message } = formErrors(err);
+      setErrors(fields);
+      setBanner(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -57,6 +68,11 @@ export default function SignupScreen() {
         </View>
       }
     >
+      {banner && (
+        <View accessibilityRole="alert" style={{ padding: 12, borderRadius: 12, backgroundColor: colors.errorSubtle }}>
+          <Text variant="caption" style={{ color: colors.error }}>{banner}</Text>
+        </View>
+      )}
       <SocialRow onPick={() => undefined} />
       <AuthDivider label="or sign up with email" />
       <Field label="Full name" icon="person-outline" placeholder="Maya Chen" autoComplete="name" value={form.name} onChangeText={v => setForm(f => ({ ...f, name: v }))} error={errors.name} />

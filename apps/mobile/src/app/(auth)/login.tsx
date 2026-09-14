@@ -1,20 +1,25 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Link, useRouter } from 'expo-router';
-import { LoginRequestSchema, useAuth } from '@ezyify/core';
+import { LoginRequestSchema } from '@ezyify/core';
 import { AuthShell, AuthDivider } from '@/components/AuthShell';
 import { SocialRow } from '@/components/SocialButton';
 import { Field } from '@/components/Field';
 import { Button } from '@/components/Button';
 import { Text } from '@/components/Text';
 import { Chip } from '@/components/Chip';
-import { mockLogin } from '@/lib/auth';
+import { formErrors, useMobileRuntime } from '@/lib/auth';
+import { API_MODE } from '@/lib/runtime';
+import { MOCK_CREDENTIALS } from '@ezyify/core/mock';
 import { useAppStore } from '@/store/app';
+import { useTheme } from '@/theme';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const setSession = useAuth(s => s.setSession);
+  const { colors } = useTheme();
+  const { api, commitSession } = useMobileRuntime();
   const markSeen = useAppStore(s => s.markOnboardingSeen);
+  const [banner, setBanner] = useState<string | null>(null);
   const [method, setMethod] = useState<'email' | 'phone'>('email');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -30,12 +35,20 @@ export default function LoginScreen() {
       return;
     }
     setErrors({});
+    setBanner(null);
     setLoading(true);
-    const session = await mockLogin(identifier);
-    setSession(session);
-    markSeen();
-    setLoading(false);
-    router.replace('/(tabs)/home');
+    try {
+      const session = await api.auth.login({ identifier: identifier.trim(), password });
+      await commitSession(session);
+      markSeen();
+      router.replace('/(tabs)/home');
+    } catch (err) {
+      const { fields, message } = formErrors(err);
+      setErrors(fields);
+      setBanner(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -49,6 +62,17 @@ export default function LoginScreen() {
         </View>
       }
     >
+      {API_MODE === 'mock' && (
+        <Pressable accessibilityRole="button" onPress={() => { setMethod('email'); setIdentifier(MOCK_CREDENTIALS.email); setPassword(MOCK_CREDENTIALS.password); }} style={{ padding: 12, borderRadius: 12, backgroundColor: colors.primarySubtle, gap: 2 }}>
+          <Text variant="label" tone="brand">Demo mode</Text>
+          <Text variant="caption" tone="secondary">Tap to fill the demo account ({MOCK_CREDENTIALS.email})</Text>
+        </Pressable>
+      )}
+      {banner && (
+        <View accessibilityRole="alert" style={{ padding: 12, borderRadius: 12, backgroundColor: colors.errorSubtle }}>
+          <Text variant="caption" style={{ color: colors.error }}>{banner}</Text>
+        </View>
+      )}
       <SocialRow onPick={() => undefined} />
       <AuthDivider label="or sign in with" />
       <View style={{ flexDirection: 'row', gap: 8 }}>
