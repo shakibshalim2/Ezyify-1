@@ -21,7 +21,12 @@ import {
 } from './realUserMonitoring';
 
 /** Collision-resistant id from the platform CSPRNG (CodeQL js/insecure-randomness). */
-const randomId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`);
+const randomId = () => {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  // Very old WebViews: still CSPRNG-backed via getRandomValues (no Math.random fallback).
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b: number) => b.toString(16).padStart(2, '0')).join('');
+};
 
 export interface ProductionRUMSession {
   sessionId: string;
