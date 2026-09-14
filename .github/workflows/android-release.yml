@@ -3,6 +3,12 @@ name: Android release (signed AAB/APK)
 # Standalone native build — no Expo Go, no EAS cloud. Produces a Play-ready .aab and a sideloadable .apk.
 on:
   workflow_dispatch:
+    inputs:
+      track:
+        description: Play track to upload to (leave empty to only build artifacts)
+        type: choice
+        options: ['', internal, alpha, beta, production]
+        default: ''
   push:
     tags: ['mobile-v*']
 
@@ -79,6 +85,18 @@ jobs:
           [ "$BAD" = 0 ] && echo "All native libs are 16 KB aligned"
           exit $BAD
 
+      - name: Verify release signature (must not be the debug key)
+        working-directory: apps/mobile/android/app/build/outputs/apk/release
+        run: |
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          APK=$(ls *.apk | head -1)
+          "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/certs.txt
+          if grep -qi 'CN=Android Debug' /tmp/certs.txt; then
+            echo "::error::APK is signed with the debug keystore — upload key was not applied"; exit 1
+          fi
+          echo "SHA-256 of the *upload* certificate (Play App Signing shows the separate app-signing cert for assetlinks.json):"
+          grep -i 'SHA-256' /tmp/certs.txt || true
+
       - uses: actions/upload-artifact@v4
         with:
           name: ezyify-android-release
@@ -86,3 +104,31 @@ jobs:
             apps/mobile/android/app/build/outputs/bundle/release/*.aab
             apps/mobile/android/app/build/outputs/apk/release/*.apk
           retention-days: 30
+
+      # Tags (mobile-v*) go to the internal track automatically; manual runs pick a track. Skips with a
+      # warning until the PLAY_SERVICE_ACCOUNT_JSON secret exists (Play Console → Setup → API access).
+      - name: Resolve Play track
+        id: track
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          INPUT_TRACK: ${{ inputs.track }}
+        run: |
+          TRACK="$INPUT_TRACK"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then TRACK="${TRACK:-internal}"; fi
+          if [ -z "$TRACK" ]; then echo "No track requested — artifacts only"; exit 0; fi
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::warning::PLAY_SERVICE_ACCOUNT_JSON secret missing — skipping upload to '$TRACK' (see docs/plan/ANDROID_RELEASE.md §7)"; exit 0
+          fi
+          echo "track=$TRACK" >> "$GITHUB_OUTPUT"
+
+      - name: Upload AAB to Google Play
+        if: steps.track.outputs.track != ''
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.ezyify.app
+          releaseFiles: apps/mobile/android/app/build/outputs/bundle/release/*.aab
+          track: ${{ steps.track.outputs.track }}
+          status: ${{ steps.track.outputs.track == 'production' && 'draft' || 'completed' }}
+          whatsNewDirectory: apps/mobile/store/whatsnew
+          mappingFile: apps/mobile/android/app/build/outputs/mapping/release/mapping.txt

@@ -119,12 +119,24 @@ files); bump `version` by hand for user‑visible releases.
 
 ## 7. CI
 
-`.github/workflows/android-release.yml` decodes the keystore from
-`ANDROID_KEYSTORE_BASE64`, writes `gradle.properties` from secrets, runs
-`bundleRelease`, uploads the `.aab` artifact, and (on tags) pushes it to the
-Play internal track with `r0adkll/upload-google-play`.
+`.github/workflows/android-release.yml` (manual `workflow_dispatch` or a `mobile-v*` tag):
 
-## 6. Push notifications (FCM) — `google-services.json`
+1. decodes the upload keystore from `ANDROID_KEYSTORE_BASE64` (+ `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`), writes `google-services.json` from `GOOGLE_SERVICES_JSON`;
+2. `expo prebuild` → `./gradlew :app:bundleRelease :app:assembleRelease`;
+3. gates: every `.so` is 16 KB aligned, and `apksigner verify --print-certs` must **not** show the debug certificate (the job fails rather than shipping an unsigned build);
+4. uploads `.aab` + `.apk` as the `ezyify-android-release` artifact (30 days);
+5. **Play upload** with `r0adkll/upload-google-play@v1` — tags go to `internal` automatically, manual runs choose `internal` / `alpha` / `beta` / `production` (production is created as a *draft* so a human presses “Roll out”). Release notes come from `apps/mobile/store/whatsnew/whatsnew-<locale>`, and the R8 `mapping.txt` is attached for de‑obfuscated crash reports. The step is skipped with a warning until `PLAY_SERVICE_ACCOUNT_JSON` exists.
+
+Required repository secrets:
+
+| Secret | Source |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -w0 ezyify-upload.keystore` |
+| `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | values used in §1 |
+| `GOOGLE_SERVICES_JSON` | Firebase Console → Project settings → `com.ezyify.app` |
+| `PLAY_SERVICE_ACCOUNT_JSON` | Play Console → *Users and permissions* → invite the GCP service account with **Release manager** on the app; JSON key from IAM. The app must exist in Play Console (one manual `.aab` upload) before API uploads work. |
+
+## 8. Push notifications (FCM) — `google-services.json`
 
 `expo-notifications` uses Firebase Cloud Messaging on Android. Download
 `google-services.json` from Firebase Console → Project settings → *Your apps* →
@@ -134,7 +146,7 @@ CI the file is written from the `GOOGLE_SERVICES_JSON` secret. Upload the FCM
 **service account JSON** to the backend (`apps/api`) — the app itself only needs
 the client config.
 
-## 7. Before the first Play upload
+## 9. Before the first Play upload
 
 1. Follow `docs/plan/PLAY_STORE_CHECKLIST.md` end‑to‑end (Data safety, permissions, account deletion URL, content rating).
 2. Enrol in Play App Signing, then copy the **App signing key certificate SHA‑256** into
