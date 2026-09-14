@@ -20,6 +20,9 @@ import {
   storeRUMMetrics
 } from './realUserMonitoring';
 
+/** Collision-resistant id from the platform CSPRNG (CodeQL js/insecure-randomness). */
+const randomId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`);
+
 export interface ProductionRUMSession {
   sessionId: string;
   startTime: number;
@@ -445,7 +448,7 @@ class ProductionRUMActivation {
   private createAlert(alert: Omit<PerformanceAlert, 'id'>): void {
     const fullAlert: PerformanceAlert = {
       ...alert,
-      id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `alert-${randomId()}`,
     };
 
     this.alerts.push(fullAlert);
@@ -622,7 +625,7 @@ class ProductionRUMActivation {
   }
 
   private generateSessionId(): string {
-    return `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return randomId();
   }
 
   private getDeviceType(): 'mobile' | 'tablet' | 'desktop' {

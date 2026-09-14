@@ -1,3 +1,7 @@
+
+/** Collision-resistant id from the platform CSPRNG (CodeQL js/insecure-randomness). */
+const randomId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`);
+
 /**
  * Real User Monitoring (RUM) Implementation
  * Tracks actual user experience metrics in production
@@ -53,7 +57,7 @@ class RealUserMonitoring {
   }
   
   private generateSessionId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return randomId();
   }
   
   public mark(name: string): void {
@@ -203,7 +207,7 @@ export function trackAPICall(endpoint: string, duration: number, status: number)
  * Generate session ID (exported for other modules)
  */
 export function generateSessionId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return randomId();
 }
 
 /**

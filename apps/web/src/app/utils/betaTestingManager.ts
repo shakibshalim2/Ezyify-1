@@ -1,3 +1,7 @@
+
+/** Collision-resistant id from the platform CSPRNG (CodeQL js/insecure-randomness). */
+const randomId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`);
+
 /**
  * Beta Testing & Soft Launch Management
  * Manage beta users, collect feedback, and control rollout
@@ -405,7 +409,7 @@ class BetaTestingManager {
         id: this.generateId(),
         userId: user.id,
         type: template.type as Feedback['type'],
-        priority: priorities[Math.floor(Math.random() * priorities.length)],
+        priority: priorities[(crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) % priorities.length],
         title: template.title,
         description: template.description,
         page: pages[Math.floor(Math.random() * pages.length)],
@@ -495,7 +499,7 @@ class BetaTestingManager {
    * Private: Generate ID
    */
   private generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return randomId();
   }
 
   /**

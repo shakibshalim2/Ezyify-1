@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useId } from 'react';
 
 export type BadgeVariant = 'user' | 'seller';
 export type BadgeSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -59,7 +59,7 @@ export const VerifiedBadge = memo(function VerifiedBadge({
 }: VerifiedBadgeProps) {
   // Stable unique ID per instance — prevents gradient ID collisions when
   // many badges render simultaneously on the same page.
-  const [uid] = useState(() => Math.random().toString(36).slice(2, 8));
+  const uid = useId().replace(/:/g, '');
 
   const px = SIZE_PX[size];
   const isSeller = variant === 'seller';

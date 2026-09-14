@@ -1,5 +1,5 @@
 // Bumps android.versionCode in app.config.ts (and mirrors it into android/app/build.gradle if present).
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const cfg = 'app.config.ts';
 let src = readFileSync(cfg, 'utf8');
@@ -10,7 +10,10 @@ src = src.replace(/versionCode:\s*\d+/, `versionCode: ${next}`);
 writeFileSync(cfg, src);
 
 const gradle = 'android/app/build.gradle';
-if (existsSync(gradle)) {
-  writeFileSync(gradle, readFileSync(gradle, 'utf8').replace(/versionCode\s+\d+/, `versionCode ${next}`));
+try {
+  const g = readFileSync(gradle, 'utf8');
+  writeFileSync(gradle, g.replace(/versionCode\s+\d+/, `versionCode ${next}`));
+} catch (e) {
+  if (e.code !== 'ENOENT') throw e; // android/ not generated yet — app.config.ts is the source of truth
 }
 console.log(`versionCode → ${next}`);

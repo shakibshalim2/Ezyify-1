@@ -30,18 +30,10 @@ export class AuthGuard implements CanActivate {
   async canActivate(ctx: ExecutionContext) {
     const req = ctx.switchToHttp().getRequest<AuthedRequest>();
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, [ctx.getHandler(), ctx.getClass()]);
-    const header = req.headers.authorization;
-    const token = header?.startsWith('Bearer ') ? header.slice(7) : null;
-
-    if (token) {
-      try {
-        req.user = await this.jwt.verifyAsync<AccessClaims>(token, { secret: this.env.JWT_ACCESS_SECRET });
-      } catch {
-        if (!isPublic) throw unauthorized('Session expired or invalid');
-      }
-    } else if (!isPublic) {
-      throw unauthorized();
-    }
+    const claims = await this.verify(req.headers.authorization);
+    if (claims) req.user = claims;
+    // Authorisation is decided by route metadata only; the request never influences whether the check applies.
+    if (!isPublic && !claims) throw unauthorized('Authentication required or session invalid');
 
     const roles = this.reflector.getAllAndOverride<Role[] | undefined>(ROLES, [ctx.getHandler(), ctx.getClass()]);
     if (roles?.length) {
@@ -51,5 +43,15 @@ export class AuthGuard implements CanActivate {
       if (!adminOverride && have < need) throw forbidden();
     }
     return true;
+  }
+
+  /** Returns verified claims for a well-formed bearer token, otherwise null (never throws). */
+  private async verify(header: string | undefined): Promise<AccessClaims | null> {
+    if (!header?.startsWith('Bearer ')) return null;
+    try {
+      return await this.jwt.verifyAsync<AccessClaims>(header.slice(7), { secret: this.env.JWT_ACCESS_SECRET });
+    } catch {
+      return null;
+    }
   }
 }

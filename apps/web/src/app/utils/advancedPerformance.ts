@@ -51,6 +51,15 @@ export const addResourceHints = () => {
 // 3. Image Optimization
 // ==========================================
 
+const isUnsplashUrl = (src: string) => {
+  try {
+    const host = new URL(src, 'https://ezyify.app').hostname;
+    return host === 'unsplash.com' || host.endsWith('.unsplash.com');
+  } catch {
+    return false;
+  }
+};
+
 export const optimizeImage = (src: string, options: {
   width?: number;
   quality?: number;
@@ -59,7 +68,7 @@ export const optimizeImage = (src: string, options: {
   const { width, quality = 85, format = 'webp' } = options;
   
   // If using Unsplash or similar service
-  if (src.includes('unsplash.com')) {
+  if (isUnsplashUrl(src)) {
     let optimizedUrl = src;
     if (width) optimizedUrl += `&w=${width}`;
     optimizedUrl += `&q=${quality}&fm=${format}&fit=crop`;
