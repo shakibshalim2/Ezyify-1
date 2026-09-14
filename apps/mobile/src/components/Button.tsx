@@ -58,7 +58,7 @@ export function Button({ label, variant = 'primary', size = 'md', loading, fullW
     <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled: !!disabled || !!loading, busy: !!loading }}
+      aria-disabled={!!disabled || !!loading} aria-busy={!!loading}
       disabled={disabled || loading}
       onPressIn={() => {
         scale.set(withSpring(0.97, motion.spring.snappy));

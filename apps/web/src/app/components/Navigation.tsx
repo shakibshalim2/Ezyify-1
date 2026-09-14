@@ -7,13 +7,15 @@ import {
 } from 'lucide-react';
 import { EzyifyLogo } from './EzyifyLogo';
 import { BottomNav } from './BottomNav';
+import { useAuth } from '../contexts/AuthContext';
+import { useBadgeCount } from '../lib/data';
+import { useUnreadCount } from '@ezyify/core';
 
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -35,59 +37,11 @@ export default function Navigation() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Update cart count from localStorage
-  useEffect(() => {
-    const updateCartCount = () => {
-      try {
-        if (typeof window !== 'undefined' && window.localStorage) {
-          const savedCart = localStorage.getItem('ezyify_cart');
-          if (savedCart) {
-            try {
-              const cart = JSON.parse(savedCart);
-              const totalItems = cart.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
-              setCartCount(totalItems);
-            } catch (e) {
-              setCartCount(0);
-            }
-          } else {
-            setCartCount(0);
-          }
-        }
-      } catch (error) {
-        console.log('Cart count update skipped:', error);
-        setCartCount(0);
-      }
-    };
-
-    // Initial load
-    updateCartCount();
-
-    // Listen for storage changes
-    if (typeof window !== 'undefined') {
-      window.addEventListener('storage', updateCartCount);
-      
-      // Custom event for same-page updates
-      window.addEventListener('cartUpdated', updateCartCount);
-
-      return () => {
-        window.removeEventListener('storage', updateCartCount);
-        window.removeEventListener('cartUpdated', updateCartCount);
-      };
-    }
-  }, []);
+  const cartCount = useBadgeCount();
+  const unread = useUnreadCount();
+  const { user, isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const savedCart = localStorage.getItem('ezyify_cart');
-        if (savedCart) {
-          try {
-            const cart = JSON.parse(savedCart);
-            setCartCount(cart.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0));
-          } catch { setCartCount(0); }
-        }
-      }
-    } catch { /* silent */ }
     setIsMenuOpen(false);
     setUserMenuOpen(false);
   }, [location]);
@@ -206,13 +160,16 @@ export default function Navigation() {
               {/* Messages */}
               <Link to="/messages" aria-label="Messages" className="relative p-2 rounded-xl text-foreground/80 hover:text-foreground hover:bg-muted/70 transition-all duration-150">
                 <MessageCircle className="w-[19px] h-[19px]" />
-                <span className="absolute top-[7px] right-[7px] w-[7px] h-[7px] bg-primary rounded-full border-[1.5px] border-background" />
               </Link>
 
               {/* Notifications */}
               <Link to="/notifications" aria-label="Notifications" className="relative p-2 rounded-xl text-foreground/80 hover:text-foreground hover:bg-muted/70 transition-all duration-150">
                 <Bell className="w-[19px] h-[19px]" />
-                <span className="absolute top-[7px] right-[7px] w-[7px] h-[7px] bg-error rounded-full border-[1.5px] border-background" />
+                {(unread.data ?? 0) > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] bg-error text-error-foreground text-[10px] rounded-full flex items-center justify-center px-1 font-bold border-2 border-background tabular-nums">
+                    {unread.data! > 99 ? '99+' : unread.data}
+                  </span>
+                )}
               </Link>
 
               {/* Wishlist — tablet+ only */}
@@ -237,17 +194,21 @@ export default function Navigation() {
                   className="flex items-center gap-1 p-1.5 rounded-xl hover:bg-muted transition-colors"
                   aria-label="User menu"
                 >
-                  <div className="w-7 h-7 rounded-full bg-brand-gradient flex items-center justify-center ring-2 ring-primary/20">
-                    <User className="w-4 h-4 text-white" />
-                  </div>
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt="" className="w-7 h-7 rounded-full object-cover ring-2 ring-primary/20" />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-brand-gradient flex items-center justify-center ring-2 ring-primary/20">
+                      <User className="w-4 h-4 text-white" />
+                    </div>
+                  )}
                   <ChevronDown className={`w-3.5 h-3.5 text-foreground-secondary transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {userMenuOpen && (
                   <div className="absolute right-0 top-full mt-2 w-52 bg-popover border border-border rounded-2xl shadow-xl overflow-hidden animate-scale-in z-50">
                     <div className="px-4 py-3 border-b border-border">
-                      <p className="font-semibold text-sm text-foreground">My Account</p>
-                      <p className="text-xs text-foreground-secondary">user@ezyify.com</p>
+                      <p className="font-semibold text-sm text-foreground">{user?.name ?? 'My Account'}</p>
+                      <p className="text-xs text-foreground-secondary">{user ? `@${user.username}` : 'Not signed in'}</p>
                     </div>
                     <div className="py-1">
                       {[
@@ -265,11 +226,11 @@ export default function Navigation() {
                     </div>
                     <div className="border-t border-border py-1">
                       <button
-                        onClick={() => { setUserMenuOpen(false); navigate('/login'); }}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-error hover:bg-muted w-full transition-colors"
+                        onClick={() => { setUserMenuOpen(false); if (isAuthenticated) void logout(); else navigate('/login'); }}
+                        className={`flex items-center gap-3 px-4 py-2.5 text-sm w-full transition-colors hover:bg-muted ${isAuthenticated ? 'text-error' : 'text-primary'}`}
                       >
                         <LogOut className="w-4 h-4" />
-                        Sign Out
+                        {isAuthenticated ? 'Sign Out' : 'Sign In'}
                       </button>
                     </div>
                   </div>
@@ -347,11 +308,11 @@ export default function Navigation() {
 
               <div className="h-px bg-border my-2" />
               <button
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-error hover:bg-muted w-full transition-colors"
-                onClick={() => { setIsMenuOpen(false); navigate('/login'); }}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm w-full transition-colors hover:bg-muted ${isAuthenticated ? 'text-error' : 'text-primary'}`}
+                onClick={() => { setIsMenuOpen(false); if (isAuthenticated) void logout(); else navigate('/login'); }}
               >
                 <LogOut className="w-5 h-5" />
-                Sign Out
+                {isAuthenticated ? 'Sign Out' : 'Sign In'}
               </button>
             </div>
           </div>

@@ -55,7 +55,7 @@ export default function InterestsScreen() {
               <Animated.View key={it.id} entering={FadeInDown.delay(i * 30).duration(300)}>
                 <Pressable
                   accessibilityRole="checkbox"
-                  accessibilityState={{ checked: on }}
+                  aria-checked={on}
                   onPress={() => toggle(it.id)}
                   style={({ pressed }) => ({
                     flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingHorizontal: 14, borderRadius: radius.pill,

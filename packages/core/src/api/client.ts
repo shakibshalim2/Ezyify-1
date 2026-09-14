@@ -30,6 +30,8 @@ export interface ApiClientOptions {
   baseUrl: string;
   tokens: TokenStore;
   fetch?: typeof fetch;
+  /** Static headers on every request, e.g. `{ 'X-Client': 'native' }` so the API returns refresh tokens in the body. */
+  headers?: Record<string, string>;
   /** Called after a refresh fails so the host app can route to login. */
   onSessionExpired?: () => void;
   timeoutMs?: number;
@@ -43,16 +45,24 @@ interface RequestOptions<T extends z.ZodTypeAny> {
   schema: T;
   auth?: boolean;
   signal?: AbortSignal;
+  /** Per-request headers (e.g. `Idempotency-Key` on checkout). */
+  headers?: Record<string, string>;
 }
 
 const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504]);
 
+/** Relative bases (`/api/v1`, same-origin deploys) resolve against the page origin; elsewhere a placeholder keeps `URL` happy. */
+const ORIGIN_FALLBACK = 'http://relative.invalid';
 function buildUrl(baseUrl: string, path: string, query?: RequestOptions<z.ZodTypeAny>['query']) {
-  const url = new URL(path.replace(/^\//, ''), baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`);
+  const base = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  const relative = base.startsWith('/');
+  const origin = relative ? (globalThis.location?.origin ?? ORIGIN_FALLBACK) : undefined;
+  const url = new URL(path.replace(/^\//, ''), relative ? `${origin}${base}` : base);
   if (query) {
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, String(v));
   }
-  return url.toString();
+  const out = url.toString();
+  return out.startsWith(ORIGIN_FALLBACK) ? out.slice(ORIGIN_FALLBACK.length) : out;
 }
 
 /**
@@ -86,7 +96,7 @@ export function createApiClient(options: ApiClientOptions) {
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       opts.signal?.addEventListener('abort', () => controller.abort(), { once: true });
 
-      const headers: Record<string, string> = { Accept: 'application/json' };
+      const headers: Record<string, string> = { Accept: 'application/json', ...options.headers, ...opts.headers };
       if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
       if (useAuth) {
         const token = await options.tokens.getAccessToken();

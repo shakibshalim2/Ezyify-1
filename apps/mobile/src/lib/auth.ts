@@ -1,8 +1,15 @@
-import type { Session } from '@ezyify/core';
-import { me } from './mock';
+import { ApiError, useRuntime } from '@ezyify/core';
+import type { MobileRuntime } from './runtime';
 
-/** Local stand-in for POST /auth/login until apps/api ships; resolves a session shaped like the real one. */
-export async function mockLogin(identifier: string): Promise<Session> {
-  await new Promise(r => setTimeout(r, 600));
-  return { accessToken: 'mock.' + Date.now(), expiresIn: 900, user: { ...me, username: identifier.split('@')[0] || me.username } };
+/** The runtime mounted in `_layout.tsx` is the mobile one; expose its extra session helpers with the right type. */
+export const useMobileRuntime = () => useRuntime() as MobileRuntime;
+
+/** Maps an ApiError onto form fields (`details`) or a single banner message. */
+export function formErrors(err: unknown, fallback = 'Something went wrong. Please try again.'): { fields: Record<string, string>; message: string | null } {
+  if (err instanceof ApiError) {
+    if (err.code === 'NETWORK_ERROR') return { fields: {}, message: "Can't reach Ezyify. Check your connection and try again." };
+    if (err.details && Object.keys(err.details).length) return { fields: err.details, message: null };
+    return { fields: {}, message: err.message || fallback };
+  }
+  return { fields: {}, message: fallback };
 }

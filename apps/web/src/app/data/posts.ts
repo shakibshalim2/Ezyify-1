@@ -584,3 +584,22 @@ export const getLoops = (): Post[] => {
 export const getFeedPosts = (): Post[] => {
   return posts.filter(p => p.type === 'post');
 };
+/**
+ * Bridges legacy in-repo posts onto the API `Post` shape so Loops/PostViewer (still on `data/posts`)
+ * can open the shared `CommentSheet`. Remove once those surfaces are on `useLoops()` / `usePost()`.
+ */
+export function toCorePost(p: Post) {
+  const images = p.content.images ?? (p.content.video ? [p.content.video] : []);
+  return {
+    id: p.id,
+    kind: p.type,
+    author: { id: p.user.id, username: p.user.username, name: p.user.name, avatarUrl: p.user.avatar, verified: p.user.verified, role: p.user.isCreator ? ('creator' as const) : ('user' as const) },
+    caption: p.content.text ?? '',
+    hashtags: (p.content.text?.match(/#(\w+)/g) ?? []).map(h => h.slice(1)),
+    media: images.map(url => ({ type: p.type === 'loop' ? ('video' as const) : ('image' as const), url, thumbnailUrl: p.type === 'loop' ? url : null, width: null, height: null, durationMs: null })),
+    taggedProductIds: p.taggedProducts ?? [],
+    engagement: { likes: p.likes, comments: p.comments, shares: p.shares, saves: 0, views: p.views, isLiked: !!p.isLiked, isSaved: !!p.isSaved },
+    location: null,
+    createdAt: new Date().toISOString(),
+  };
+}

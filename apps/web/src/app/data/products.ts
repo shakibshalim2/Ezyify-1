@@ -263,3 +263,24 @@ export const getFeaturedProducts = (): Product[] => {
 export const getTrendingProducts = (): Product[] => {
   return [...products].sort((a, b) => (b.sold || 0) - (a.sold || 0)).slice(0, 6);
 };
+/**
+ * Bridges the legacy in-repo catalogue onto the API `ProductSummary` shape so pages that still read
+ * `data/products` (search, wishlist, seller store) can render the shared `ProductCard`. Remove once those
+ * pages are on `useProducts()`.
+ */
+export function toProductSummary(p: Product) {
+  return {
+    id: p.id,
+    slug: p.id,
+    name: p.name,
+    imageUrl: p.image,
+    price: { amount: Math.round(p.price * 100), currency: 'USD' as const },
+    compareAtPrice: p.originalPrice ? { amount: Math.round(p.originalPrice * 100), currency: 'USD' as const } : null,
+    rating: p.rating,
+    reviewCount: p.reviews,
+    seller: { id: p.seller.id, username: p.seller.username, name: p.seller.name, verified: p.seller.verified },
+    badge: null,
+    inStock: p.inStock,
+    soldCount: p.sold,
+  };
+}

@@ -7,10 +7,13 @@ import { Button } from '../../components/primitives/Button';
 import { Field } from '../../components/primitives/Field';
 import { AuthLayout } from '../../features/auth/AuthLayout';
 import { fadeUp, springSoft } from '../../lib/motion';
+import { useRuntime } from '@ezyify/core';
+import { formErrors } from '../../lib/apiErrors';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ForgotPasswordPage() {
+  const { api } = useRuntime();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
@@ -24,9 +27,16 @@ export default function ForgotPasswordPage() {
     }
     setError(undefined);
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setSubmitting(false);
-    setSent(true);
+    try {
+      // The API always answers OK (no account enumeration); the confirmation copy is the same either way.
+      await api.auth.forgotPassword(email.trim());
+      setSent(true);
+    } catch (err) {
+      const e = formErrors(err);
+      setError(e.fields.email ?? e.message ?? undefined);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

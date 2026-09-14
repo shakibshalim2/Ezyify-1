@@ -8,6 +8,7 @@ import {
 import { getProductById } from '../data/products';
 import { VerifiedBadge } from './VerifiedBadge';
 import { CommentSheet } from './CommentSheet';
+import { toCorePost } from '../data/posts';
 import { RepostSheet } from './RepostSheet';
 import { toast } from 'sonner';
 
@@ -461,7 +462,7 @@ export function PostViewer({ post, onClose }: PostViewerProps) {
         key={post.id}
         open={commentOpen}
         onOpenChange={setCommentOpen}
-        post={post}
+        post={toCorePost(post)}
       />
 
       {/* ── REPOST SHEET ────────────────────────────────────────────────────── */}

@@ -1,631 +1,399 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { Link, useNavigate } from 'react-router';
-import { ArrowLeft, MapPin, Truck, CreditCard, Shield, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, MapPin, CreditCard, Plus, ShieldCheck, Wallet } from 'lucide-react';
+import { toast } from 'sonner';
+import { ApiError, formatMoney, useAddresses, useCheckout, useCreateAddress, useServerCart, useWallet, type Address, type CheckoutRequest, type CreateAddressRequest } from '@ezyify/core';
 import { SEO } from '../../components/SEO';
 import { Button } from '../../components/primitives/Button';
 import { Field } from '../../components/primitives/Field';
 import { Card } from '../../components/primitives/Card';
 import { Skeleton } from '../../components/primitives/Skeleton';
 import { EscrowProtectionBanner } from '../../components/EscrowProtectionBanner';
-import { PaymentFailureModal, PaymentErrorType } from '../../components/PaymentFailureModal';
-import { UnavailableItemsModal, UnavailableItem } from '../../components/UnavailableItemsModal';
-import { QuickAddFunds } from '../../components/QuickAddFunds';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
+import { PaymentFailureModal, type PaymentErrorType } from '../../components/PaymentFailureModal';
+import { QueryError } from '../../components/QueryError';
 import { RadioGroup, RadioGroupItem } from '../../components/ui/radio-group';
-import { Label } from '../../components/ui/label';
-import { products } from '../../data/products';
-import { ReferralService } from '../../services/referral';
-import { toast } from 'sonner';
-import { fadeUp, staggerContainer, DURATION } from '../../lib/motion';
-
-interface CartItem {
-  id: string;
-  quantity: number;
-}
+import { useAuthed } from '../../lib/data';
+import { formErrors } from '../../lib/apiErrors';
+import { fadeUp, staggerContainer } from '../../lib/motion';
+import { cn } from '../../components/ui/utils';
 
 const STEPS = [
   { id: 'address', label: 'Address' },
   { id: 'payment', label: 'Payment' },
   { id: 'review', label: 'Review' },
 ] as const;
+type Step = (typeof STEPS)[number]['id'];
+type PaymentMethod = CheckoutRequest['paymentMethod'];
+
+const PAYMENT_OPTIONS: { value: PaymentMethod; label: string; desc: string }[] = [
+  { value: 'wallet', label: 'Ezyify Wallet', desc: 'Pay instantly from your balance' },
+  { value: 'card', label: 'Credit / debit card', desc: 'Visa, Mastercard, Amex' },
+  { value: 'bank_transfer', label: 'Bank transfer', desc: 'Order is confirmed once the transfer lands' },
+  { value: 'cod', label: 'Cash on delivery', desc: 'Pay the courier when it arrives' },
+];
+
+const EMPTY_ADDRESS: CreateAddressRequest = { label: 'Home', recipient: '', phone: '', line1: '', line2: '', city: '', region: '', postal: '', country: 'ID', isDefault: false };
 
 function CheckoutSkeleton() {
   return (
     <div className="min-h-screen bg-background">
-      <div className="px-4 py-6 pb-40">
+      <div className="px-4 py-6 pb-40 max-w-3xl mx-auto" aria-busy>
         <Skeleton className="h-6 w-32 mb-6" />
-        <div className="space-y-6">
-          <Card>
-            <div className="p-4 space-y-4">
-              <Skeleton className="h-6 w-40" />
-              <div className="grid grid-cols-2 gap-4">
-                {[1, 2, 3, 4].map(i => (
-                  <div key={i}>
-                    <Skeleton className="h-4 w-20 mb-2" />
-                    <Skeleton className="h-12" />
-                  </div>
-                ))}
-              </div>
+        <Card>
+          <div className="p-4 space-y-4">
+            <Skeleton className="h-6 w-40" />
+            <div className="grid grid-cols-2 gap-4">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i}>
+                  <Skeleton className="h-4 w-20 mb-2" />
+                  <Skeleton className="h-12" />
+                </div>
+              ))}
             </div>
-          </Card>
-        </div>
+          </div>
+        </Card>
       </div>
     </div>
   );
 }
 
+function AddressForm({ onSaved, onCancel }: { onSaved: (a: Address) => void; onCancel?: () => void }) {
+  const create = useCreateAddress();
+  const [form, setForm] = useState<CreateAddressRequest>(EMPTY_ADDRESS);
+  const errors = create.error ? formErrors(create.error) : null;
+  const set = <K extends keyof CreateAddressRequest>(k: K, v: CreateAddressRequest[K]) => setForm(f => ({ ...f, [k]: v }));
+  const complete = form.recipient.trim() && form.phone.trim().length >= 6 && form.line1.trim() && form.city.trim() && form.postal.trim().length >= 2;
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!complete) return;
+    try {
+      const saved = await create.mutateAsync({ ...form, line2: form.line2 || undefined, region: form.region || undefined });
+      onSaved(saved);
+    } catch {
+      /* shown inline */
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-4" noValidate>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Label" placeholder="Home" value={form.label} onChange={e => set('label', e.target.value)} error={errors?.fields.label} />
+        <Field label="Recipient" autoComplete="name" placeholder="Full name" value={form.recipient} onChange={e => set('recipient', e.target.value)} error={errors?.fields.recipient} />
+      </div>
+      <Field label="Phone number" type="tel" autoComplete="tel" placeholder="+62 812 3456 7890" value={form.phone} onChange={e => set('phone', e.target.value)} error={errors?.fields.phone} />
+      <Field label="Street address" autoComplete="address-line1" placeholder="House #, street, area" value={form.line1} onChange={e => set('line1', e.target.value)} error={errors?.fields.line1} />
+      <Field label="Apartment, floor (optional)" autoComplete="address-line2" value={form.line2 ?? ''} onChange={e => set('line2', e.target.value)} />
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="City" autoComplete="address-level2" value={form.city} onChange={e => set('city', e.target.value)} error={errors?.fields.city} />
+        <Field label="Postal code" autoComplete="postal-code" inputMode="numeric" value={form.postal} onChange={e => set('postal', e.target.value)} error={errors?.fields.postal} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Region / state" autoComplete="address-level1" value={form.region ?? ''} onChange={e => set('region', e.target.value)} />
+        <Field label="Country" autoComplete="country" maxLength={2} value={form.country} onChange={e => set('country', e.target.value.toUpperCase())} error={errors?.fields.country} hint="ISO code, e.g. ID, US" />
+      </div>
+      {errors?.message && <p role="alert" className="text-sm text-error">{errors.message}</p>}
+      <div className="flex gap-2 pt-2">
+        {onCancel && <Button type="button" variant="ghost" size="lg" onClick={onCancel}>Cancel</Button>}
+        <Button type="submit" variant="primary" size="lg" fullWidth loading={create.isPending} disabled={!complete}>Save address</Button>
+      </div>
+    </form>
+  );
+}
+
+const fmtAddress = (a: Address) => [a.line1, a.line2, `${a.city}${a.region ? `, ${a.region}` : ''} ${a.postal}`, a.country].filter(Boolean).join(' · ');
+
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const reduce = useReducedMotion();
-  const [currentStep, setCurrentStep] = useState<'address' | 'payment' | 'review'>('address');
-  const [paymentMethod, setPaymentMethod] = useState('card');
-  const [shippingMethod, setShippingMethod] = useState('standard');
-  const [promoCode, setPromoCode] = useState('');
-  const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const authed = useAuthed();
+  const cart = useServerCart();
+  const addresses = useAddresses();
+  const wallet = useWallet();
+  const checkout = useCheckout();
 
-  const [showPaymentFailure, setShowPaymentFailure] = useState(false);
-  const [paymentError, setPaymentError] = useState<PaymentErrorType>('UNKNOWN_ERROR');
-  const [walletBalance] = useState(1500);
-  const [showAddFunds, setShowAddFunds] = useState(false);
-  const [showUnavailableItems, setShowUnavailableItems] = useState(false);
-  const [unavailableItems, setUnavailableItems] = useState<UnavailableItem[]>([]);
-
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    phone: '',
-    address: '',
-    city: '',
-    zip: ''
-  });
-
-  const [pageData, setPageData] = useState<{
-    cartItemIds: CartItem[];
-    cartItems: any[];
-  } | null>(null);
+  const [step, setStep] = useState<Step>('address');
+  const [addressId, setAddressId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [method, setMethod] = useState<PaymentMethod>('wallet');
+  const [note, setNote] = useState('');
+  const [failure, setFailure] = useState<PaymentErrorType | null>(null);
+  // One key per checkout attempt so a retry after a network blip can't double-charge.
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
-    const loadCheckoutData = () => {
-      const savedCart = localStorage.getItem('ezyify_cart');
-      let cartItemIds: CartItem[] = [];
+    if (!authed) navigate('/login', { replace: true, state: { next: '/checkout' } });
+  }, [authed, navigate]);
 
-      if (savedCart) {
-        try {
-          cartItemIds = JSON.parse(savedCart);
-        } catch (e) {
-          console.error('Failed to parse cart', e);
-        }
+  useEffect(() => {
+    if (addressId || !addresses.data?.length) return;
+    setAddressId((addresses.data.find(a => a.isDefault) ?? addresses.data[0]).id);
+  }, [addresses.data, addressId]);
+
+  const items = cart.data?.items ?? [];
+  const total = cart.data?.total ?? { amount: 0, currency: 'USD' as const };
+  const balance = wallet.data?.balance.amount ?? 0;
+  const walletShort = method === 'wallet' && wallet.data ? balance < total.amount : false;
+  const address = useMemo(() => addresses.data?.find(a => a.id === addressId) ?? null, [addresses.data, addressId]);
+  const stepIndex = STEPS.findIndex(s => s.id === step);
+
+  const placeOrder = async () => {
+    if (!address) return setStep('address');
+    if (walletShort) return setFailure('INSUFFICIENT_FUNDS');
+    try {
+      const orders = await checkout.mutateAsync({ body: { addressId: address.id, paymentMethod: method, couponCode: cart.data?.couponCode ?? undefined, note: note.trim() || undefined }, idempotencyKey });
+      toast.success('Order placed 🎉', { description: `${formatMoney(total)} is held in escrow until you confirm delivery.` });
+      navigate(`/order-success?orders=${orders.map(o => o.orderNumber).join(',')}&total=${total.amount}&currency=${total.currency}&status=${orders[0]?.status ?? 'paid'}`, { replace: true });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.details?.payment) return setFailure('INSUFFICIENT_FUNDS');
+        if (err.code === 'NETWORK_ERROR') return setFailure('NETWORK_ERROR');
+        if (err.status >= 500) return setFailure('PAYMENT_GATEWAY_ERROR');
+        toast.error(formErrors(err).message ?? 'Couldn’t place your order');
+        return;
       }
-
-      const cartItems = cartItemIds
-        .map(item => {
-          const product = products.find(p => p.id === item.id);
-          return product ? { ...product, quantity: item.quantity } : null;
-        })
-        .filter(Boolean);
-
-      setPageData({ cartItemIds, cartItems });
-    };
-
-    if ('requestIdleCallback' in window) {
-      const handle = requestIdleCallback(loadCheckoutData, { timeout: 50 });
-      return () => cancelIdleCallback(handle);
-    } else {
-      const timer = setTimeout(loadCheckoutData, 10);
-      return () => clearTimeout(timer);
+      setFailure('UNKNOWN_ERROR');
     }
-  }, []);
+  };
 
-  if (!pageData) {
-    return <CheckoutSkeleton />;
-  }
-
-  const { cartItemIds, cartItems } = pageData;
-
-  if (cartItems.length === 0) {
+  if (!authed) return null;
+  if (cart.isLoading || addresses.isLoading) return <CheckoutSkeleton />;
+  if (cart.error) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen bg-background px-4 py-10">
+        <QueryError error={cart.error} onRetry={() => void cart.refetch()} />
+      </div>
+    );
+  }
+  if (items.length === 0) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 text-center">
+        <SEO title="Checkout — Ezyify" description="Complete your purchase securely with escrow protection." />
         <h2 className="font-display text-2xl font-semibold text-foreground mb-2">Your cart is empty</h2>
         <p className="text-foreground-secondary mb-6">Add some items before checkout</p>
-        <Link to="/shop">
-          <Button variant="primary">Continue Shopping</Button>
-        </Link>
+        <Button variant="primary" asChild><Link to="/shop">Continue shopping</Link></Button>
       </div>
     );
   }
 
-  const subtotal = cartItems.reduce((sum, item) => sum + (item?.price || 0) * (item?.quantity || 0), 0);
-  const discount = appliedPromo === 'EZYIFY20' ? subtotal * 0.2 : appliedPromo === 'EZYIFY10' ? subtotal * 0.1 : 0;
-  const shippingCost = shippingMethod === 'express' ? 15 : subtotal > 100 ? 0 : 9.99;
-  const total = subtotal - discount + shippingCost;
-
-  const applyPromo = () => {
-    if (promoCode.toUpperCase() === 'EZYIFY10') {
-      setAppliedPromo('EZYIFY10');
-      toast.success('10% discount applied!');
-      setPromoCode('');
-    } else if (promoCode.toUpperCase() === 'EZYIFY20') {
-      setAppliedPromo('EZYIFY20');
-      toast.success('20% discount applied!');
-      setPromoCode('');
-    } else {
-      toast.error('Invalid promo code');
-    }
-  };
-
-  const handlePlaceOrder = async () => {
-    if (!formData.firstName || !formData.lastName || !formData.phone || !formData.address || !formData.city) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-
-    if (paymentMethod === 'card' && walletBalance < total) {
-      setPaymentError('INSUFFICIENT_FUNDS');
-      setShowPaymentFailure(true);
-      return;
-    }
-
-    setIsProcessing(true);
-
-    setTimeout(() => {
-      // Demo-mode failure simulation (15 %) so the failure sheets are reachable; disabled for automated runs.
-      const randomFail = localStorage.getItem('ezyify.e2e') === '1' ? 0 : Math.random();
-
-      if (randomFail > 0.9) {
-        setPaymentError('PAYMENT_GATEWAY_ERROR');
-        setShowPaymentFailure(true);
-        setIsProcessing(false);
-        return;
-      }
-
-      if (randomFail > 0.85) {
-        setPaymentError('NETWORK_ERROR');
-        setShowPaymentFailure(true);
-        setIsProcessing(false);
-        return;
-      }
-
-      localStorage.setItem('ezyify_cart', JSON.stringify([]));
-
-      const pendingReferralRaw = sessionStorage.getItem('ezyify_pending_referral');
-      if (pendingReferralRaw) {
-        try {
-          const { productId } = JSON.parse(pendingReferralRaw);
-          const orderId = `order-${Date.now()}`;
-          const buyerUserId = (JSON.parse(localStorage.getItem('ezyify_user') ?? 'null')?.id as string) ?? 'guest';
-          ReferralService.attributePurchase({ productId, buyerUserId, orderId, orderValue: total });
-          sessionStorage.removeItem('ezyify_pending_referral');
-        } catch (_) {}
-      }
-
-      toast.success('Order placed successfully! 🎉', {
-        description: `Payment of $${total.toFixed(2)} is held securely in escrow until delivery is confirmed.`
-      });
-
-      setIsProcessing(false);
-
-      setTimeout(() => {
-        navigate('/orders');
-      }, 1500);
-    }, 2000);
-  };
-
-  const stepIndex = STEPS.findIndex(s => s.id === currentStep);
-  const isAddressComplete = formData.firstName && formData.lastName && formData.address && formData.city && formData.phone;
+  const sellers = new Set(items.map(i => i.product.seller.id)).size;
 
   return (
     <div className="min-h-screen bg-background">
       <SEO title="Checkout — Ezyify" description="Complete your purchase securely with escrow protection." />
 
       <div className="mx-auto max-w-7xl lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8 lg:px-6 lg:py-8">
-      <motion.div
-        variants={staggerContainer(reduce ? 0 : 0.05)}
-        initial="hidden"
-        animate="visible"
-        className="px-4 py-6 pb-28 space-y-6 lg:p-0"
-      >
-        {/* Header */}
-        <motion.div variants={fadeUp}>
-          <Link to="/cart" className="inline-flex items-center gap-2 text-primary hover:text-primary/80 mb-6 transition-colors">
-            <ArrowLeft className="size-5" />
-            <span className="text-sm font-medium">Back to Cart</span>
-          </Link>
-          <h1 className="font-display text-2xl font-semibold text-foreground">Checkout</h1>
-        </motion.div>
+        <motion.div variants={staggerContainer(reduce ? 0 : 0.05)} initial="hidden" animate="visible" className="px-4 py-6 pb-28 space-y-6 lg:p-0">
+          <motion.div variants={fadeUp}>
+            <Link to="/cart" className="inline-flex items-center gap-2 text-primary hover:text-primary/80 mb-6 transition-colors">
+              <ArrowLeft className="size-5" />
+              <span className="text-sm font-medium">Back to cart</span>
+            </Link>
+            <h1 className="font-display text-2xl font-semibold text-foreground">Checkout</h1>
+          </motion.div>
 
-        {/* Progress Steps */}
-        <motion.div variants={fadeUp}>
-          <ol className="flex gap-2" aria-label="Checkout progress">
-            {STEPS.map((step, i) => (
-              <li key={step.id} className="flex-1">
-                <button
-                  type="button"
-                  onClick={() => i < stepIndex && setCurrentStep(step.id)}
-                  className="w-full text-left"
-                >
-                  <div className="space-y-1.5">
-                    <div className={`h-1.5 rounded-full transition-colors ${
-                      i < stepIndex ? 'bg-success' : i === stepIndex ? 'bg-primary' : 'bg-border'
-                    }`} />
-                    <p className={`text-xs font-medium ${
-                      i <= stepIndex ? 'text-foreground' : 'text-foreground-tertiary'
-                    }`}>
-                      {step.label}
-                    </p>
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ol>
-        </motion.div>
-
-        {/* Escrow Banner */}
-        <motion.div variants={fadeUp}>
-          <EscrowProtectionBanner amount={total} variant="checkout" />
-        </motion.div>
-
-        {/* Form Sections */}
-        <motion.div variants={fadeUp} className="space-y-6">
-          {/* Address Step */}
-          {currentStep === 'address' && (
-            <Card className="p-4 lg:p-6 space-y-4">
-              <div className="flex items-center gap-3">
-                <MapPin className="size-5 text-primary flex-shrink-0" />
-                <h2 className="font-display font-semibold text-lg">Shipping Address</h2>
-              </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <Field
-                    label="First Name"
-                    placeholder="John"
-                    value={formData.firstName}
-                    onChange={e => setFormData({ ...formData, firstName: e.target.value })}
-                    success={!!(formData.firstName && !formData.firstName.match(/^\s*$/))}
-                  />
-                  <Field
-                    label="Last Name"
-                    placeholder="Doe"
-                    value={formData.lastName}
-                    onChange={e => setFormData({ ...formData, lastName: e.target.value })}
-                    success={!!(formData.lastName && !formData.lastName.match(/^\s*$/))}
-                  />
-                </div>
-
-                <Field
-                  label="Phone Number"
-                  type="tel"
-                  placeholder="+1 (888) 234-5678"
-                  value={formData.phone}
-                  onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                />
-
-                <Field
-                  label="Street Address"
-                  placeholder="House #, Road #, Area"
-                  value={formData.address}
-                  onChange={e => setFormData({ ...formData, address: e.target.value })}
-                />
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Field
-                    label="City"
-                    placeholder="New York"
-                    value={formData.city}
-                    onChange={e => setFormData({ ...formData, city: e.target.value })}
-                  />
-                  <Field
-                    label="ZIP Code"
-                    placeholder="10001"
-                    value={formData.zip}
-                    onChange={e => setFormData({ ...formData, zip: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-border flex gap-2">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  fullWidth
-                  onClick={() => isAddressComplete && setCurrentStep('payment')}
-                  disabled={!isAddressComplete}
-                >
-                  Continue to Payment
-                </Button>
-              </div>
-            </Card>
-          )}
-
-          {/* Payment Step */}
-          {currentStep === 'payment' && (
-            <div className="space-y-4">
-              {/* Shipping Method */}
-              <Card className="p-4 lg:p-6 space-y-4">
-                <div className="flex items-center gap-3">
-                  <Truck className="size-5 text-primary flex-shrink-0" />
-                  <h2 className="font-display font-semibold text-lg">Shipping Method</h2>
-                </div>
-
-                <RadioGroup value={shippingMethod} onValueChange={setShippingMethod}>
-                  <div className="space-y-3">
-                    {[
-                      { value: 'standard', label: 'Standard Delivery', desc: '5-7 business days', cost: subtotal > 100 ? 'FREE' : '$9.99' },
-                      { value: 'express', label: 'Express Delivery', desc: '2-3 business days', cost: '$15.00' }
-                    ].map(option => (
-                      <label key={option.value} className="flex items-start gap-3 p-3 rounded-xl border border-border hover:border-border-strong cursor-pointer transition-colors">
-                        <RadioGroupItem value={option.value} id={option.value} className="mt-1 flex-shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-foreground">{option.label}</p>
-                          <p className="text-xs text-foreground-secondary">{option.desc}</p>
-                        </div>
-                        <span className="text-sm font-semibold text-accent-brand flex-shrink-0">{option.cost}</span>
-                      </label>
-                    ))}
-                  </div>
-                </RadioGroup>
-              </Card>
-
-              {/* Payment Method */}
-              <Card className="p-4 lg:p-6 space-y-4">
-                <div className="flex items-center gap-3">
-                  <CreditCard className="size-5 text-primary flex-shrink-0" />
-                  <h2 className="font-display font-semibold text-lg">Payment Method</h2>
-                </div>
-
-                <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <div className="space-y-3">
-                    {[
-                      { value: 'card', label: 'Credit/Debit Card', desc: 'Visa, Mastercard, Amex' },
-                      { value: 'wallet', label: 'Digital Wallet', desc: 'Apple Pay, Google Pay' },
-                      { value: 'ezyify-wallet', label: 'Ezyify Wallet', desc: 'Use your wallet balance' }
-                    ].map(option => (
-                      <label key={option.value} className="flex items-start gap-3 p-3 rounded-xl border border-border hover:border-border-strong cursor-pointer transition-colors">
-                        <RadioGroupItem value={option.value} id={option.value} className="mt-1 flex-shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-foreground">{option.label}</p>
-                          <p className="text-xs text-foreground-secondary">{option.desc}</p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </RadioGroup>
-              </Card>
-
-              {/* Promo Code */}
-              <Card className="p-4 lg:p-6 space-y-3">
-                <label className="text-sm font-semibold text-foreground block">Promo Code</label>
-                {appliedPromo ? (
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 px-4 py-2 rounded-xl bg-success/10 border border-success/30 flex items-center gap-2">
-                      <span className="text-sm font-medium text-success">{appliedPromo}</span>
-                      <span className="text-xs text-success">-${discount.toFixed(2)}</span>
+          <motion.div variants={fadeUp}>
+            <ol className="flex gap-2" aria-label="Checkout progress">
+              {STEPS.map((s, i) => (
+                <li key={s.id} className="flex-1">
+                  <button type="button" onClick={() => i < stepIndex && setStep(s.id)} aria-current={i === stepIndex ? 'step' : undefined} className="w-full text-left">
+                    <div className="space-y-1.5">
+                      <div className={cn('h-1.5 rounded-full transition-colors', i < stepIndex ? 'bg-success' : i === stepIndex ? 'bg-primary' : 'bg-border')} />
+                      <p className={cn('text-xs font-medium', i <= stepIndex ? 'text-foreground' : 'text-foreground-tertiary')}>{s.label}</p>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setAppliedPromo(null)}
-                      aria-label="Remove promo"
-                    >
-                      ✕
-                    </Button>
-                  </div>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </motion.div>
+
+          <motion.div variants={fadeUp}>
+            <EscrowProtectionBanner amount={total.amount / 100} variant="checkout" />
+          </motion.div>
+
+          <motion.div variants={fadeUp} className="space-y-6">
+            {step === 'address' && (
+              <Card className="p-4 lg:p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                  <MapPin className="size-5 text-primary flex-shrink-0" />
+                  <h2 className="font-display font-semibold text-lg">Shipping address</h2>
+                </div>
+                {addresses.error ? (
+                  <QueryError error={addresses.error} onRetry={() => void addresses.refetch()} compact />
+                ) : adding || !addresses.data?.length ? (
+                  <AddressForm
+                    onSaved={a => {
+                      setAddressId(a.id);
+                      setAdding(false);
+                      setStep('payment');
+                    }}
+                    onCancel={addresses.data?.length ? () => setAdding(false) : undefined}
+                  />
                 ) : (
-                  <div className="flex gap-2">
-                    <Field
-                      label="Enter code"
-                      hideLabel
-                      placeholder="EZYIFY10"
-                      value={promoCode}
-                      onChange={e => setPromoCode(e.target.value.toUpperCase())}
-                      containerClassName="flex-1 m-0"
-                      onKeyDown={e => e.key === 'Enter' && applyPromo()}
-                    />
-                    <Button
-                      variant="outline"
-                      size="md"
-                      onClick={applyPromo}
-                      className="mt-6"
-                    >
-                      Apply
+                  <>
+                    <RadioGroup value={addressId ?? ''} onValueChange={setAddressId} aria-label="Saved addresses">
+                      <div className="space-y-3">
+                        {addresses.data.map(a => (
+                          <label key={a.id} className={cn('flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors', addressId === a.id ? 'border-primary bg-primary-subtle' : 'border-border hover:border-border-strong')}>
+                            <RadioGroupItem value={a.id} id={`addr-${a.id}`} className="mt-1 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-foreground">
+                                {a.label} · {a.recipient}
+                                {a.isDefault && <span className="ml-2 text-[10px] font-bold uppercase text-primary">Default</span>}
+                              </p>
+                              <p className="text-xs text-foreground-secondary">{fmtAddress(a)}</p>
+                              <p className="text-xs text-foreground-tertiary">{a.phone}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </RadioGroup>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setAdding(true)}>
+                      <Plus className="size-4" /> Add a new address
                     </Button>
-                  </div>
+                    <div className="pt-4 border-t border-border">
+                      <Button variant="primary" size="lg" fullWidth disabled={!address} onClick={() => setStep('payment')}>
+                        Continue to payment
+                      </Button>
+                    </div>
+                  </>
                 )}
               </Card>
+            )}
 
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  fullWidth
-                  onClick={() => setCurrentStep('address')}
-                >
-                  Back
-                </Button>
-                <Button
-                  variant="primary"
-                  size="lg"
-                  fullWidth
-                  onClick={() => setCurrentStep('review')}
-                >
-                  Review Order
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Review Step */}
-          {currentStep === 'review' && (
-            <div className="space-y-4">
-              {/* Address Summary */}
-              <Card variant="ghost" className="p-4 lg:p-6 border border-border-subtle space-y-2">
-                <h3 className="font-semibold text-sm text-foreground-secondary">Shipping To</h3>
-                <p className="font-medium text-foreground">{formData.firstName} {formData.lastName}</p>
-                <p className="text-sm text-foreground-secondary">{formData.address}</p>
-                <p className="text-sm text-foreground-secondary">{formData.city}, {formData.zip}</p>
-              </Card>
-
-              {/* Items Summary */}
-              <Card variant="ghost" className="p-4 lg:p-6 border border-border-subtle space-y-3">
-                <h3 className="font-semibold text-sm text-foreground-secondary">Order Items</h3>
-                <div className="space-y-2">
-                  {cartItems.map(item => (
-                    <div key={item.id} className="flex justify-between text-sm">
-                      <span className="text-foreground">{item.name} × {item.quantity}</span>
-                      <span className="font-medium text-foreground">${(item.price * item.quantity).toFixed(2)}</span>
+            {step === 'payment' && (
+              <div className="space-y-4">
+                <Card className="p-4 lg:p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <CreditCard className="size-5 text-primary flex-shrink-0" />
+                    <h2 className="font-display font-semibold text-lg">Payment method</h2>
+                  </div>
+                  <RadioGroup value={method} onValueChange={v => setMethod(v as PaymentMethod)} aria-label="Payment method">
+                    <div className="space-y-3">
+                      {PAYMENT_OPTIONS.map(o => (
+                        <label key={o.value} className={cn('flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors', method === o.value ? 'border-primary bg-primary-subtle' : 'border-border hover:border-border-strong')}>
+                          <RadioGroupItem value={o.value} id={`pay-${o.value}`} className="mt-1 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-foreground">{o.label}</p>
+                            <p className="text-xs text-foreground-secondary">{o.desc}</p>
+                          </div>
+                          {o.value === 'wallet' && wallet.data && (
+                            <span className={cn('text-sm font-semibold flex-shrink-0 inline-flex items-center gap-1', walletShort ? 'text-error' : 'text-success')}>
+                              <Wallet className="size-4" /> {formatMoney(wallet.data.balance)}
+                            </span>
+                          )}
+                        </label>
+                      ))}
                     </div>
-                  ))}
+                  </RadioGroup>
+                  {walletShort && (
+                    <p className="text-sm text-error">
+                      Your wallet is {formatMoney({ amount: total.amount - balance, currency: total.currency })} short.{' '}
+                      <Link to="/wallet" className="font-semibold underline">Top up</Link> or pick another method.
+                    </p>
+                  )}
+                </Card>
+                <Card className="p-4 lg:p-6 space-y-3">
+                  <Field label="Note for the seller (optional)" placeholder="Leave at the front desk…" value={note} onChange={e => setNote(e.target.value)} maxLength={500} />
+                </Card>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="lg" onClick={() => setStep('address')}>Back</Button>
+                  <Button variant="primary" size="lg" fullWidth disabled={walletShort} onClick={() => setStep('review')}>Review order</Button>
                 </div>
-              </Card>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  fullWidth
-                  onClick={() => setCurrentStep('payment')}
-                >
-                  Back
-                </Button>
-              </div>
-            </div>
-          )}
-        </motion.div>
-      </motion.div>
-
-      {/* Sticky Bottom Bar (Mobile) */}
-      {currentStep === 'review' && (
-      <div className="fixed inset-x-0 bottom-[calc(var(--nav-height)+var(--safe-bottom))] lg:hidden z-20 bg-background/95 backdrop-blur-xl border-t border-border">
-        <div className="px-4 py-3 flex items-center gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-foreground-secondary">Total{discount > 0 ? ` · saved $${discount.toFixed(2)}` : ''}</p>
-            <p className="font-display font-bold text-lg tabular-nums text-foreground">${total.toFixed(2)}</p>
-          </div>
-          {(
-            <Button
-              variant="gradient"
-              size="lg"
-              onClick={handlePlaceOrder}
-              disabled={isProcessing}
-              className="shadow-brand"
-              leftIcon={isProcessing ? undefined : <Shield className="size-5" />}
-              loadingText="Processing..."
-              loading={isProcessing}
-            >
-              {isProcessing ? 'Processing...' : 'Place order'}
-            </Button>
-          )}
-        </div>
-      </div>
-      )}
-
-      {/* Desktop Summary */}
-      <div className="hidden lg:block">
-        <div className="sticky top-24">
-        <Card variant="elevated" className="p-6 space-y-4">
-          <h3 className="font-display font-semibold text-lg">Order Summary</h3>
-
-          <div className="space-y-3 max-h-64 overflow-y-auto">
-            {cartItems.map(item => (
-              <div key={item.id} className="flex justify-between text-sm">
-                <span className="text-foreground line-clamp-1">{item.name} × {item.quantity}</span>
-                <span className="font-medium flex-shrink-0">${(item.price * item.quantity).toFixed(2)}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="border-t border-border pt-3 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-foreground-secondary">Subtotal</span>
-              <span>${subtotal.toFixed(2)}</span>
-            </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-sm text-success">
-                <span>Discount</span>
-                <span>-${discount.toFixed(2)}</span>
               </div>
             )}
-            <div className="flex justify-between text-sm">
-              <span className="text-foreground-secondary">Shipping</span>
-              <span>{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span>
+
+            {step === 'review' && address && (
+              <div className="space-y-4">
+                <Card className="p-4 lg:p-6 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-foreground-tertiary">Deliver to</p>
+                      <p className="text-sm font-semibold text-foreground mt-1">{address.recipient} · {address.phone}</p>
+                      <p className="text-xs text-foreground-secondary">{fmtAddress(address)}</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setStep('address')}>Change</Button>
+                  </div>
+                  <div className="flex items-start justify-between gap-3 pt-3 border-t border-border">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-foreground-tertiary">Pay with</p>
+                      <p className="text-sm font-semibold text-foreground mt-1">{PAYMENT_OPTIONS.find(o => o.value === method)?.label}</p>
+                      {note && <p className="text-xs text-foreground-secondary">Note: {note}</p>}
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setStep('payment')}>Change</Button>
+                  </div>
+                </Card>
+                <Card className="p-4 lg:p-6 space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-foreground-tertiary">{items.length} item{items.length > 1 ? 's' : ''} · {sellers} seller{sellers > 1 ? 's' : ''}</p>
+                  <ul className="divide-y divide-border">
+                    {items.map(i => (
+                      <li key={`${i.productId}:${i.variantId ?? ''}`} className="flex items-center gap-3 py-3">
+                        <img src={i.product.imageUrl} alt="" className="size-14 rounded-lg object-cover bg-muted" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{i.product.name}</p>
+                          <p className="text-xs text-foreground-secondary">{i.product.seller.name} · Qty {i.quantity}</p>
+                        </div>
+                        <p className="text-sm font-semibold tabular-nums">{formatMoney({ amount: i.product.price.amount * i.quantity, currency: i.product.price.currency })}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+                <div className="flex items-start gap-3 rounded-card bg-success/5 border border-success/20 p-4">
+                  <ShieldCheck className="size-5 text-success shrink-0 mt-0.5" />
+                  <p className="text-sm text-foreground-secondary">By placing this order you agree to Ezyify’s terms. Your payment stays in escrow until you confirm delivery.</p>
+                </div>
+                <div className="flex gap-2 lg:hidden">
+                  <Button variant="outline" size="lg" onClick={() => setStep('payment')}>Back</Button>
+                  <Button variant="gradient" size="lg" fullWidth className="shadow-brand" loading={checkout.isPending} loadingText="Placing order…" onClick={() => void placeOrder()}>
+                    Place order · {formatMoney(total)}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </motion.div>
+
+        <div className="hidden lg:block">
+          <Card variant="elevated" className="sticky top-24 p-6 space-y-4">
+            <h3 className="font-display font-semibold text-lg">Order summary</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-foreground-secondary">Subtotal</span><span>{formatMoney(cart.data!.subtotal)}</span></div>
+              {cart.data!.discount.amount > 0 && <div className="flex justify-between text-success"><span>Discount{cart.data!.couponCode ? ` (${cart.data!.couponCode})` : ''}</span><span>-{formatMoney(cart.data!.discount)}</span></div>}
+              <div className="flex justify-between"><span className="text-foreground-secondary">Shipping</span><span>{cart.data!.shipping.amount === 0 ? 'FREE' : formatMoney(cart.data!.shipping)}</span></div>
             </div>
-          </div>
-
-          <div className="pt-3 border-t border-border flex justify-between font-display font-bold text-lg">
-            <span>Total</span>
-            <span className="text-accent-brand">${total.toFixed(2)}</span>
-          </div>
-
-          {currentStep === 'review' && (
-            <Button
-              variant="gradient"
-              size="lg"
-              onClick={handlePlaceOrder}
-              disabled={isProcessing}
-              className="shadow-brand"
-              loading={isProcessing}
-              loadingText="Processing..."
-            >
-              Place Order
-            </Button>
-          )}
-        </Card>
+            <div className="pt-3 border-t border-border flex justify-between font-display font-bold text-lg">
+              <span>Total</span>
+              <span className="text-accent-brand">{formatMoney(total)}</span>
+            </div>
+            {step === 'review' && (
+              <Button variant="gradient" size="lg" fullWidth className="shadow-brand" loading={checkout.isPending} loadingText="Placing order…" onClick={() => void placeOrder()}>
+                Place order
+              </Button>
+            )}
+          </Card>
         </div>
       </div>
-      </div>
 
-      {/* Modals */}
       <PaymentFailureModal
-        isOpen={showPaymentFailure}
-        error={paymentError}
-        requiredAmount={total}
-        currentBalance={walletBalance}
+        isOpen={!!failure}
+        error={failure ?? 'UNKNOWN_ERROR'}
+        requiredAmount={total.amount / 100}
+        currentBalance={balance / 100}
         onRetry={() => {
-          setShowPaymentFailure(false);
-          handlePlaceOrder();
+          setFailure(null);
+          setIdempotencyKey(crypto.randomUUID());
+          void placeOrder();
         }}
         onAddFunds={() => {
-          setShowPaymentFailure(false);
-          setShowAddFunds(true);
+          setFailure(null);
+          navigate('/wallet');
         }}
-        onCancel={() => setShowPaymentFailure(false)}
+        onCancel={() => setFailure(null)}
         onContactSupport={() => {
-          setShowPaymentFailure(false);
+          setFailure(null);
           navigate('/help');
         }}
-      />
-
-      <Dialog open={showAddFunds} onOpenChange={setShowAddFunds}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Funds to Wallet</DialogTitle>
-            <DialogDescription>
-              Securely add funds to your Ezyify wallet to complete your purchase
-            </DialogDescription>
-          </DialogHeader>
-          <QuickAddFunds
-            suggestedAmount={Math.ceil((total - walletBalance) / 100) * 100}
-            onSuccess={amount => {
-              toast.success(`Successfully added $${amount.toFixed(2)} to your wallet`);
-              setShowAddFunds(false);
-              toast.info('Please click "Place Order" again to complete your purchase');
-            }}
-            onCancel={() => setShowAddFunds(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      <UnavailableItemsModal
-        isOpen={showUnavailableItems}
-        items={unavailableItems}
-        onUpdateQuantity={() => setShowUnavailableItems(false)}
-        onRemoveItem={() => setShowUnavailableItems(false)}
-        onRemoveAll={() => setShowUnavailableItems(false)}
-        onMoveToWishlist={() => setShowUnavailableItems(false)}
-        onContinue={() => setShowUnavailableItems(false)}
-        onViewCart={() => navigate('/cart')}
       />
     </div>
   );

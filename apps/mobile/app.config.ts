@@ -101,6 +101,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   experiments: { typedRoutes: true, reactCompiler: true },
   extra: {
     apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? 'https://api.ezyify.app/v1',
+    // `mock` = in-process demo API (no backend needed: QA builds, Maestro, store screenshots). Never the default.
+    apiMode: process.env.EXPO_PUBLIC_API_MODE === 'mock' ? 'mock' : 'live',
     eas: {},
   },
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCompactNumber, formatRelativeTime, clamp, formatMoney } from './index.js';
+import { formatCompactNumber, formatRelativeTime, formatTimeUntil, clamp, formatMoney } from './index.js';
 
 describe('utils (edge cases)', () => {
   it('compact numbers for engagement counters', () => {
@@ -13,6 +13,14 @@ describe('utils (edge cases)', () => {
     expect(formatRelativeTime('2026-09-13T09:00:00Z', now)).toBe('3h');
     expect(formatRelativeTime('2026-09-01T09:00:00Z', now)).toMatch(/Sep 1/);
     expect(formatRelativeTime('2027-01-01T00:00:00Z', now)).toBe('now'); // future never goes negative
+  });
+  it('time until covers every bucket (escrow auto-release)', () => {
+    const now = Date.parse('2026-09-13T12:00:00Z');
+    expect(formatTimeUntil('2026-09-13T11:00:00Z', now)).toBe('now');
+    expect(formatTimeUntil('2026-09-13T12:20:00Z', now)).toBe('in 20m');
+    expect(formatTimeUntil('2026-09-13T15:00:00Z', now)).toBe('in 3h');
+    expect(formatTimeUntil('2026-09-20T12:00:00Z', now)).toBe('in 7d');
+    expect(formatTimeUntil('2026-12-01T12:00:00Z', now)).toMatch(/on Dec 1/);
   });
   it('clamp', () => {
     expect(clamp(5, 0, 3)).toBe(3);
