@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type { z } from 'zod';
 import type { FeedQuery, ProductQuery } from '../api/endpoints.js';
+import type { SearchType } from '../schemas/index.js';
 import type { paginated } from '../schemas/common.js';
 import type { Cart, CheckoutRequest, CreateAddressRequest, CreatePostRequest, Post, UpdateProfileRequest, UserProfile } from '../schemas/index.js';
 import { useApi, useAuth } from './index.js';
@@ -17,6 +18,7 @@ export const queryKeys = {
   product: (id: string) => ['product', id] as const,
   categories: ['categories'] as const,
   search: (q: string) => ['search', q] as const,
+  unifiedSearch: (q: string, type: SearchType = 'all') => ['search', 'all', q, type] as const,
   cart: ['cart'] as const,
   orders: (params: Record<string, unknown> = {}) => ['orders', params] as const,
   order: (id: string) => ['order', id] as const,
@@ -70,6 +72,12 @@ export function useCategories() {
 export function useSearch(q: string, query: PageQuery = {}) {
   const api = useApi();
   return useQuery({ queryKey: [...queryKeys.search(q), query], queryFn: () => api.catalog.search(q, query), enabled: q.trim().length > 0 });
+}
+
+/** Searches all discoverable entities through the sectioned search endpoint. */
+export function useUnifiedSearch(q: string, type: SearchType = 'all') {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.unifiedSearch(q, type), queryFn: () => api.search.all(q, { type }), enabled: q.trim().length > 0 });
 }
 
 // ---------- Social ----------
