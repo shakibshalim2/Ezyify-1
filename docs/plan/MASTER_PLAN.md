@@ -4,7 +4,7 @@
 > social‑commerce product shipped on **Web** and **Google Play (signed AAB/APK)**.
 > Status legend: ☐ todo · ◐ in progress · ☑ done · ✗ dropped
 
-Last updated: 2026‑09‑13
+Last updated: 2026‑09‑14
 
 ---
 
@@ -12,7 +12,7 @@ Last updated: 2026‑09‑13
 
 | Rule | Detail |
 |---|---|
-| Branch | All work on `hoplite/praisos-5d6d32fd` (thread branch). One PR to `main`; each finished step is a separate commit + push. |
+| Branch | Phases 0–7 shipped from `hoplite/praisos-5d6d32fd` (PR #1, PR #2 → `main`). Phase 8 continues on `hoplite/thespiai-de0dfed9`; each finished step is a separate commit + push, one PR to `main`. |
 | Definition of done (per step) | code → `pnpm typecheck` + `pnpm lint` + `pnpm test` green → build passes → visual check in preview → commit → push. |
 | Mobile build | **Standalone signed release** (`.aab` for Play Store + `.apk` for sideload) produced by Gradle/EAS `--local`. **Expo Go is never required** to run the app; the dev client is optional for developers only. Same model as a Flutter signed build. |
 | No secrets in repo | Keystore, API keys, `.env*` are git‑ignored. Signing config reads from `~/.gradle/gradle.properties` or CI secrets. |
@@ -72,9 +72,9 @@ Migration is incremental: Phase 1 works inside the current layout; Phase 2 perfo
 - ☑ `tsconfig.json` (strict), ESLint 9 flat config, Prettier, Vitest + Testing Library (312 TS errors → 0)
 - ☑ Remove Figma quirks: `process.env.NODE_ENV=production` define, `figma:asset` alias → real imports, duplicate `pkg@version` deps, unused MUI/Emotion/react-slick/react-dnd/etc.
 - ☑ `.gitignore`, `.env.example`, `.nvmrc`, `pnpm-lock.yaml` committed
-- ☐ Route‑level dead code: move ~25 "launch/validation/QA dashboard" pages + `utils/*Validator*` behind `import.meta.env.DEV` or delete
+- ☑ Route‑level dead code: 24 launch/QA dashboards gated behind `import.meta.env.DEV` (`routes/devRoutes.tsx`, a5c9476)
 - ☑ GitHub Actions: `ci.yml` (install → lint → typecheck → test → build)
-- ☐ Playwright E2E skeleton
+- ☑ Playwright E2E skeleton (882371d) → full journeys in Phase 7
 
 ### Phase 1 — Design system + first‑run experience (P0 design)
 Source: `docs/audit/DESIGN_ISSUES_BY_SEVERITY.md`, `docs/research/EZYIFY_DESIGN_RESEARCH_BRIEF.md`
@@ -105,7 +105,7 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 - ☑ API client with zod‑validated responses, auth interceptor (silent refresh), bounded retry/backoff, timeout
 - ☑ `@ezyify/tokens`: `tokens.json` → generated `tokens.css` (web) + `nativeTheme()` (RN); web imports the generated CSS
 - ☑ `@ezyify/core` runtime (auth + guest‑cart stores, endpoint map, react‑query client) mounted in `App.tsx`
-- ☐ Migrate screens from local mock data to `useApi()` + MSW handlers that satisfy the core schemas (continues alongside backend work)
+- ◐ Migrate screens from local mock data to `useApi()` → **Phase 8.1–8.4**
 
 ### Phase 4 — Mobile app (Expo, standalone signed builds)
 - 4.1 ☑ `apps/mobile` via `create-expo-app` (**SDK 57**, RN 0.86, React 19.2, Expo Router 57, React Compiler), Reanimated 4, expo-image, SecureStore, Inter/Plus Jakarta fonts; theme from `@ezyify/tokens`, runtime from `@ezyify/core`. NativeWind skipped (v5 still RC; styles use the token theme directly)
@@ -123,7 +123,7 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 - ☑ Cross-cutting: zod-validated env (fails fast), request validation with the **same `@ezyify/core` schemas the clients use**, spec error envelope + codes, rate limiting (100/min, tighter on auth), Helmet, strict CORS, pino logging with secret redaction, Swagger UI at `/v1/docs` + `openapi.json`
 - ☑ Seed fixtures mirroring the mobile mock data; vitest unit + e2e (25 tests through the real Fastify stack: auth rotation/reuse, contract-validated responses, checkout → escrow → release with fee, RBAC, blocking, reports); CI runs against a Postgres 16 service
 - ☑ Stripe adapter + webhooks (Phase 6) · ☐ LiveKit tokens, FCM v1 send, Meilisearch — Phase 8
-- ☐ Migrate web + mobile screens from mock data to `useApi()` (Phase 7 alongside testing)
+- ◐ Migrate web + mobile screens from mock data to `useApi()` → **Phase 8.1–8.4**
 
 ### Phase 6 — Security — ✅ delivered (PR #2)
 - ☑ OWASP ASVS L2 checklist with control → code → verification mapping in `docs/plan/SECURITY.md` (+ threat model, ops runbook)
@@ -146,11 +146,17 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 - ☑ Visual: Playwright screenshot baselines for 6 screens × 2 viewports (non-blocking CI step); **Lighthouse CI** budget perf ≥ 90 / a11y ≥ 95 (measured 93–99 / 98–100) as a CI job
 - Fixes surfaced by the new tests: dark-theme primary/on-primary, tertiary text, error and accent badge contrast (all below AA), unlabeled carousel dots (+ 24 px targets), unlabeled sort `<select>`, unnamed add-to-cart button, opacity-diluted secondary text
 
-### Phase 8 — Web hardening & launch
-- ☐ SEO: prerender product/store/profile routes, OG tags, sitemap generation
-- ☐ PWA: manifest icons (PNG), service worker via `vite-plugin-pwa`, offline shell
-- ☐ Analytics (PostHog), error tracking (Sentry), feature flags
-- ☐ Final review pass against every audit item; regression checklist; release notes
+### Phase 8 — Real API wiring, web hardening & launch — ◐ in progress (this branch)
+Goal: no screen renders mock data in a release build; the signed APK talks to `apps/api`, and the web app is launch‑ready (SEO/PWA/observability). Every sub‑step = commit + push after `pnpm check` is green.
+
+- 8.1 ☐ **Core** — extend the endpoint map to the full API surface (stories, comments, save, create post, profile update, followers/following, start conversation, unread count, addresses, sessions, cancel order, uploads); `createApiClient` gains static `headers` (mobile sends `X-Client: native`) and `SessionSchema` carries the optional `refreshToken` the API returns to native clients; TanStack Query hooks (`useProducts`, `useProduct`, `useFeed`, `useStories`, `useServerCart`, `useOrders`, `useWallet`, `useConversations`, `useNotifications`, …) with stable `queryKeys`; unit tests for every new endpoint + hook (coverage gate stays ≥ 70 %).
+- 8.2 ☐ **Mobile auth on the real API** — Login / Signup / OTP / Forgot call `api.auth.*`; refresh token persisted in SecureStore and rotated through `X-Client: native` (fixes the silent logout after first refresh); logout revokes the session server‑side; `me` hydrated from `/users/me` on cold start; guest cart merged into the server cart on login. Field‑level API errors mapped onto the forms.
+- 8.3 ☐ **Mobile data screens on `useApi()`** — Home feed + stories, Explore, Shop/Deals/Categories, Product, Cart, Checkout (real addresses + wallet/card), Order success/Orders, Wallet, Messages + chat, Notifications, Profile (+ follow/block), Post detail + comments, Loops, Story viewer, Create (post/loop/story via signed uploads). Each screen gets loading skeleton, error + retry, and empty state. `lib/mock.ts` deleted. **Demo mode**: `EXPO_PUBLIC_API_MODE=mock` swaps the client `fetch` for an in‑process mock server built from the same seed fixtures, so Maestro/QA builds run without a backend while release builds never bundle mock screens.
+- 8.4 ☐ **Web auth + data on core** — `AuthContext` becomes a thin adapter over the core auth store (real `/auth/*`, httpOnly refresh cookie); MSW handlers regenerated for the core endpoint map (`VITE_ENABLE_MSW` dev‑only); Home/Shop/Product/Cart/Orders/Wallet/Messages read through the shared hooks. Playwright journeys run against MSW in CI and against a real API when `E2E_API_URL` is set.
+- 8.5 ☐ **Web launch hardening** — SEO (route meta + OG tags, `sitemap.xml` + `robots.txt` build step, prerender of `/`, `/shop`, `/product/:id` shells), PWA (`vite-plugin-pwa`, PNG icons, offline shell), Sentry (web + mobile + api) behind DSN env, PostHog behind cookie consent (analytics off by default → SECURITY 8.3.8), web CSP via `<meta http-equiv>` + `_headers`.
+- 8.6 ☐ **API providers** — FCM v1 push send (service‑account JSON), Resend email for OTP/reset, Meilisearch indexer (products/users/posts) with Postgres fallback, LiveKit token endpoint for Live/calls.
+- 8.7 ☐ **Security follow‑ups** — MFA (TOTP) for seller/admin roles, `no-danger` lint rule on web, secrets‑rotation runbook.
+- 8.8 ☐ **Release** — full audit‑item review, regression checklist, `CHANGELOG.md` + release notes, versionCode bump, signed AAB from `android-release.yml` → Play internal track (needs user: Play App Signing enrolment, service‑account JSON, real‑device screenshots, CSAE page).
 
 ---
 
@@ -201,4 +207,6 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 | 2026‑09‑13 | Phase 4.6–4.7: App Links + assetlinks, FCM push (contextual opt-in), Photo Picker/camera, biometrics, account deletion, report/block, Play checklist, store assets, 16 KB CI gate | 5b3dafe |
 | 2026‑09‑13 | Phase 5: `apps/api` NestJS 12 / Fastify 5 / Prisma 7 backend — auth, users, catalog, cart, orders + escrow, wallet, feed, messaging + WS, notifications, account deletion/export, moderation; seed; 25 e2e tests; CI Postgres | 4a63969 |
 | 2026‑09‑14 | Phase 6: ASVS L2 `SECURITY.md`, lockout + audit log + device sessions, CSRF origin check, hardened Helmet, Stripe webhooks (signed + idempotent), signed uploads with MIME sniffing, prod env guardrails, audit/CodeQL/gitleaks CI, Renovate, Android cleartext off | 27ef538 |
-| 2026‑09‑14 | Phase 7: coverage gates (core 96 %, api 87 %), vitest-axe primitives, token contrast tests, Playwright journeys + axe + visual baselines, Lighthouse CI, k6 smoke, Maestro flows, `TESTING.md`; AA contrast fixes across dark theme | (this commit) |
+| 2026‑09‑14 | Phase 7: coverage gates (core 96 %, api 87 %), vitest-axe primitives, token contrast tests, Playwright journeys + axe + visual baselines, Lighthouse CI, k6 smoke, Maestro flows, `TESTING.md`; AA contrast fixes across dark theme | 9c78e12 |
+| 2026‑09‑14 | Security: 7 CodeQL highs, CSPRNG‑only ids, prisma generate race in CI | 09295f4 · 602dbbd · fe38e38 · 4a4ef2b (PR #2 merged) |
+| 2026‑09‑14 | Phase 8 plan: real API wiring (core → mobile → web), launch hardening, providers, release | (this commit) |
