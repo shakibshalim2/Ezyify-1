@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
+import { MfaService } from './mfa.service.js';
 import { AuthGuard } from './auth.guard.js';
 import { MAILER, MailProvider } from './mail.provider.js';
 
@@ -10,7 +11,7 @@ import { MAILER, MailProvider } from './mail.provider.js';
 @Module({
   imports: [JwtModule.register({})],
   controllers: [AuthController],
-  providers: [AuthService, { provide: MAILER, useClass: MailProvider }, { provide: APP_GUARD, useClass: AuthGuard }],
-  exports: [AuthService, JwtModule],
+  providers: [AuthService, MfaService, { provide: MAILER, useClass: MailProvider }, { provide: APP_GUARD, useClass: AuthGuard }],
+  exports: [AuthService, MfaService, JwtModule],
 })
 export class AuthModule {}

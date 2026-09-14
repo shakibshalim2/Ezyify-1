@@ -100,6 +100,7 @@ const UploadPage = createLazyComponent(() => import('./pages/UploadPage'));
 const ForgotPasswordPage = createLazyComponent(() => import('./pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = createLazyComponent(() => import('./pages/auth/ResetPasswordPage'));
 const OTPVerificationPage = createLazyComponent(() => import('./pages/auth/OTPVerificationPage'));
+const TwoFactorPage = createLazyComponent(() => import('./pages/auth/TwoFactorPage'));
 const UserDashboardPage = createLazyComponent(() => import('./pages/user/UserDashboard'));
 const CheckoutPage = createLazyComponent(() => import('./pages/user/index').then(m => ({ default: m.CheckoutPage })));
 const WalletPage = createLazyComponent(() => import('./pages/user/index').then(m => ({ default: m.WalletPage })));
@@ -315,6 +316,7 @@ export default function App() {
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/otp-verification" element={<OTPVerificationPage />} />
+              <Route path="/two-factor" element={<TwoFactorPage />} />
               <Route path="/landing" element={<LandingPage />} />
               <Route path="/stories/:username" element={<StoriesPage />} />
               <Route path="/loops" element={<LoopsPage />} />

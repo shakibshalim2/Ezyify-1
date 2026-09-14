@@ -6,7 +6,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { requestPush } from '@/lib/push';
 import { biometricsAvailable } from '@/lib/biometrics';
-import { useAddresses, useApi, useAuth, useBlockedUsers } from '@ezyify/core';
+import { useAddresses, useApi, useAuth, useBlockedUsers, useMfaStatus } from '@ezyify/core';
 import { Header } from '@/components/Header';
 import { Text } from '@/components/Text';
 import { Avatar } from '@/components/Avatar';
@@ -25,6 +25,7 @@ export default function SettingsScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const interests = useAppStore(s => s.interests);
   const blocked = useBlockedUsers();
+  const mfa = useMfaStatus();
   const addresses = useAddresses();
   const api = useApi();
   const setPushAsked = useAppStore(s => s.setPushAsked);
@@ -57,6 +58,7 @@ export default function SettingsScreen() {
     { title: 'Privacy & security', rows: [
       { icon: 'lock-closed-outline', label: 'Private account', toggle: true, toggleValue: privateAcct, onToggle: setPrivateAcct },
       { icon: 'finger-print-outline', label: 'Biometric unlock', value: bioOk ? 'Available' : 'Not set up on device' },
+      { icon: 'shield-checkmark-outline', label: 'Two-factor authentication', value: mfa.data ? (mfa.data.enabled ? 'On' : mfa.data.requiredForRole ? 'Required' : 'Off') : undefined, onPress: () => router.push('/settings/two-factor') },
       { icon: 'phone-portrait-outline', label: 'Devices & sessions', onPress: () => router.push('/settings/sessions') },
       { icon: 'download-outline', label: 'Download your data', onPress: () => Alert.alert('Export your data', "We'll email you a download link within 24 hours.", [{ text: 'Cancel', style: 'cancel' }, { text: 'Request export', onPress: () => api.account.exportData().then(() => Alert.alert('Request received', 'Check your inbox soon.')).catch(() => Alert.alert('Something went wrong', 'Please try again later.')) }]) },
       { icon: 'ban-outline', label: 'Blocked accounts', value: `${blocked.data?.length ?? 0}`, onPress: () => router.push('/settings/blocked') },

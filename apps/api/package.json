@@ -49,6 +49,7 @@
     "google-auth-library": "^11.0.2",
     "livekit-server-sdk": "^2.19.0",
     "nestjs-pino": "^5.1.0",
+    "otplib": "^13.5.0",
     "pg": "^8.23.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",

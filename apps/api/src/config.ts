@@ -11,6 +11,8 @@ const EnvSchema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
   COOKIE_DOMAIN: z.string().optional(),
+  /** base64 of 32 random bytes (`openssl rand -base64 32`); encrypts TOTP secrets at rest. Derived from JWT_REFRESH_SECRET outside production. */
+  MFA_ENCRYPTION_KEY: z.string().refine(v => Buffer.from(v, 'base64').length === 32, 'must be base64 of exactly 32 bytes').optional(),
   ESCROW_AUTO_RELEASE_DAYS: z.coerce.number().int().positive().default(7),
   PLATFORM_FEE_BPS: z.coerce.number().int().min(0).max(10_000).default(500),
   FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
@@ -43,6 +45,7 @@ const EnvSchema = z.object({
     if (/change-me|dev-|test-|secret-please/i.test(env[k])) ctx.addIssue({ code: 'custom', path: [k], message: 'placeholder secret in production' });
   }
   if (env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) ctx.addIssue({ code: 'custom', path: ['JWT_REFRESH_SECRET'], message: 'must differ from JWT_ACCESS_SECRET' });
+  if (!env.MFA_ENCRYPTION_KEY) ctx.addIssue({ code: 'custom', path: ['MFA_ENCRYPTION_KEY'], message: 'required in production (openssl rand -base64 32)' });
   if (env.CORS_ORIGINS.split(',').some(o => o.trim() === '*' || o.includes('localhost'))) ctx.addIssue({ code: 'custom', path: ['CORS_ORIGINS'], message: 'wildcard/localhost origins not allowed in production' });
 });
 

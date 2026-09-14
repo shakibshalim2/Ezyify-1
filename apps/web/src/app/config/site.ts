@@ -52,7 +52,7 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
 
 /** Path prefixes that must never be indexed or cached by the service worker's navigation fallback. */
 export const PRIVATE_PREFIXES = [
-  '/login', '/signup', '/forgot-password', '/reset-password', '/otp-verification', '/welcome', '/onboarding',
+  '/login', '/signup', '/forgot-password', '/reset-password', '/otp-verification', '/two-factor', '/welcome', '/onboarding',
   '/cart', '/checkout', '/wallet', '/orders', '/order', '/order-success', '/messages', '/notifications', '/wishlist',
   '/settings', '/dashboard', '/profile/me', '/profile/edit', '/profile/followers', '/upload', '/creator-dashboard',
   '/live-schedule', '/affiliate-manager', '/admin', '/user', '/report-problem', '/referral-tracking', '/verification-status',

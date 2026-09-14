@@ -4,6 +4,7 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
+import react from 'eslint-plugin-react';
 
 export default tseslint.config(
   { ignores: ['lighthouserc.cjs', 'dist', 'node_modules', 'coverage', 'public/theme-init.js', 'src/imports/**', '**/*.timestamp-*.mjs', 'playwright-report', 'test-results', 'dev-dist'] },
@@ -13,10 +14,13 @@ export default tseslint.config(
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: { ecmaVersion: 2022, globals: { ...globals.browser, ...globals.node } },
-    plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh, 'jsx-a11y': jsxA11y },
+    plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh, 'jsx-a11y': jsxA11y, react },
     rules: {
       ...reactHooks.configs.recommended.rules,
       ...jsxA11y.configs.recommended.rules,
+      // SECURITY.md 5.2 — user text is never rendered as HTML. The two allow-listed files only inject build-time CSS / dev-only icon SVGs.
+      'react/no-danger': 'error',
+      'react/no-danger-with-children': 'error',
       'react-refresh/only-export-components': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
@@ -144,5 +148,9 @@ export default tseslint.config(
       '@typescript-eslint/triple-slash-reference': 'off',
       '@typescript-eslint/prefer-namespace-keyword': 'off',
     },
+  },
+  {
+    files: ['src/app/components/ui/chart.tsx', 'src/app/pages/admin/IconGeneratorPage.tsx'],
+    rules: { 'react/no-danger': 'off' },
   },
 );

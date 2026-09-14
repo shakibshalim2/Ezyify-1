@@ -3,7 +3,7 @@ import { loadEnv } from '../../config.js';
 import { MailProvider } from './mail.provider.js';
 
 const base = { DATABASE_URL: 'postgresql://u:p@localhost:5432/db', JWT_ACCESS_SECRET: 'a'.repeat(32), JWT_REFRESH_SECRET: 'b'.repeat(32) };
-const prod = { ...base, NODE_ENV: 'production', JWT_ACCESS_SECRET: 'x'.repeat(40), JWT_REFRESH_SECRET: 'y'.repeat(40), CORS_ORIGINS: 'https://ezyify.app' };
+const prod = { ...base, NODE_ENV: 'production', JWT_ACCESS_SECRET: 'x'.repeat(40), JWT_REFRESH_SECRET: 'y'.repeat(40), CORS_ORIGINS: 'https://ezyify.app', MFA_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') };
 const CODE = '482913';
 const TOKEN = 'reset-token-abc';
 

@@ -23,7 +23,7 @@ tested, ◐ = implemented, verification pending, ☐ = planned. Re-audit before 
 | 2.4 | Argon2id, m=19 MiB, t=2, p=1 (OWASP 2025 minimums) | `auth.service.ts#ARGON` | ☑ |
 | 2.5 | Forgot-password never reveals account existence; reset tokens are 192-bit random, single-use, 10 min TTL, sha256 at rest; reset revokes all sessions | `auth.service.ts#forgotPassword/resetPassword` | ☑ |
 | 2.7 | OTP: 6 digits, 10 min TTL, 5 attempts then new code required, previous codes invalidated on reissue | `auth.service.ts#issueOtp/verifyOtp` | ☑ e2e |
-| 2.8 | MFA (TOTP / passkeys) for sellers & admins | — | ☐ Phase 8 |
+| 2.8 | MFA (TOTP, RFC 6238, ±1 step) — mandatory for seller/admin (`GET /auth/mfa.requiredForRole`), opt-in for others. Secret AES-256-GCM encrypted at rest (`MFA_ENCRYPTION_KEY`, required in production); 10 single-use recovery codes stored as sha256; login returns `{ mfaRequired, challengeToken }` (256-bit random, sha256 at rest, 5 min TTL, single use, 5 wrong codes → invalidated + `auth.mfa_failed`); enabling revokes every other session; admins cannot disable; `/auth/mfa/verify` throttled 10/min | `auth/mfa.service.ts`, `auth/mfa.crypto.ts`, `auth.service.ts#login/verifyMfa`, `core/schemas/auth.ts#Mfa*` | ☑ unit (`mfa.crypto.spec.ts`) + e2e (`test/mfa.e2e-spec.ts`); passkeys deferred |
 | 2.10 | Service-to-service secrets (Stripe, FCM, S3) via env only, never in repo (`.env*` ignored, `.example` committed) | `.gitignore`, `.env.example` | ☑ |
 
 ## V3 Session management
@@ -53,7 +53,7 @@ tested, ◐ = implemented, verification pending, ☐ = planned. Re-audit before 
 |---|---------|-------|--------|
 | 5.1 | Every body/query parsed by zod with allow-lists (enums, lengths, regexes); unknown keys stripped | `common/zod.pipe.ts` | ☑ e2e |
 | 5.1.4 | Pagination bounded 1–100; IDs URL-encoded by the client | `common/pagination.ts`, `core/api/endpoints.ts` | ☑ |
-| 5.2 | User text is stored raw and rendered by React (auto-escaped); no `dangerouslySetInnerHTML` with user data on web | `apps/web` | ◐ lint rule pending |
+| 5.2 | User text is stored raw and rendered by React (auto-escaped); `react/no-danger` is an **error** in `apps/web` (allow-listed only for build-time chart CSS and the dev-only icon generator) | `apps/web/eslint.config.js` | ☑ lint (CI) |
 | 5.3.4 | Parameterised queries only (Prisma); no raw SQL with interpolation (`$queryRaw` used once with a constant) | `apps/api` | ☑ |
 | 5.5 | JSON body limit 2 MiB (413 beyond) | `bootstrap.ts` | ☑ e2e |
 
@@ -62,7 +62,7 @@ tested, ◐ = implemented, verification pending, ☐ = planned. Re-audit before 
 | # | Control | Where | Status |
 |---|---------|-------|--------|
 | 6.2 | `node:crypto` CSPRNG for tokens/OTP (`randomBytes`, `randomInt`); sha256 for token digests; argon2id for passwords | `auth.service.ts` | ☑ |
-| 6.4 | Secrets rotation procedure: change `JWT_*_SECRET` → all sessions invalid; documented in `apps/api/README.md` | — | ◐ |
+| 6.4 | Secrets rotation runbook: schedule + blast radius per secret, zero-downtime DB password swap, Stripe key/webhook roll, MFA key re-encryption, Android upload-key reset, incident checklist | `docs/plan/SECRETS_ROTATION.md` | ☑ |
 
 ## V7 Error handling & logging
 

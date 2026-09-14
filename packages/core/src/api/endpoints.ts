@@ -14,10 +14,16 @@ import {
   FinalizedUploadSchema,
   ForgotPasswordRequestSchema,
   LoginRequestSchema,
+  LoginResultSchema,
   LiveTokenRequestSchema,
   LiveTokenSchema,
-  LoginResponseSchema,
   MessageSchema,
+  MfaDisableRequestSchema,
+  MfaEnableRequestSchema,
+  MfaEnableResponseSchema,
+  MfaSetupResponseSchema,
+  MfaStatusSchema,
+  MfaVerifyRequestSchema,
   NotificationSchema,
   OrderEventSchema,
   OrderSchema,
@@ -48,6 +54,8 @@ import {
   type DeleteAccountRequest,
   type LiveTokenRequest,
   type LoginRequest,
+  type LoginResult,
+  type MfaVerifyRequest,
   type RegisterDeviceRequest,
   type ReportRequest,
   type SearchType,
@@ -71,7 +79,8 @@ export function createEndpoints(api: ApiClient) {
   return {
     auth: {
       signup: (body: SignupRequest) => api.post('/auth/signup', SignupRequestSchema.parse(body), SignupResponseSchema, { auth: false }),
-      login: (body: LoginRequest) => api.post('/auth/login', LoginRequestSchema.parse(body), LoginResponseSchema, { auth: false }),
+      /** Resolves to a `Session`, or `{ mfaRequired: true, challengeToken }` — check `isMfaChallenge()` then call `auth.mfa.verify`. */
+      login: (body: LoginRequest): Promise<LoginResult> => api.post('/auth/login', LoginRequestSchema.parse(body), LoginResultSchema, { auth: false }) as Promise<LoginResult>,
       verifyOtp: (body: VerifyOtpRequest) => api.post('/auth/verify-otp', VerifyOtpRequestSchema.parse(body), VerifyOtpResponseSchema, { auth: false }),
       forgotPassword: (email: string) => api.post('/auth/forgot-password', ForgotPasswordRequestSchema.parse({ email }), Ok, { auth: false }),
       resetPassword: (token: string, password: string) => api.post('/auth/reset-password', ResetPasswordRequestSchema.parse({ token, password }), Ok, { auth: false }),
@@ -81,6 +90,14 @@ export function createEndpoints(api: ApiClient) {
       logoutAll: () => api.post('/auth/logout-all', {}, Ok),
       sessions: () => api.get('/auth/sessions', z.array(DeviceSessionSchema)),
       revokeSession: (id: string) => api.delete(`/auth/sessions/${enc(id)}`, Ok),
+      mfa: {
+        status: () => api.get('/auth/mfa', MfaStatusSchema),
+        setup: () => api.post('/auth/mfa/setup', {}, MfaSetupResponseSchema),
+        enable: (code: string) => api.post('/auth/mfa/enable', MfaEnableRequestSchema.parse({ code }), MfaEnableResponseSchema),
+        disable: (code: string) => api.post('/auth/mfa/disable', MfaDisableRequestSchema.parse({ code }), Ok),
+        /** Second login step; same session transport as `login` (cookie on web, body on native). */
+        verify: (body: MfaVerifyRequest) => api.post('/auth/mfa/verify', MfaVerifyRequestSchema.parse(body), VerifyOtpResponseSchema, { auth: false }),
+      },
     },
     users: {
       me: () => api.get('/users/me', UserProfileSchema),

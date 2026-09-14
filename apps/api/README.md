@@ -53,6 +53,7 @@ need network access.
 | Provider | Env | When unset |
 | --- | --- | --- |
 | Postgres | `DATABASE_URL` | required |
+| MFA secret encryption (`auth/mfa.crypto.ts`) | `MFA_ENCRYPTION_KEY` (base64, 32 bytes) | required in production; dev/test derive a key from `JWT_REFRESH_SECRET` |
 | Stripe (cards, top-ups, webhooks) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | card flows → `Payments unavailable` |
 | S3 / R2 / MinIO uploads | `S3_*` | upload endpoints → `Storage unavailable` |
 | FCM HTTP v1 push (`fcm.provider.ts`) | `FCM_SERVICE_ACCOUNT_JSON` (service-account JSON, one line) | `push()` logs the payload; devices still register |
@@ -81,5 +82,9 @@ See `docs/plan/SECURITY.md` for the full OWASP ASVS L2 checklist. Quick facts:
 - Stripe: `POST /payments/topup-intent`, `POST /payments/order-intent`, webhook `POST /payments/webhooks/stripe`
   (signature over raw body, de-duplicated by event id). Unset `STRIPE_*` → card flows return "Payments unavailable".
 - Uploads: `POST /uploads/sign` → signed PUT to S3-compatible storage → `POST /uploads/finalize` sniffs magic bytes.
+- MFA (TOTP): `POST /auth/mfa/setup` → `enable {code}` (returns 10 one-time recovery codes) → login answers
+  `{ mfaRequired, challengeToken }` → `POST /auth/mfa/verify {challengeToken, code}` mints the session. Mandatory for
+  seller/admin (`GET /auth/mfa.requiredForRole`); admins cannot disable. Rotating `MFA_ENCRYPTION_KEY` makes stored
+  secrets undecryptable — users must re-enrol.
 - Rotating `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` invalidates every session (intended). Production boot refuses
   placeholder secrets, identical secrets, and wildcard/localhost CORS origins.

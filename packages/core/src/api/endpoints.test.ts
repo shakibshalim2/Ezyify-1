@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createApiClient } from './client.js';
 import { createEndpoints } from './endpoints.js';
+import { isMfaChallenge } from '../schemas/index.js';
 
 const product = {
   id: 'p1', slug: 'p1', name: 'Thing', imageUrl: 'https://img.test/a.jpg', price: { amount: 100, currency: 'USD' }, compareAtPrice: null,
@@ -120,6 +121,11 @@ describe('createEndpoints — every endpoint is wired to a path', () => {
       () => api.auth.logoutAll(),
       () => api.auth.sessions(),
       () => api.auth.revokeSession('s1'),
+      () => api.auth.mfa.status(),
+      () => api.auth.mfa.setup(),
+      () => api.auth.mfa.enable('123456'),
+      () => api.auth.mfa.disable('aaaaa-11111'),
+      () => api.auth.mfa.verify({ challengeToken: 'ch', code: '123456' }),
       () => api.users.updateMe({ bio: 'hi' }),
       () => api.users.followers('maya'),
       () => api.users.following('maya'),
@@ -156,6 +162,19 @@ describe('createEndpoints — every endpoint is wired to a path', () => {
     expect(urls).toContain('/v1/posts/saved');
     expect(urls).toContain('/v1/uploads/sign');
     expect(urls).toContain('/v1/users/me/blocked');
+    expect(urls).toContain('/v1/auth/mfa/verify');
+  });
+
+  it('login accepts both a session and an MFA challenge; mfa.verify is unauthenticated', async () => {
+    const { api, call } = harness({ mfaRequired: true, challengeToken: 'ch_1' });
+    const r = await api.auth.login({ identifier: 'seller@x.co', password: 'Password1' });
+    expect(isMfaChallenge(r)).toBe(true);
+    expect(r.challengeToken).toBe('ch_1');
+    expect(isMfaChallenge({ accessToken: 't', expiresIn: 900, user: {} })).toBe(false);
+    await api.auth.mfa.verify({ challengeToken: 'ch_1', code: '123456' }).catch(() => undefined);
+    expect(call(1)).toMatchObject({ url: 'https://api.test/v1/auth/mfa/verify', method: 'POST', body: { challengeToken: 'ch_1', code: '123456' } });
+    expect(call(1).headers.Authorization).toBeUndefined();
+    expect(() => api.auth.mfa.enable('12')).toThrow(/6-digit/);
   });
 
   it('native refresh sends the stored token in the body; web refresh sends an empty body', async () => {

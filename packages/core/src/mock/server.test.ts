@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createApiClient } from '../api/client.js';
 import { createEndpoints } from '../api/endpoints.js';
 import { createMockFetch, MOCK_CREDENTIALS } from './server.js';
+import { isMfaChallenge } from '../schemas/index.js';
 import { OrderSchema, PostSchema, ProductDetailSchema, UserProfileSchema } from '../schemas/index.js';
 
 /** The mock server is exercised through the real client + endpoint map, so every response is contract-validated. */
@@ -270,5 +271,53 @@ describe('mock API server', () => {
     const second = createMockFetch({ latencyMs: 0, persist });
     const api2 = await login(second);
     expect((await api2.cart.get()).items.map(i => [i.productId, i.quantity])).toEqual([['prod-003', 2]]);
+  });
+});
+
+describe('mock API server — MFA (TOTP)', () => {
+  it('seed users log in without MFA; setup → enable → login challenge → verify (TOTP or recovery code)', async () => {
+    const { api, login, setAccess } = harness();
+    const first = await login(MOCK_CREDENTIALS.seller);
+    expect(isMfaChallenge(first)).toBe(false);
+    expect(await api.auth.mfa.status()).toMatchObject({ enabled: false, requiredForRole: true, recoveryCodesLeft: 0 });
+    const setup = await api.auth.mfa.setup();
+    expect(setup.otpauthUrl).toMatch(/^otpauth:\/\/totp\/Ezyify:/);
+    await expect(api.auth.mfa.enable('000000')).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    const { recoveryCodes } = await api.auth.mfa.enable('123456');
+    expect(recoveryCodes).toHaveLength(10);
+    await expect(api.auth.mfa.setup()).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    setAccess(null);
+    const challenge = await api.auth.login({ identifier: MOCK_CREDENTIALS.seller, password: MOCK_CREDENTIALS.password });
+    expect(isMfaChallenge(challenge)).toBe(true);
+    expect(challenge.accessToken).toBeUndefined();
+    await expect(api.auth.mfa.verify({ challengeToken: challenge.challengeToken!, code: '000000' })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    const session = await api.auth.mfa.verify({ challengeToken: challenge.challengeToken!, code: recoveryCodes[0] });
+    expect(session.user.username).toBe('homebyjules');
+    setAccess(session.accessToken);
+    expect((await api.auth.mfa.status()).recoveryCodesLeft).toBe(9);
+    await expect(api.auth.mfa.verify({ challengeToken: challenge.challengeToken!, code: '123456' })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' }); // single use
+
+    expect(await api.auth.mfa.disable('123456')).toEqual({ ok: true });
+    expect((await api.auth.mfa.status()).enabled).toBe(false);
+  });
+
+  it('five wrong codes burn the challenge; admins cannot disable', async () => {
+    const { api, fetch, login, setAccess } = harness();
+    await login(MOCK_CREDENTIALS.seller);
+    await api.auth.mfa.setup();
+    await api.auth.mfa.enable('654321');
+    setAccess(null);
+    const { challengeToken } = await api.auth.login({ identifier: MOCK_CREDENTIALS.seller, password: MOCK_CREDENTIALS.password });
+    for (let i = 0; i < 4; i++) await expect(api.auth.mfa.verify({ challengeToken: challengeToken!, code: '000000' })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    await expect(api.auth.mfa.verify({ challengeToken: challengeToken!, code: '000000' })).rejects.toMatchObject({ code: 'RATE_LIMIT_EXCEEDED' });
+    await expect(api.auth.mfa.verify({ challengeToken: challengeToken!, code: '123456' })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+
+    // No admin fixture: promote the buyer in-state to exercise the admin guard.
+    fetch.state.users.find(u => u.id === 'u_buyer')!.role = 'admin';
+    await login(MOCK_CREDENTIALS.email);
+    await api.auth.mfa.setup();
+    await api.auth.mfa.enable('123456');
+    await expect(api.auth.mfa.disable('123456')).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });

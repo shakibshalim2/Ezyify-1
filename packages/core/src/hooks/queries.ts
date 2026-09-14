@@ -35,6 +35,8 @@ export const queryKeys = {
   notifications: ['notifications'] as const,
   unreadCount: ['notifications', 'unread'] as const,
   blocked: ['blocked'] as const,
+  sessions: ['auth', 'sessions'] as const,
+  mfa: ['auth', 'mfa'] as const,
 };
 
 /** Shared cursor for every paginated endpoint: page numbers, `hasMore` from the envelope. */
@@ -440,4 +442,41 @@ export function useMarkNotificationsRead() {
       qc.invalidateQueries({ queryKey: queryKeys.unreadCount });
     },
   });
+}
+
+// ---------- Account security ----------
+
+export function useSessions() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sessions, queryFn: () => api.auth.sessions(), enabled: authed });
+}
+
+export function useRevokeSession() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id?: string) => (id ? api.auth.revokeSession(id) : api.auth.logoutAll()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.sessions }),
+  });
+}
+
+export function useMfaStatus() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.mfa, queryFn: () => api.auth.mfa.status(), enabled: authed, staleTime: 60_000 });
+}
+
+/** Setup → enable → disable; every step refreshes the status query and the session list (enable revokes others). */
+export function useMfaActions() {
+  const api = useApi();
+  const qc = useQueryClient();
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: queryKeys.mfa });
+    qc.invalidateQueries({ queryKey: queryKeys.sessions });
+  };
+  const setup = useMutation({ mutationFn: () => api.auth.mfa.setup() });
+  const enable = useMutation({ mutationFn: (code: string) => api.auth.mfa.enable(code), onSuccess: refresh });
+  const disable = useMutation({ mutationFn: (code: string) => api.auth.mfa.disable(code), onSuccess: refresh });
+  return { setup, enable, disable };
 }

@@ -145,11 +145,16 @@ model User {
   failedLogins  Int       @default(0)
   lockedUntil   DateTime?
   passwordChangedAt DateTime?
+  // TOTP MFA (ASVS 2.8): secret is AES-256-GCM encrypted at rest; recovery codes are sha256 hashes, removed on use.
+  mfaSecret     String?
+  mfaEnabledAt  DateTime?
+  mfaRecoveryCodes String[] @default([])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   sessions      RefreshSession[]
   otps          OtpCode[]
+  mfaChallenges MfaChallenge[]
   devices       Device[]
   wallet        Wallet?
   addresses     Address[]
@@ -188,6 +193,20 @@ model RefreshSession {
   revokedAt    DateTime?
   replacedById String?
   createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Login step-up: password accepted, TOTP / recovery code still pending. Short-lived, single use, hashed token.
+model MfaChallenge {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([expiresAt])

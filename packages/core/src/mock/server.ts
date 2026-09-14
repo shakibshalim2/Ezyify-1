@@ -65,6 +65,8 @@ const validation = (details: Record<string, string>) => new MockApiError(422, 'V
 
 const PASSWORD = 'Password1';
 const OTP_INVALID = '000000';
+const MFA_SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+const MFA_RECOVERY = ['aaaaa-11111', 'bbbbb-22222', 'ccccc-33333', 'ddddd-44444', 'eeeee-55555', 'fffff-66666', 'ggggg-77777', 'hhhhh-88888', 'iiiii-99999', 'jjjjj-00000'];
 
 export function createMockState() {
   const users = fx.users.map(u => ({ ...u }));
@@ -73,6 +75,8 @@ export function createMockState() {
   const refreshTokens = new Map<string, string>(); // refreshToken → userId
   const revoked = new Set<string>();
   const pendingOtp = new Map<string, string>(); // userId → purpose
+  const mfa = new Map<string, { secret: string; enabled: boolean; recoveryCodes: string[] }>(); // userId → TOTP state (no seed user has it on)
+  const mfaChallenges = new Map<string, { userId: string; attempts: number }>(); // challengeToken → pending login
   const posts: Post[] = [...fx.posts, ...fx.loops, ...fx.stories].map(p => ({ ...p, engagement: { ...p.engagement } }));
   const likes = new Map<string, Set<string>>(); // userId → postIds
   const saves = new Map<string, Set<string>>();
@@ -88,7 +92,7 @@ export function createMockState() {
   const notifications = new Map<string, Notification[]>([['u_buyer', fx.notifications.map(n => ({ ...n }))]]);
   const comments = new Map<string, Comment[]>();
   const uploads = new Map<string, { contentType: string; sizeBytes: number }>();
-  return { users, passwords, sessions, refreshTokens, revoked, pendingOtp, posts, likes, saves, follows, blocks, carts, orders, addresses, wallets, transactions, conversations, messages, notifications, comments, uploads, counter: 1000 };
+  return { users, passwords, sessions, refreshTokens, revoked, pendingOtp, mfa, mfaChallenges, posts, likes, saves, follows, blocks, carts, orders, addresses, wallets, transactions, conversations, messages, notifications, comments, uploads, counter: 1000 };
 }
 export type MockState = ReturnType<typeof createMockState>;
 
@@ -209,7 +213,64 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       const id = String(c.body.identifier ?? '').trim().toLowerCase();
       const user = state.users.find(u => u.email === id || u.username === id);
       if (!user || state.passwords.get(user.id) !== c.body.password) throw new MockApiError(401, 'UNAUTHORIZED', 'Incorrect email/phone or password');
+      if (state.mfa.get(user.id)?.enabled) {
+        const challengeToken = nextId('mfa');
+        state.mfaChallenges.set(challengeToken, { userId: user.id, attempts: 0 });
+        return { mfaRequired: true, challengeToken };
+      }
       return session(user, c.headers.get('x-client') === 'native');
+    }],
+    // ---- MFA: any 6-digit code except 000000 is accepted as a valid TOTP; recovery codes are the fixed list above.
+    ['POST', '/auth/mfa/verify', c => {
+      const token = String(c.body.challengeToken ?? '');
+      const ch = state.mfaChallenges.get(token);
+      if (!ch) throw validation({ challengeToken: 'Sign-in expired — start again' });
+      const code = String(c.body.code ?? '');
+      const m = state.mfa.get(ch.userId);
+      const recoveryIdx = m?.recoveryCodes.indexOf(code.toLowerCase()) ?? -1;
+      const ok = recoveryIdx >= 0 || (/^\d{6}$/.test(code) && code !== OTP_INVALID);
+      if (!ok) {
+        if (++ch.attempts >= 5) {
+          state.mfaChallenges.delete(token);
+          throw new MockApiError(429, 'RATE_LIMIT_EXCEEDED', 'Too many incorrect codes. Sign in again.');
+        }
+        throw validation({ code: 'That code is not valid' });
+      }
+      if (recoveryIdx >= 0) m!.recoveryCodes.splice(recoveryIdx, 1);
+      state.mfaChallenges.delete(token);
+      const user = state.users.find(u => u.id === ch.userId)!;
+      return session(user, c.headers.get('x-client') === 'native');
+    }],
+    ['GET', '/auth/mfa', c => {
+      const u = requireUser(c);
+      const m = state.mfa.get(u.id);
+      return { enabled: !!m?.enabled, enabledAt: m?.enabled ? iso() : null, recoveryCodesLeft: m?.enabled ? m.recoveryCodes.length : 0, requiredForRole: u.role === 'seller' || u.role === 'admin' };
+    }],
+    ['POST', '/auth/mfa/setup', c => {
+      const u = requireUser(c);
+      if (state.mfa.get(u.id)?.enabled) throw new MockApiError(409, 'CONFLICT', 'Two-factor authentication is already enabled');
+      state.mfa.set(u.id, { secret: MFA_SECRET, enabled: false, recoveryCodes: [] });
+      return { secret: MFA_SECRET, otpauthUrl: `otpauth://totp/Ezyify:${encodeURIComponent(u.email)}?secret=${MFA_SECRET}&issuer=Ezyify`, qrLabel: u.email };
+    }],
+    ['POST', '/auth/mfa/enable', c => {
+      const u = requireUser(c);
+      const m = state.mfa.get(u.id);
+      if (m?.enabled) throw new MockApiError(409, 'CONFLICT', 'Two-factor authentication is already enabled');
+      if (!m) throw validation({ code: 'Start setup first' });
+      if (c.body.code === OTP_INVALID) throw validation({ code: 'That code is not valid' });
+      m.enabled = true;
+      m.recoveryCodes = [...MFA_RECOVERY];
+      return { recoveryCodes: [...MFA_RECOVERY] };
+    }],
+    ['POST', '/auth/mfa/disable', c => {
+      const u = requireUser(c);
+      if (u.role === 'admin') throw new MockApiError(403, 'FORBIDDEN', 'Administrators cannot disable two-factor authentication');
+      const m = state.mfa.get(u.id);
+      if (!m?.enabled) throw new MockApiError(409, 'CONFLICT', 'Two-factor authentication is not enabled');
+      const code = String(c.body.code ?? '');
+      if (!m.recoveryCodes.includes(code.toLowerCase()) && code === OTP_INVALID) throw validation({ code: 'That code is not valid' });
+      state.mfa.delete(u.id);
+      return { ok: true };
     }],
     ['POST', '/auth/refresh', c => {
       const native = c.headers.get('x-client') === 'native';

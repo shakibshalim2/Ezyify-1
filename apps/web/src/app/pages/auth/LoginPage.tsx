@@ -51,7 +51,11 @@ export default function LoginPage() {
         navigate('/otp-verification', { state: { channel: 'sms', destination: identifier.trim(), next: '/' } });
         return;
       }
-      await login(identifier.trim(), password);
+      const result = await login(identifier.trim(), password);
+      if (result.mfaRequired) {
+        navigate('/two-factor', { state: { challengeToken: result.challengeToken, next: '/' } });
+        return;
+      }
       toast.success('Welcome back!');
       navigate('/');
     } catch (err) {
