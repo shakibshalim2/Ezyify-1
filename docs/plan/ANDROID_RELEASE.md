@@ -76,7 +76,8 @@ buildTypes {
 ```bash
 pnpm install                               # repo root
 cd apps/mobile
-pnpm android:prebuild                           # only if app.config.ts / plugins changed (regenerates android/)
+pnpm assets                                     # only if the brand mark/colours changed (re-renders icon, adaptive, splash, notification, store art)
+pnpm android:prebuild                           # only if app.config.ts / plugins / assets changed (regenerates android/)
 cd android
 ./gradlew :app:bundleRelease              # → app/build/outputs/bundle/release/app-release.aab (Play Store)
 ./gradlew :app:assembleRelease            # → app/build/outputs/apk/release/app-release.apk (sideload/testing)

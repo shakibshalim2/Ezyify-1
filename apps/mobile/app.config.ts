@@ -68,7 +68,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ['expo-local-authentication', { faceIDPermission: 'Ezyify uses Face ID to protect your wallet and account.' }],
     [
       'expo-splash-screen',
-      { backgroundColor: '#0f66c7', image: './assets/images/splash-icon.png', imageWidth: 140 },
+      {
+        // Matches the web splash (`features/splash`): brand blue field, mark ~140 dp. Android 12+ draws it
+        // inside the system icon circle; dark theme keeps the same mark on the app's dark background.
+        backgroundColor: '#0f66c7',
+        image: './assets/images/splash-icon.png',
+        imageWidth: 140,
+        dark: { backgroundColor: '#0a0d14' },
+      },
     ],
     [
       'expo-build-properties',
