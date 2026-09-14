@@ -66,9 +66,40 @@
     },
     "@ezyify/api#test": {
       "dependsOn": [
-        "^build"
+        "^build",
+        "@ezyify/api#prisma:generate"
       ],
       "cache": false
+    },
+    "@ezyify/api#prisma:generate": {
+      "inputs": [
+        "prisma/schema.prisma",
+        "prisma.config.ts"
+      ],
+      "outputs": [
+        "src/generated/**"
+      ]
+    },
+    "@ezyify/api#build": {
+      "dependsOn": [
+        "^build",
+        "@ezyify/api#prisma:generate"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
+    },
+    "@ezyify/api#typecheck": {
+      "dependsOn": [
+        "^build",
+        "@ezyify/api#prisma:generate"
+      ]
+    },
+    "@ezyify/api#lint": {
+      "dependsOn": [
+        "^build",
+        "@ezyify/api#prisma:generate"
+      ]
     }
   },
   "globalPassThroughEnv": [
