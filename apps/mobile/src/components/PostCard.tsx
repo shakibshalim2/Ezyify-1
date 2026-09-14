@@ -72,7 +72,7 @@ export function PostCard({ post }: { post: Post }) {
     <View style={{ backgroundColor: colors.card, borderRadius: radius.card, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderSubtle }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 }}>
         <Pressable accessibilityRole="button" accessibilityLabel={`View ${post.author.name}'s profile`} onPress={() => router.push({ pathname: '/profile/[username]', params: { username: post.author.username } })} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <Avatar uri={post.author.avatarUrl} size={40} verified={post.author.verified} />
+          <Avatar uri={post.author.avatarUrl} name={post.author.name} size={40} verified={post.author.verified} />
           <View style={{ flex: 1 }}>
             <Text variant="bodyMedium">{post.author.name}</Text>
             <Text variant="caption" tone="secondary">

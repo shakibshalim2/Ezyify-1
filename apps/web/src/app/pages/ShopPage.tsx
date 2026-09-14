@@ -13,6 +13,7 @@ import { useDebounced } from '../hooks/useDebounced';
 import { useInfiniteList } from '../lib/data';
 import { fadeUp, staggerContainer, DURATION } from '../lib/motion';
 import { cn } from '../components/ui/utils';
+import { Img } from '../components/primitives/Img';
 
 type Sort = NonNullable<Parameters<typeof useProducts>[0]>['sort'];
 const SORT_OPTIONS: { value: NonNullable<Sort>; label: string }[] = [
@@ -87,7 +88,7 @@ function CategoryTile({ cat, onSelect, reduce }: { cat: Category; onSelect: () =
       {...(!reduce ? { variants: fadeUp } : {})}
       className="group relative overflow-hidden rounded-card h-40 md:h-48 bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      {cat.imageUrl && <img src={cat.imageUrl} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />}
+      {cat.imageUrl && <Img src={cat.imageUrl} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />}
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
       <div className="absolute inset-0 flex flex-col justify-end items-start p-4">
         <h3 className="font-display font-semibold text-white">{cat.name}</h3>

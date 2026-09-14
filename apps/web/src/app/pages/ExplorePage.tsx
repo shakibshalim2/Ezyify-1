@@ -15,6 +15,7 @@ import { PostViewer } from '../components/PostViewer';
 import { Button } from '../components/primitives/Button';
 import { fadeUp, staggerContainer, springSnappy, DURATION, EASE_EMPHASIZED } from '../lib/motion';
 import { cn } from '../components/ui/utils';
+import { Img } from '../components/primitives/Img';
 
 type Tab = 'all' | 'posts' | 'loops' | 'products' | 'creators' | 'stores';
 
@@ -68,7 +69,7 @@ function LoopGridTile({ loop, onSelect }: { loop: any; onSelect: (l: any) => voi
       transition={springSnappy}
       className="group relative overflow-hidden rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aspect-[9/16]"
     >
-      <img src={loop.thumbnail} alt={loop.title} loading="lazy" className="w-full h-full object-cover" />
+      <Img src={loop.thumbnail} alt={loop.title} loading="lazy" className="w-full h-full object-cover" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
       {/* Play badge */}
@@ -91,7 +92,7 @@ function ProductGridTile({ product }: { product: any }) {
       to={`/product/${product.id}`}
       className="group relative overflow-hidden rounded-card bg-card border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aspect-square"
     >
-      <img src={product.image} alt={product.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+      <Img src={product.image} alt={product.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
 
       {/* Price chip */}
       <div className="absolute bottom-3 left-3 bg-black/70 text-white px-2 py-1 rounded-lg text-xs font-semibold tabular-nums backdrop-blur-sm">
@@ -109,7 +110,7 @@ function CreatorCard({ creator }: { creator: any }) {
       className="bg-card border border-border rounded-card p-4 space-y-3"
     >
       <Link to={`/creator/${creator.id}`} className="flex items-center gap-3">
-        <img src={creator.avatar} alt={creator.name} loading="lazy" className="size-12 rounded-full object-cover ring-2 ring-border" />
+        <Img src={creator.avatar} alt={creator.name} loading="lazy" className="size-12 rounded-full object-cover ring-2 ring-border" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1 mb-0.5">
             <h3 className="font-semibold text-foreground text-sm truncate">{creator.name}</h3>
@@ -138,12 +139,12 @@ function StoreCard({ store }: { store: (typeof MOCK_STORES)[number] }) {
     <motion.div variants={fadeUp} className="bg-card border border-border rounded-card overflow-hidden">
       {/* Cover image */}
       <div className="relative bg-gradient-to-br from-primary/20 to-accent-brand/20 aspect-video">
-        <img src={store.avatar} alt={store.name} loading="lazy" className="w-full h-full object-cover opacity-30 absolute inset-0" />
+        <Img src={store.avatar} alt={store.name} loading="lazy" className="w-full h-full object-cover opacity-30 absolute inset-0" />
       </div>
 
       <div className="p-4 space-y-3">
         <Link to={`/seller/${store.username}`} className="flex items-center gap-3">
-          <img src={store.avatar} alt={store.name} loading="lazy" className="size-10 rounded-lg object-cover ring-2 ring-background" />
+          <Img src={store.avatar} alt={store.name} loading="lazy" className="size-10 rounded-lg object-cover ring-2 ring-background" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1">
               <h3 className="font-semibold text-foreground text-sm truncate">{store.name}</h3>
@@ -432,7 +433,7 @@ export default function ExplorePage() {
                   onClick={() => setExplorePostSheet(post)}
                   className="group relative overflow-hidden rounded-card mb-3 break-inside-avoid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aspect-[4/5] block w-full"
                 >
-                  <img src={post.content.images?.[0] || ''} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                  <Img src={post.content.images?.[0] || ''} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 </motion.button>
               ))}

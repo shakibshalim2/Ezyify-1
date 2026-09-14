@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Camera, ChevronRight, Check, Flame, Play, ShoppingCart, Sparkles, Star, Store, TrendingUp, Users, UserPlus, UserCheck, Zap } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import { discountPercent, formatCompactNumber as fmtCount, formatMoney, useAuth, useCategories, useFeed, useLoops, useProducts, useStories, useToggleFollow, type Category, type Post, type ProductSummary } from '@ezyify/core';
+import { avatarDataUri, avatarUrlFor, discountPercent, formatCompactNumber as fmtCount, formatMoney, useAuth, useCategories, useFeed, useLoops, useProducts, useStories, useToggleFollow, type Category, type Post, type ProductSummary } from '@ezyify/core';
 import { FeedLoading } from '../components/LoadingStates';
 import { EmptyPosts } from '../components/EmptyStates';
 import { VerifiedBadge } from '../components/VerifiedBadge';
@@ -15,6 +15,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { useAddLine, useAuthed, useInCart, useInfiniteList } from '../lib/data';
 import { formErrors } from '../lib/apiErrors';
+import { Img } from '../components/primitives/Img';
 
 type FeedFilter = 'foryou' | 'following' | 'trending';
 type FeedItem =
@@ -27,7 +28,7 @@ type FeedItem =
   | { type: 'following-header'; id: string };
 
 const CATEGORY_ICON: Record<string, string> = { fashion: '👗', beauty: '💄', tech: '📱', home: '🏠', fitness: '🏋️', food: '🍕', sports: '⚽', books: '📚', health: '🌿' };
-const avatarOf = (u: { avatarUrl: string | null; name: string }) => u.avatarUrl ?? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.name)}`;
+const avatarOf = (u: { avatarUrl: string | null; name: string }) => avatarUrlFor(u, 100);
 
 /** Interleaves posts with commerce/discovery sections so the feed keeps its rhythm regardless of page size. */
 function buildFeed(filter: FeedFilter, posts: Post[], loops: Post[], products: ProductSummary[], creators: Post['author'][]): FeedItem[] {
@@ -69,7 +70,7 @@ function ProductTile({ product }: { product: ProductSummary }) {
   return (
     <Link to={`/product/${product.id}`} className="group rounded-xl overflow-hidden border border-border/50 bg-background hover:border-border hover:shadow-sm transition-all duration-200">
       <div className="aspect-[4/3] relative overflow-hidden bg-muted/40">
-        <img loading="lazy" src={product.imageUrl} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
+        <Img loading="lazy" src={product.imageUrl} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
         {pct !== null && pct > 0 && <span className="absolute top-2 left-2 bg-error text-error-foreground px-1.5 py-0.5 rounded-md text-[10px] font-bold leading-none">-{pct}%</span>}
         <button
           type="button"
@@ -113,7 +114,7 @@ function CreatorRow({ creator }: { creator: Post['author'] }) {
       <Link to={`/profile/${creator.username}`} className="flex items-center gap-3 min-w-0 flex-1">
         <div className="story-ring-gradient p-[2px] rounded-full shrink-0">
           <div className="bg-card p-[1.5px] rounded-full">
-            <img loading="lazy" src={avatarOf(creator)} alt="" className="w-10 h-10 rounded-full object-cover" />
+            <Img loading="lazy" src={avatarOf(creator)} alt="" className="w-10 h-10 rounded-full object-cover" />
           </div>
         </div>
         <div className="min-w-0">
@@ -217,7 +218,7 @@ export default function HomePage() {
     return (
       <Link key={key} to={`/loops?v=${loop.id}`} className="block relative rounded-xl sm:rounded-2xl overflow-hidden animate-feed-in group" style={{ animationDelay: `${delay}ms` }}>
         <div className="aspect-[16/9] sm:aspect-[21/9] relative overflow-hidden">
-          <img loading="lazy" src={m.thumbnailUrl ?? m.url} alt={loop.caption} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
+          <Img loading="lazy" src={m.thumbnailUrl ?? m.url} alt={loop.caption} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
           <div className="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold text-white bg-brand-gradient">
             <Zap className="w-3 h-3 fill-current" />Loops
@@ -229,7 +230,7 @@ export default function HomePage() {
           </div>
           <div className="absolute bottom-0 left-0 right-0 px-4 py-4">
             <div className="flex items-center gap-2.5 mb-1.5">
-              <img loading="lazy" src={avatarOf(loop.author)} alt="" className="w-8 h-8 rounded-full object-cover ring-2 ring-white/30 shrink-0" />
+              <Img loading="lazy" src={avatarOf(loop.author)} alt="" className="w-8 h-8 rounded-full object-cover ring-2 ring-white/30 shrink-0" />
               <div>
                 <div className="flex items-center gap-1">
                   <span className="text-[13px] font-semibold text-white">{loop.author.name}</span>
@@ -263,14 +264,14 @@ export default function HomePage() {
             return (
               <Link key={loop.id} to={`/loops?v=${loop.id}`} className="group w-[132px] sm:w-[152px] shrink-0 rounded-xl overflow-hidden">
                 <div className="aspect-[9/16] relative overflow-hidden bg-muted/50">
-                  <img loading="lazy" src={m.thumbnailUrl ?? m.url} alt={loop.caption} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
+                  <Img loading="lazy" src={m.thumbnailUrl ?? m.url} alt={loop.caption} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/78 via-transparent to-black/10" />
                   {!!loop.engagement.views && (
                     <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md text-white text-[9px] font-bold tabular-nums" style={{ background: 'rgba(0,0,0,0.55)' }}>{fmtCount(loop.engagement.views)}</div>
                   )}
                   <div className="absolute bottom-0 left-0 right-0 px-2 py-2.5">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <img loading="lazy" src={avatarOf(loop.author)} alt="" className="w-5 h-5 rounded-full object-cover ring-1 ring-white/30 shrink-0" />
+                      <Img loading="lazy" src={avatarOf(loop.author)} alt="" className="w-5 h-5 rounded-full object-cover ring-1 ring-white/30 shrink-0" />
                       <span className="text-[10px] font-semibold text-white/90 truncate">{loop.author.name.split(' ')[0]}</span>
                     </div>
                     {loop.caption && <p className="text-[10px] text-white/75 line-clamp-2 leading-snug">{loop.caption}</p>}
@@ -313,7 +314,7 @@ export default function HomePage() {
             <Link to={authed ? '/upload' : '/login'} className="flex flex-col items-center gap-1.5 shrink-0 group">
               <div className="relative p-[2.5px] rounded-full ring-[1.5px] ring-border/50 transition-transform duration-200 group-hover:scale-[1.06]">
                 <div className="bg-card p-[2px] rounded-full">
-                  <img src={me ? avatarOf(me) : `https://api.dicebear.com/7.x/initials/svg?seed=you`} alt="" className="w-[50px] h-[50px] rounded-full object-cover" />
+                  <Img src={me ? avatarOf(me) : avatarDataUri('You', 100)} alt="" className="w-[50px] h-[50px] rounded-full object-cover" />
                 </div>
                 <div className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] rounded-full flex items-center justify-center border-[2px] border-card bg-brand-gradient">
                   <Camera className="w-2.5 h-2.5 text-white" />
@@ -326,7 +327,7 @@ export default function HomePage() {
               <Link key={u.id} to={`/stories/${u.username}`} className="flex flex-col items-center gap-1.5 shrink-0 group">
                 <div className="relative p-[2.5px] rounded-full transition-transform duration-200 group-hover:scale-[1.06] story-ring-gradient">
                   <div className="bg-card p-[2px] rounded-full">
-                    <img loading={i < 5 ? 'eager' : 'lazy'} src={avatarOf(u)} alt={u.name} className="w-[50px] h-[50px] rounded-full object-cover" />
+                    <Img loading={i < 5 ? 'eager' : 'lazy'} src={avatarOf(u)} alt={u.name} className="w-[50px] h-[50px] rounded-full object-cover" />
                   </div>
                 </div>
                 <span className="text-[11px] max-w-[54px] truncate text-center leading-tight font-medium text-foreground-secondary group-hover:text-foreground transition-colors">{u.name.split(' ')[0]}</span>

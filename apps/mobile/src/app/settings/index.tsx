@@ -78,7 +78,7 @@ export default function SettingsScreen() {
       <Header title="Settings" />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 24, paddingBottom: 40 }}>
         {user && <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/profile/[username]', params: { username: user.username } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, backgroundColor: colors.card, borderRadius: radius.card, borderWidth: 1, borderColor: colors.borderSubtle }}>
-          <Avatar uri={user.avatarUrl} size={56} verified={user.verified} />
+          <Avatar uri={user.avatarUrl} name={user.name} size={56} verified={user.verified} />
           <View style={{ flex: 1 }}>
             <Text variant="heading">{user.name}</Text>
             <Text variant="caption" tone="secondary">@{user.username}</Text>

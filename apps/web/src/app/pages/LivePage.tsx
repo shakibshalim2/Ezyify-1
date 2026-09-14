@@ -8,6 +8,7 @@ import {
 import { toast } from 'sonner';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { Button } from '../components/primitives/Button';
+import { avatarDataUri } from '@ezyify/core';
 import { SEO, SEOConfigs } from '../components/SEO';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { mockProducts, type Product } from '../data/enhanced-mock-data';
@@ -172,8 +173,8 @@ export default function LivePage() {
         ...prev.slice(-30),
         {
           id: Date.now(),
-          user: ['Ava', 'Ken', 'Priya', 'Leo'][Math.floor(Math.random() * 4)],
-          avatar: `https://api.dicebear.com/7.x/thumbs/svg?seed=${Math.random()}`,
+          user: ['Ava', 'Ken', 'Priya', 'Leo'][Math.floor(Math.random() * 4)]!,
+          avatar: avatarDataUri(['Ava', 'Ken', 'Priya', 'Leo'][Math.floor(Math.random() * 4)]!, 48),
           message: AUTO_CHAT[Math.floor(Math.random() * AUTO_CHAT.length)],
           isSystem: false,
         },

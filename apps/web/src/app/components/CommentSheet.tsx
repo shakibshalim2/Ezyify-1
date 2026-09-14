@@ -2,7 +2,7 @@ import { memo, useRef, useState, type FormEvent } from 'react';
 import { Send, ShoppingBag, Star } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import { formatCompactNumber, formatMoney, formatRelativeTime, useAddComment, useComments, useProduct, type Comment, type Post } from '@ezyify/core';
+import { avatarUrlFor, formatCompactNumber, formatMoney, formatRelativeTime, useAddComment, useComments, useProduct, type Comment, type Post } from '@ezyify/core';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from './ui/sheet';
 import { VisuallyHidden } from './ui/visually-hidden';
 import { VerifiedBadge } from './VerifiedBadge';
@@ -10,6 +10,7 @@ import { QueryError } from './QueryError';
 import { Button } from './primitives/Button';
 import { useAuthed, useInfiniteList } from '../lib/data';
 import { formErrors } from '../lib/apiErrors';
+import { Img } from './primitives/Img';
 
 interface CommentSheetProps {
   open: boolean;
@@ -17,7 +18,7 @@ interface CommentSheetProps {
   post: Post;
 }
 
-const avatar = (u: { avatarUrl: string | null; name: string }) => u.avatarUrl ?? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.name)}`;
+const avatar = (u: { avatarUrl: string | null; name: string }) => avatarUrlFor(u, 64);
 
 function TaggedProduct({ id, onNavigate }: { id: string; onNavigate: () => void }) {
   const { data: product } = useProduct(id);
@@ -25,7 +26,7 @@ function TaggedProduct({ id, onNavigate }: { id: string; onNavigate: () => void 
   return (
     <Link to={`/product/${product.id}`} onClick={onNavigate} className="flex items-center gap-3 p-2 rounded-xl hover:bg-card/80 active:bg-card/80 transition-colors group">
       <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted flex-shrink-0">
-        <img loading="lazy" src={product.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+        <Img loading="lazy" src={product.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground line-clamp-1 group-hover:text-primary transition-colors">{product.name}</p>
@@ -46,7 +47,7 @@ function CommentRow({ c, onReply }: { c: Comment; onReply: (username: string) =>
   return (
     <div className="flex items-start gap-3">
       <Link to={`/profile/${c.author.username}`}>
-        <img loading="lazy" src={avatar(c.author)} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+        <Img loading="lazy" src={avatar(c.author)} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
       </Link>
       <div className="flex-1 min-w-0">
         <div className="bg-muted rounded-2xl px-4 py-2.5">
@@ -116,7 +117,7 @@ export const CommentSheet = memo(function CommentSheet({ open, onOpenChange, pos
             <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
           </div>
           <div className="p-4 flex items-start gap-3">
-            <img loading="lazy" src={avatar(post.author)} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+            <Img loading="lazy" src={avatar(post.author)} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-semibold text-foreground">{post.author.name}</span>
@@ -124,7 +125,7 @@ export const CommentSheet = memo(function CommentSheet({ open, onOpenChange, pos
               </div>
               {post.caption && <p className="text-sm text-foreground line-clamp-2">{post.caption}</p>}
             </div>
-            {image && <img loading="lazy" src={image} alt="" className="w-12 h-12 rounded object-cover flex-shrink-0" />}
+            {image && <Img loading="lazy" src={image} alt="" className="w-12 h-12 rounded object-cover flex-shrink-0" />}
           </div>
           <div className="px-4 pb-3">
             <p className="text-sm text-muted-foreground font-medium">

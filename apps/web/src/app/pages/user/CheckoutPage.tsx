@@ -17,6 +17,7 @@ import { useAuthed } from '../../lib/data';
 import { formErrors } from '../../lib/apiErrors';
 import { fadeUp, staggerContainer } from '../../lib/motion';
 import { cn } from '../../components/ui/utils';
+import { Img } from '../../components/primitives/Img';
 
 const STEPS = [
   { id: 'address', label: 'Address' },
@@ -329,7 +330,7 @@ export default function CheckoutPage() {
                   <ul className="divide-y divide-border">
                     {items.map(i => (
                       <li key={`${i.productId}:${i.variantId ?? ''}`} className="flex items-center gap-3 py-3">
-                        <img src={i.product.imageUrl} alt="" className="size-14 rounded-lg object-cover bg-muted" />
+                        <Img src={i.product.imageUrl} alt="" className="size-14 rounded-lg object-cover bg-muted" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground truncate">{i.product.name}</p>
                           <p className="text-xs text-foreground-secondary">{i.product.seller.name} · Qty {i.quantity}</p>

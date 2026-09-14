@@ -6,15 +6,16 @@ import {
   Repeat2, Play, Zap, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { formatCompactNumber as fmtCount, formatMoney, formatRelativeTime, useProduct, useProfile, useToggleFollow, useToggleLike, useToggleSave, type Post } from '@ezyify/core';
+import { avatarUrlFor, formatCompactNumber as fmtCount, formatMoney, formatRelativeTime, useProduct, useProfile, useToggleFollow, useToggleLike, useToggleSave, type Post } from '@ezyify/core';
 import { VerifiedBadge } from './VerifiedBadge';
 import { CommentSheet } from './CommentSheet';
 import { RepostSheet } from './RepostSheet';
 import { toast } from 'sonner';
 import { useAddLine, useAuthed, useInCart } from '../lib/data';
 import { formErrors } from '../lib/apiErrors';
+import { Img } from './primitives/Img';
 
-const avatarOf = (u: { avatarUrl: string | null; name: string }) => u.avatarUrl ?? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.name)}`;
+const avatarOf = (u: { avatarUrl: string | null; name: string }) => avatarUrlFor(u, 72);
 
 /** Tagged-product chip: the post only carries ids. */
 function ProductChip({ id, onAdd, inCart, pending }: { id: string; onAdd: (id: string, name: string) => void; inCart: boolean; pending: boolean }) {
@@ -184,11 +185,11 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0,
             {isLive ? (
               <div className="p-[2.5px] rounded-full" style={{ background: 'linear-gradient(135deg, var(--error), var(--orange-500))' }}>
                 <div className="bg-card p-[2px] rounded-full">
-                  <img loading="lazy" src={avatarOf(post.author)} alt={post.author.name} className="w-9 h-9 rounded-full object-cover" />
+                  <Img loading="lazy" src={avatarOf(post.author)} alt={post.author.name} className="w-9 h-9 rounded-full object-cover" />
                 </div>
               </div>
             ) : (
-              <img loading="lazy" src={avatarOf(post.author)} alt={post.author.name} className="w-9 h-9 rounded-full object-cover ring-[1.5px] ring-border/60 group-hover:ring-2 group-hover:ring-primary/30 transition-all" />
+              <Img loading="lazy" src={avatarOf(post.author)} alt={post.author.name} className="w-9 h-9 rounded-full object-cover ring-[1.5px] ring-border/60 group-hover:ring-2 group-hover:ring-primary/30 transition-all" />
             )}
             {isLive && (
               <span className="absolute -bottom-0.5 -right-0.5 px-1 py-px rounded-full text-[8px] font-black text-error-foreground leading-none bg-error border border-card">

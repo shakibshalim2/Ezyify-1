@@ -89,7 +89,7 @@ export default function ExploreScreen() {
           ListEmptyComponent={loading ? <GridSkeleton /> : <EmptyState icon="people-outline" title="No creators found" body="Try a different name." />}
           renderItem={({ item }) => (
             <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/profile/[username]', params: { username: item.username } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, backgroundColor: colors.card, borderRadius: radius.card, borderWidth: 1, borderColor: colors.borderSubtle }}>
-              <Avatar uri={item.avatarUrl} size={48} verified={item.verified} />
+              <Avatar uri={item.avatarUrl} name={item.name} size={48} verified={item.verified} />
               <View style={{ flex: 1 }}>
                 <Text variant="bodyMedium">{item.name}</Text>
                 <Text variant="caption" tone="secondary">@{item.username}</Text>
@@ -158,7 +158,7 @@ export default function ExploreScreen() {
                 <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 80 }} />
                 {tall && <View style={{ position: 'absolute', top: 8, left: 8 }}><Badge label="LOOP" tone="primary" /></View>}
                 <View style={{ position: 'absolute', left: 8, right: 8, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Avatar uri={item.post.author.avatarUrl} size={20} />
+                  <Avatar uri={item.post.author.avatarUrl} name={item.post.author.name} size={20} />
                   <Text variant="caption" style={{ color: '#fff', flex: 1 }} numberOfLines={1}>{item.post.author.username}</Text>
                   <Ionicons name={tall ? 'play' : 'heart'} size={12} color="#fff" />
                   <Text variant="caption" style={{ color: '#fff' }}>{formatCompactNumber(tall ? item.post.engagement.views ?? 0 : item.post.engagement.likes)}</Text>

@@ -8,6 +8,7 @@ import { storage } from '../lib/storage';
 import { SEO, SEOConfigs } from '../components/SEO';
 import { Button } from '../components/primitives/Button';
 import { Card } from '../components/primitives/Card';
+import { avatarDataUri } from '@ezyify/core';
 import { Skeleton } from '../components/primitives/Skeleton';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
@@ -159,7 +160,7 @@ export default function SearchPage() {
       if (sellerName && sellerName.toLowerCase().includes(q)) {
         const username = sellerName.toLowerCase().replace(/\s+/g, '_');
         if (!storeMap.has(username)) {
-          storeMap.set(username, { username, name: sellerName, avatar: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(sellerName)}` });
+          storeMap.set(username, { username, name: sellerName, avatar: avatarDataUri(sellerName, 96) });
         }
       }
     });

@@ -106,6 +106,16 @@ test.describe('accessibility (axe-core, WCAG 2.2 A/AA)', () => {
     test(`${path} has no serious/critical violations`, async ({ page }) => {
       await page.goto(path);
       await page.waitForLoadState('networkidle');
+      // Entrance animations fade text in; sampling mid-fade yields false colour-contrast hits.
+      // Only await finite animations — the decorative floats loop forever.
+      await page.evaluate(() =>
+        Promise.all(
+          document
+            .getAnimations()
+            .filter(a => Number.isFinite(Number(a.effect?.getComputedTiming().endTime ?? Infinity)))
+            .map(a => a.finished.catch(() => undefined)),
+        ),
+      );
       const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).exclude('[data-motion]').analyze();
       const serious = results.violations.filter(v => v.impact === 'serious' || v.impact === 'critical');
       expect(serious.map(v => `${v.id}: ${v.nodes.length}× ${v.help}`)).toEqual([]);

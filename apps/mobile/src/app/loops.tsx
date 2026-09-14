@@ -73,7 +73,7 @@ function LoopItem({ loop, active }: { loop: Post; active: boolean }) {
       <View style={{ position: 'absolute', right: 8, bottom: insets.bottom + 120, gap: 22 }}>
         <View style={{ alignItems: 'center' }}>
           <Pressable accessibilityRole="button" accessibilityLabel={`View ${loop.author.name}`} onPress={() => router.push({ pathname: '/profile/[username]', params: { username: loop.author.username } })}>
-            <Avatar uri={loop.author.avatarUrl} size={46} ring="story" />
+            <Avatar uri={loop.author.avatarUrl} name={loop.author.name} size={46} ring="story" />
           </Pressable>
           {!followed && (
             <Pressable accessibilityRole="button" accessibilityLabel={`Follow ${loop.author.username}`} onPress={() => gate() && toggleFollow.mutate({ username: loop.author.username, following: false })} style={{ marginTop: -10, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}>
