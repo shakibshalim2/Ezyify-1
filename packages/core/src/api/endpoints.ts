@@ -1,13 +1,17 @@
 import { z } from 'zod';
 import type { ApiClient } from './client.js';
 import {
+  AddressSchema,
   CartSchema,
   CategorySchema,
   CheckoutRequestSchema,
+  CommentSchema,
   ConversationSchema,
+  CreateAddressRequestSchema,
+  CreatePostRequestSchema,
   DeleteAccountRequestSchema,
-  RegisterDeviceRequestSchema,
-  ReportRequestSchema,
+  DeviceSessionSchema,
+  FinalizedUploadSchema,
   ForgotPasswordRequestSchema,
   LoginRequestSchema,
   LoginResponseSchema,
@@ -19,28 +23,45 @@ import {
   ProductDetailSchema,
   ProductSummarySchema,
   RefreshResponseSchema,
+  RegisterDeviceRequestSchema,
+  ReportRequestSchema,
   ResetPasswordRequestSchema,
+  SendMessageRequestSchema,
+  SignUploadRequestSchema,
+  SignedUploadSchema,
   SignupRequestSchema,
   SignupResponseSchema,
   TransactionSchema,
+  UpdateProfileRequestSchema,
   UserProfileSchema,
+  UserSummarySchema,
   VerifyOtpRequestSchema,
   VerifyOtpResponseSchema,
   WalletSchema,
   paginated,
   type CheckoutRequest,
+  type CreateAddressRequest,
+  type CreatePostRequest,
   type DeleteAccountRequest,
   type LoginRequest,
   type RegisterDeviceRequest,
   type ReportRequest,
+  type SendMessageRequest,
+  type SignUploadRequest,
   type SignupRequest,
+  type UpdateProfileRequest,
   type VerifyOtpRequest,
 } from '../schemas/index.js';
 
 const Ok = z.object({ ok: z.literal(true) }).or(z.null());
+const Count = z.object({ count: z.number().int().min(0) });
 type PageQuery = { page?: number; pageSize?: number };
+export type FeedQuery = PageQuery & { kind?: 'post' | 'loop' | 'story'; author?: string; hashtag?: string };
+export type ProductQuery = PageQuery & { category?: string; q?: string; sort?: string };
 
-/** Endpoint map mirroring BACKEND_API_SPECIFICATION.md; each call validates input and output. */
+const enc = encodeURIComponent;
+
+/** Endpoint map mirroring apps/api; each call validates input and output against the shared schemas. */
 export function createEndpoints(api: ApiClient) {
   return {
     auth: {
@@ -49,37 +70,51 @@ export function createEndpoints(api: ApiClient) {
       verifyOtp: (body: VerifyOtpRequest) => api.post('/auth/verify-otp', VerifyOtpRequestSchema.parse(body), VerifyOtpResponseSchema, { auth: false }),
       forgotPassword: (email: string) => api.post('/auth/forgot-password', ForgotPasswordRequestSchema.parse({ email }), Ok, { auth: false }),
       resetPassword: (token: string, password: string) => api.post('/auth/reset-password', ResetPasswordRequestSchema.parse({ token, password }), Ok, { auth: false }),
-      refresh: () => api.post('/auth/refresh', {}, RefreshResponseSchema, { auth: false }),
-      logout: () => api.post('/auth/logout', {}, Ok),
+      /** Web: cookie carries the refresh token. Native: pass the stored one explicitly. */
+      refresh: (refreshToken?: string) => api.post('/auth/refresh', refreshToken ? { refreshToken } : {}, RefreshResponseSchema, { auth: false }),
+      logout: (refreshToken?: string) => api.post('/auth/logout', refreshToken ? { refreshToken } : {}, Ok),
+      logoutAll: () => api.post('/auth/logout-all', {}, Ok),
+      sessions: () => api.get('/auth/sessions', z.array(DeviceSessionSchema)),
+      revokeSession: (id: string) => api.delete(`/auth/sessions/${enc(id)}`, Ok),
     },
     users: {
       me: () => api.get('/users/me', UserProfileSchema),
-      profile: (username: string) => api.get(`/users/${encodeURIComponent(username)}`, UserProfileSchema),
-      follow: (username: string) => api.post(`/users/${encodeURIComponent(username)}/follow`, {}, Ok),
-      unfollow: (username: string) => api.delete(`/users/${encodeURIComponent(username)}/follow`, Ok),
+      updateMe: (body: UpdateProfileRequest) => api.patch('/users/me', UpdateProfileRequestSchema.parse(body), UserProfileSchema),
+      profile: (username: string) => api.get(`/users/${enc(username)}`, UserProfileSchema),
+      followers: (username: string) => api.get(`/users/${enc(username)}/followers`, z.array(UserSummarySchema)),
+      following: (username: string) => api.get(`/users/${enc(username)}/following`, z.array(UserSummarySchema)),
+      follow: (username: string) => api.post(`/users/${enc(username)}/follow`, {}, Ok),
+      unfollow: (username: string) => api.delete(`/users/${enc(username)}/follow`, Ok),
     },
     catalog: {
-      products: (query: PageQuery & { category?: string; q?: string; sort?: string } = {}) =>
-        api.get('/products', paginated(ProductSummarySchema), { query }),
-      product: (id: string) => api.get(`/products/${encodeURIComponent(id)}`, ProductDetailSchema),
-      categories: () => api.get('/categories', z.array(CategorySchema)),
-      search: (q: string, query: PageQuery = {}) => api.get('/search', paginated(ProductSummarySchema), { query: { q, ...query } }),
+      products: (query: ProductQuery = {}) => api.get('/products', paginated(ProductSummarySchema), { query, auth: false }),
+      product: (id: string) => api.get(`/products/${enc(id)}`, ProductDetailSchema, { auth: false }),
+      categories: () => api.get('/categories', z.array(CategorySchema), { auth: false }),
+      search: (q: string, query: PageQuery = {}) => api.get('/search', paginated(ProductSummarySchema), { query: { q, ...query }, auth: false }),
     },
     cart: {
       get: () => api.get('/cart', CartSchema),
-      add: (productId: string, quantity = 1, variantId?: string) => api.post('/cart/items', { productId, quantity, variantId }, CartSchema),
-      update: (productId: string, quantity: number) => api.patch(`/cart/items/${encodeURIComponent(productId)}`, { quantity }, CartSchema),
-      remove: (productId: string) => api.delete(`/cart/items/${encodeURIComponent(productId)}`, CartSchema),
+      add: (productId: string, quantity = 1, variantId?: string | null) =>
+        api.post('/cart/items', { productId, quantity, ...(variantId ? { variantId } : {}) }, CartSchema),
+      update: (productId: string, quantity: number) => api.patch(`/cart/items/${enc(productId)}`, { quantity }, CartSchema),
+      remove: (productId: string) => api.delete(`/cart/items/${enc(productId)}`, CartSchema),
       applyCoupon: (code: string) => api.post('/cart/coupon', { code }, CartSchema),
     },
     orders: {
-      checkout: (body: CheckoutRequest) => api.post('/checkout', CheckoutRequestSchema.parse(body), z.array(OrderSchema)),
+      /** `idempotencyKey` lets a retried checkout return the already-created orders instead of charging twice. */
+      checkout: (body: CheckoutRequest, idempotencyKey?: string) =>
+        api.post('/checkout', CheckoutRequestSchema.parse(body), z.array(OrderSchema), idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
       list: (query: PageQuery & { status?: string } = {}) => api.get('/orders', paginated(OrderSchema), { query }),
-      get: (id: string) => api.get(`/orders/${encodeURIComponent(id)}`, OrderSchema),
-      timeline: (id: string) => api.get(`/orders/${encodeURIComponent(id)}/timeline`, z.array(OrderEventSchema)),
-      confirmDelivery: (id: string) => api.post(`/orders/${encodeURIComponent(id)}/confirm-delivery`, {}, OrderSchema),
-      requestRefund: (id: string, reason: string, itemIds: string[]) =>
-        api.post(`/orders/${encodeURIComponent(id)}/refund`, { reason, itemIds }, OrderSchema),
+      get: (id: string) => api.get(`/orders/${enc(id)}`, OrderSchema),
+      timeline: (id: string) => api.get(`/orders/${enc(id)}/timeline`, z.array(OrderEventSchema)),
+      confirmDelivery: (id: string) => api.post(`/orders/${enc(id)}/confirm-delivery`, {}, OrderSchema),
+      requestRefund: (id: string, reason: string, itemIds: string[]) => api.post(`/orders/${enc(id)}/refund`, { reason, itemIds }, OrderSchema),
+      cancel: (id: string) => api.post(`/orders/${enc(id)}/cancel`, {}, OrderSchema),
+    },
+    addresses: {
+      list: () => api.get('/addresses', z.array(AddressSchema)),
+      create: (body: CreateAddressRequest) => api.post('/addresses', CreateAddressRequestSchema.parse(body), AddressSchema),
+      remove: (id: string) => api.delete(`/addresses/${enc(id)}`, Ok),
     },
     wallet: {
       get: () => api.get('/wallet', WalletSchema),
@@ -88,37 +123,52 @@ export function createEndpoints(api: ApiClient) {
       withdraw: (amount: number, payoutMethodId: string) => api.post('/wallet/withdraw', { amount, payoutMethodId }, TransactionSchema),
     },
     feed: {
-      home: (query: PageQuery = {}) => api.get('/feed', paginated(PostSchema), { query }),
-      loops: (query: PageQuery = {}) => api.get('/loops', paginated(PostSchema), { query }),
-      post: (id: string) => api.get(`/posts/${encodeURIComponent(id)}`, PostSchema),
-      like: (id: string) => api.post(`/posts/${encodeURIComponent(id)}/like`, {}, Ok),
-      unlike: (id: string) => api.delete(`/posts/${encodeURIComponent(id)}/like`, Ok),
+      home: (query: FeedQuery = {}) => api.get('/feed', paginated(PostSchema), { query }),
+      loops: (query: FeedQuery = {}) => api.get('/loops', paginated(PostSchema), { query }),
+      stories: () => api.get('/stories', z.array(PostSchema)),
+      post: (id: string) => api.get(`/posts/${enc(id)}`, PostSchema),
+      create: (body: CreatePostRequest) => api.post('/posts', CreatePostRequestSchema.parse(body), PostSchema),
+      remove: (id: string) => api.delete(`/posts/${enc(id)}`, Ok),
+      like: (id: string) => api.post(`/posts/${enc(id)}/like`, {}, Ok),
+      unlike: (id: string) => api.delete(`/posts/${enc(id)}/like`, Ok),
+      save: (id: string) => api.post(`/posts/${enc(id)}/save`, {}, Ok),
+      unsave: (id: string) => api.delete(`/posts/${enc(id)}/save`, Ok),
+      comments: (id: string, query: PageQuery = {}) => api.get(`/posts/${enc(id)}/comments`, paginated(CommentSchema), { query }),
+      comment: (id: string, text: string) => api.post(`/posts/${enc(id)}/comments`, { text }, CommentSchema),
     },
     messaging: {
       conversations: () => api.get('/conversations', z.array(ConversationSchema)),
-      messages: (conversationId: string, query: PageQuery = {}) =>
-        api.get(`/conversations/${encodeURIComponent(conversationId)}/messages`, paginated(MessageSchema), { query }),
-      send: (conversationId: string, text: string) =>
-        api.post(`/conversations/${encodeURIComponent(conversationId)}/messages`, { text }, MessageSchema),
+      /** Returns the existing 1:1 conversation id or creates one. */
+      start: (username: string) => api.post('/conversations', { username }, z.object({ id: z.string().min(1) })),
+      messages: (conversationId: string, query: PageQuery = {}) => api.get(`/conversations/${enc(conversationId)}/messages`, paginated(MessageSchema), { query }),
+      send: (conversationId: string, body: SendMessageRequest | string) =>
+        api.post(`/conversations/${enc(conversationId)}/messages`, SendMessageRequestSchema.parse(typeof body === 'string' ? { text: body } : body), MessageSchema),
     },
     notifications: {
       list: (query: PageQuery = {}) => api.get('/notifications', paginated(NotificationSchema), { query }),
-      markRead: (id: string) => api.post(`/notifications/${encodeURIComponent(id)}/read`, {}, Ok),
+      unreadCount: () => api.get('/notifications/unread-count', Count),
+      markRead: (id: string) => api.post(`/notifications/${enc(id)}/read`, {}, Ok),
       markAllRead: () => api.post('/notifications/read-all', {}, Ok),
       /** Register/refresh this device's push token (FCM on Android, APNs on iOS, web push). */
       registerDevice: (body: RegisterDeviceRequest) => api.post('/devices', RegisterDeviceRequestSchema.parse(body), Ok),
-      unregisterDevice: (token: string) => api.delete(`/devices/${encodeURIComponent(token)}`, Ok),
+      unregisterDevice: (token: string) => api.delete(`/devices/${enc(token)}`, Ok),
+    },
+    uploads: {
+      sign: (body: SignUploadRequest) => api.post('/uploads/sign', SignUploadRequestSchema.parse(body), SignedUploadSchema),
+      finalize: (key: string) => api.post('/uploads/finalize', { key }, FinalizedUploadSchema),
     },
     account: {
       /** Play policy: in-app account deletion must exist and match the web URL. */
       requestDeletion: (body: DeleteAccountRequest) => api.post('/account/delete', DeleteAccountRequestSchema.parse(body), Ok),
+      restore: () => api.post('/account/restore', {}, Ok),
       exportData: () => api.post('/account/export', {}, Ok),
     },
     moderation: {
       /** UGC policy: users must be able to report and block. */
       report: (body: ReportRequest) => api.post('/reports', ReportRequestSchema.parse(body), Ok),
-      block: (userId: string) => api.post(`/users/${encodeURIComponent(userId)}/block`, {}, Ok),
-      unblock: (userId: string) => api.delete(`/users/${encodeURIComponent(userId)}/block`, Ok),
+      block: (userId: string) => api.post(`/users/${enc(userId)}/block`, {}, Ok),
+      unblock: (userId: string) => api.delete(`/users/${enc(userId)}/block`, Ok),
+      blocked: () => api.get('/users/me/blocked', z.array(UserSummarySchema.pick({ id: true, username: true, name: true, avatarUrl: true }))),
     },
   };
 }

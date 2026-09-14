@@ -45,6 +45,49 @@ export const CommentSchema = z.object({
 });
 export type Comment = z.infer<typeof CommentSchema>;
 
+/** POST /posts — media URLs come from the signed-upload flow (`uploads.sign` → PUT → `uploads.finalize`). */
+export const CreatePostRequestSchema = z.object({
+  kind: z.enum(['post', 'loop', 'story']).default('post'),
+  caption: z.string().max(2200).default(''),
+  hashtags: z.array(z.string().regex(/^[\w]+$/)).max(30).default([]),
+  media: z.array(MediaSchema).min(1).max(10),
+  taggedProductIds: z.array(IdSchema).max(10).default([]),
+  location: z.string().max(80).nullable().default(null),
+});
+export type CreatePostRequest = z.input<typeof CreatePostRequestSchema>;
+
+/** Direct-to-bucket upload contract: sign → PUT bytes to `url` with `headers` → finalize. */
+export const UploadContentTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'video/mp4', 'video/quicktime']);
+export const UploadPurposeSchema = z.enum(['post', 'loop', 'story', 'avatar', 'cover', 'product', 'message']);
+export const SignUploadRequestSchema = z.object({
+  contentType: UploadContentTypeSchema,
+  sizeBytes: z.number().int().positive(),
+  purpose: UploadPurposeSchema,
+});
+export type SignUploadRequest = z.infer<typeof SignUploadRequestSchema>;
+export const SignedUploadSchema = z.object({
+  key: z.string().min(1),
+  url: z.string().url(),
+  method: z.literal('PUT'),
+  headers: z.record(z.string()),
+  expiresInSeconds: z.number().int().positive(),
+  publicUrl: z.string().url(),
+});
+export type SignedUpload = z.infer<typeof SignedUploadSchema>;
+export const FinalizedUploadSchema = z.object({
+  key: z.string().min(1),
+  url: z.string().url(),
+  contentType: z.string(),
+  kind: z.enum(['image', 'video']),
+  sizeBytes: z.number().int().min(0),
+});
+export type FinalizedUpload = z.infer<typeof FinalizedUploadSchema>;
+
+export const SendMessageRequestSchema = z
+  .object({ text: z.string().max(4000).optional(), productId: IdSchema.optional(), mediaUrl: z.string().url().optional() })
+  .refine(b => b.text || b.productId || b.mediaUrl, { message: 'Message is empty' });
+export type SendMessageRequest = z.infer<typeof SendMessageRequestSchema>;
+
 export const ConversationSchema = z.object({
   id: IdSchema,
   participants: z.array(UserSummarySchema).min(1),

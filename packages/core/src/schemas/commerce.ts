@@ -102,3 +102,25 @@ export const TransactionSchema = z.object({
   createdAt: IsoDateSchema,
 });
 export type Transaction = z.infer<typeof TransactionSchema>;
+
+/** Address book entry (GET/POST /addresses). Country is ISO‑3166‑1 alpha‑2. */
+export const AddressSchema = z.object({
+  id: IdSchema,
+  label: z.string().min(1).max(30),
+  recipient: z.string().min(1).max(80),
+  phone: z.string().min(6).max(20),
+  line1: z.string().min(1).max(120),
+  line2: z.string().max(120).nullable().optional(),
+  city: z.string().min(1).max(80),
+  region: z.string().max(80).nullable().optional(),
+  postal: z.string().min(2).max(12),
+  country: z.string().length(2),
+  isDefault: z.boolean().default(false),
+});
+export type Address = z.infer<typeof AddressSchema>;
+export const CreateAddressRequestSchema = AddressSchema.omit({ id: true }).extend({
+  line2: z.string().max(120).optional(),
+  region: z.string().max(80).optional(),
+  isDefault: z.boolean().optional(),
+});
+export type CreateAddressRequest = z.infer<typeof CreateAddressRequestSchema>;

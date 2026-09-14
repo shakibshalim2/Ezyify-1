@@ -115,6 +115,31 @@ describe('createEndpoints — every endpoint is wired to a path', () => {
       () => api.notifications.unregisterDevice('tok'),
       () => api.account.exportData(),
       () => api.moderation.unblock('u2'),
+      // Phase 8 additions
+      () => api.auth.refresh('rt'),
+      () => api.auth.logoutAll(),
+      () => api.auth.sessions(),
+      () => api.auth.revokeSession('s1'),
+      () => api.users.updateMe({ bio: 'hi' }),
+      () => api.users.followers('maya'),
+      () => api.users.following('maya'),
+      () => api.orders.cancel('o1'),
+      () => api.addresses.list(),
+      () => api.addresses.create({ label: 'Home', recipient: 'A', phone: '0812345', line1: 'Jl. 1', city: 'Jakarta', postal: '12345', country: 'ID' }),
+      () => api.addresses.remove('a1'),
+      () => api.feed.stories(),
+      () => api.feed.create({ media: [{ type: 'image', url: 'https://img.test/a.jpg', thumbnailUrl: null, width: null, height: null, durationMs: null }] }),
+      () => api.feed.remove('post-1'),
+      () => api.feed.save('post-1'),
+      () => api.feed.unsave('post-1'),
+      () => api.feed.comments('post-1'),
+      () => api.feed.comment('post-1', 'nice'),
+      () => api.messaging.start('maya'),
+      () => api.notifications.unreadCount(),
+      () => api.uploads.sign({ contentType: 'image/jpeg', sizeBytes: 10, purpose: 'post' }),
+      () => api.uploads.finalize('u/x/post/k.jpg'),
+      () => api.account.restore(),
+      () => api.moderation.blocked(),
     ];
     for (const c of calls) await c().catch(() => undefined);
     expect(fetch).toHaveBeenCalledTimes(calls.length);
@@ -123,5 +148,43 @@ describe('createEndpoints — every endpoint is wired to a path', () => {
     expect(urls).toContain('/v1/orders/o1/confirm-delivery');
     expect(urls).toContain('/v1/wallet/withdraw');
     expect(urls).toContain('/v1/devices/tok');
+    expect(urls).toContain('/v1/stories');
+    expect(urls).toContain('/v1/uploads/sign');
+    expect(urls).toContain('/v1/users/me/blocked');
+  });
+
+  it('native refresh sends the stored token in the body; web refresh sends an empty body', async () => {
+    const { api, call } = harness({ accessToken: 'a', expiresIn: 900, refreshToken: 'r2' });
+    const native = await api.auth.refresh('r1');
+    expect(call(0)).toMatchObject({ url: 'https://api.test/v1/auth/refresh', method: 'POST', body: { refreshToken: 'r1' } });
+    expect(native.refreshToken).toBe('r2');
+    await api.auth.refresh();
+    expect(call(1).body).toEqual({});
+  });
+
+  it('checkout forwards the Idempotency-Key header only when provided', async () => {
+    const { api, call } = harness([]);
+    await api.orders.checkout({ addressId: 'a1', paymentMethod: 'wallet' }, 'idem-1');
+    expect(call(0).headers['Idempotency-Key']).toBe('idem-1');
+    await api.orders.checkout({ addressId: 'a1', paymentMethod: 'wallet' });
+    expect(call(1).headers['Idempotency-Key']).toBeUndefined();
+  });
+
+  it('messaging.send accepts a plain string or a structured body and rejects empty messages', async () => {
+    const msg = { id: 'm1', conversationId: 'c1', senderId: 'me', text: 'hi', media: null, productId: null, status: 'sent', createdAt: new Date().toISOString() };
+    const { api, call } = harness(msg);
+    await api.messaging.send('c1', 'hi');
+    expect(call(0).body).toEqual({ text: 'hi' });
+    await api.messaging.send('c1', { productId: 'p1' });
+    expect(call(1).body).toEqual({ productId: 'p1' });
+    expect(() => api.messaging.send('c1', {})).toThrow(/empty/i);
+  });
+
+  it('public catalog reads never attach the bearer token (cacheable, works for guests)', async () => {
+    const { api, call } = harness([]);
+    await api.catalog.categories();
+    expect(call(0).headers.Authorization).toBeUndefined();
+    await api.cart.get().catch(() => undefined);
+    expect(call(1).headers.Authorization).toBe('Bearer tok');
   });
 });

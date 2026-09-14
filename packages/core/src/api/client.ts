@@ -30,6 +30,8 @@ export interface ApiClientOptions {
   baseUrl: string;
   tokens: TokenStore;
   fetch?: typeof fetch;
+  /** Static headers on every request, e.g. `{ 'X-Client': 'native' }` so the API returns refresh tokens in the body. */
+  headers?: Record<string, string>;
   /** Called after a refresh fails so the host app can route to login. */
   onSessionExpired?: () => void;
   timeoutMs?: number;
@@ -43,6 +45,8 @@ interface RequestOptions<T extends z.ZodTypeAny> {
   schema: T;
   auth?: boolean;
   signal?: AbortSignal;
+  /** Per-request headers (e.g. `Idempotency-Key` on checkout). */
+  headers?: Record<string, string>;
 }
 
 const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -86,7 +90,7 @@ export function createApiClient(options: ApiClientOptions) {
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       opts.signal?.addEventListener('abort', () => controller.abort(), { once: true });
 
-      const headers: Record<string, string> = { Accept: 'application/json' };
+      const headers: Record<string, string> = { Accept: 'application/json', ...options.headers, ...opts.headers };
       if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
       if (useAuth) {
         const token = await options.tokens.getAccessToken();

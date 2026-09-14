@@ -68,4 +68,16 @@ describe('createApiClient', () => {
     const api = createApiClient({ baseUrl: 'https://api.test', tokens: tokens(null), fetch });
     await expect(api.get('/x', z.object({ id: z.string() }), { auth: false })).rejects.toMatchObject({ code: 'SERVER_ERROR' });
   });
+
+  it('merges static client headers with per-request headers', async () => {
+    const fetch = vi.fn(async () => ok(null));
+    const api = createApiClient({ baseUrl: 'https://api.test', tokens: tokens('t'), fetch, headers: { 'X-Client': 'native' } });
+    await api.post('/checkout', {}, z.null(), { headers: { 'Idempotency-Key': 'k1' } });
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    const h = init.headers as Record<string, string>;
+    expect(h['X-Client']).toBe('native');
+    expect(h['Idempotency-Key']).toBe('k1');
+    expect(h.Authorization).toBe('Bearer t');
+    expect(h['Content-Type']).toBe('application/json');
+  });
 });

@@ -46,4 +46,4 @@ export const ResetPasswordRequestSchema = z.object({
 
 export const LoginResponseSchema = SessionSchema;
 export const VerifyOtpResponseSchema = SessionSchema;
-export const RefreshResponseSchema = SessionSchema.pick({ accessToken: true, expiresIn: true });
+export const RefreshResponseSchema = SessionSchema.pick({ accessToken: true, expiresIn: true, refreshToken: true });
