@@ -105,7 +105,7 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 - ☑ API client with zod‑validated responses, auth interceptor (silent refresh), bounded retry/backoff, timeout
 - ☑ `@ezyify/tokens`: `tokens.json` → generated `tokens.css` (web) + `nativeTheme()` (RN); web imports the generated CSS
 - ☑ `@ezyify/core` runtime (auth + guest‑cart stores, endpoint map, react‑query client) mounted in `App.tsx`
-- ◐ Migrate screens from local mock data to `useApi()` → **Phase 8.1–8.4**
+- ☑ Migrate screens from local mock data to `useApi()` → done in **Phase 8.1–8.4**
 
 ### Phase 4 — Mobile app (Expo, standalone signed builds)
 - 4.1 ☑ `apps/mobile` via `create-expo-app` (**SDK 57**, RN 0.86, React 19.2, Expo Router 57, React Compiler), Reanimated 4, expo-image, SecureStore, Inter/Plus Jakarta fonts; theme from `@ezyify/tokens`, runtime from `@ezyify/core`. NativeWind skipped (v5 still RC; styles use the token theme directly)
@@ -123,7 +123,7 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 - ☑ Cross-cutting: zod-validated env (fails fast), request validation with the **same `@ezyify/core` schemas the clients use**, spec error envelope + codes, rate limiting (100/min, tighter on auth), Helmet, strict CORS, pino logging with secret redaction, Swagger UI at `/v1/docs` + `openapi.json`
 - ☑ Seed fixtures mirroring the mobile mock data; vitest unit + e2e (25 tests through the real Fastify stack: auth rotation/reuse, contract-validated responses, checkout → escrow → release with fee, RBAC, blocking, reports); CI runs against a Postgres 16 service
 - ☑ Stripe adapter + webhooks (Phase 6) · ☑ LiveKit tokens, FCM v1 send, Resend email, Meilisearch + Postgres fallback (Phase 8.6)
-- ◐ Migrate web + mobile screens from mock data to `useApi()` → **Phase 8.1–8.4**
+- ☑ Migrate web + mobile screens from mock data to `useApi()` → done in **Phase 8.1–8.4**
 
 ### Phase 6 — Security — ✅ delivered (PR #2)
 - ☑ OWASP ASVS L2 checklist with control → code → verification mapping in `docs/plan/SECURITY.md` (+ threat model, ops runbook)
@@ -134,7 +134,7 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 - ☑ Production env guardrails (placeholder/identical secrets, wildcard/localhost CORS rejected at boot) · `pnpm audit --prod` clean via `pnpm.overrides` + CI gate (high/critical) · **Renovate** (grouped weekly, security PRs immediate, Expo SDK excluded) · **CodeQL** security-extended · **gitleaks** secret scan
 - ☑ Android: `usesCleartextTraffic=false`, R8 + resource shrinking (already), extra ProGuard rules, `allowBackup=false` (already), SecureStore tokens (already); certificate pinning documented as opt-in
 - ☑ Privacy: account deletion + export (already, now audited + export throttled 3/h); Data-safety mapping in Play checklist
-- ☐ MFA (TOTP/passkeys) for sellers/admins, web CSP + cookie consent — Phase 8
+- ☑ MFA (TOTP) for sellers/admins (8.7), web CSP + cookie consent (8.5); passkeys deferred
 - Tests: api 36 (unit 12 + e2e 24) incl. lockout, session revoke, CSRF, headers, 413, webhook idempotency, upload allow-list
 
 ### Phase 7 — Testing — ✅ delivered (PR #2) · see `docs/plan/TESTING.md`
