@@ -223,7 +223,7 @@ export default function FraudDetectionDashboard() {
       'low': { color: 'bg-warning/10 text-warning', icon: <AlertTriangle className="w-3 h-3 mr-1" /> },
       'medium': { color: 'bg-warning/10 text-warning', icon: <AlertTriangle className="w-3 h-3 mr-1" /> },
       'high': { color: 'bg-error/10 text-error', icon: <AlertTriangle className="w-3 h-3 mr-1" /> },
-      'critical': { color: 'bg-error text-white', icon: <AlertTriangle className="w-3 h-3 mr-1" /> }
+      'critical': { color: 'bg-error text-error-foreground', icon: <AlertTriangle className="w-3 h-3 mr-1" /> }
     };
     const item = config[severity];
     return (

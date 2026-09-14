@@ -137,13 +137,14 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 - ☐ MFA (TOTP/passkeys) for sellers/admins, web CSP + cookie consent — Phase 8
 - Tests: api 36 (unit 12 + e2e 24) incl. lockout, session revoke, CSRF, headers, 413, webhook idempotency, upload allow-list
 
-### Phase 7 — Testing
-- ☐ Unit: Vitest (web/core), Jest (api), coverage gate 70 % on `packages/core` + `apps/api`
-- ☐ Component: Testing Library + axe‑core a11y assertions for primitives
-- ☐ E2E web: Playwright (auth, browse, add‑to‑cart, checkout with Stripe test mode, chat)
-- ☐ E2E mobile: Maestro flows on release APK (splash → onboarding → login → home)
-- ☐ API: supertest contract tests; k6 smoke load test on feed/product endpoints
-- ☐ Visual: Playwright screenshots of key screens, Lighthouse CI budget (perf ≥ 90, a11y ≥ 95)
+### Phase 7 — Testing — ✅ delivered (PR #2) · see `docs/plan/TESTING.md`
+- ☑ Unit: Vitest with **coverage gates** — `packages/core` ≥ 70 % (now ~96 %, 36 tests incl. auth/cart stores, endpoint map, hooks), `apps/api` ≥ 70 % (now ~87 % lines, 47 tests: 12 unit + 35 e2e through the real Fastify stack)
+- ☑ Component: Testing Library + **vitest-axe** on every web primitive (Button, Field, OTPInput, PasswordStrength, Card, EmptyState, Skeleton, SocialButton, BrandMark) — zero WCAG 2.2 A/AA violations; token-level **contrast guardrail tests** (every fg/bg pair ≥ 4.5:1 in both themes)
+- ☑ E2E web: Playwright journeys — sign-in + validation, browse → product → cart → 3-step checkout → orders, chat send, first-run, smoke of all routes — on Pixel 7 + Desktop Chrome; **@axe-core/playwright** on `/`, `/shop`, `/login`, `/cart` with zero serious/critical
+- ☑ E2E mobile: **Maestro** flows on the release APK (first run → onboarding → login → home; shop → product → cart) with `testID` hooks
+- ☑ API: contract tests assert responses against the shared zod schemas; **k6** smoke (`test/load/smoke.js`, p95 budgets on feed/products)
+- ☑ Visual: Playwright screenshot baselines for 6 screens × 2 viewports (non-blocking CI step); **Lighthouse CI** budget perf ≥ 90 / a11y ≥ 95 (measured 93–99 / 98–100) as a CI job
+- Fixes surfaced by the new tests: dark-theme primary/on-primary, tertiary text, error and accent badge contrast (all below AA), unlabeled carousel dots (+ 24 px targets), unlabeled sort `<select>`, unnamed add-to-cart button, opacity-diluted secondary text
 
 ### Phase 8 — Web hardening & launch
 - ☐ SEO: prerender product/store/profile routes, OG tags, sitemap generation
@@ -199,4 +200,5 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 | 2026‑09‑13 | Phase 4.5b: Home feed, Explore, Shop, Profile, Loops, Stories, Post, Cart/Checkout/Success, Orders, Wallet, Messages, Notifications, Deals, Create, Settings | d082e6f |
 | 2026‑09‑13 | Phase 4.6–4.7: App Links + assetlinks, FCM push (contextual opt-in), Photo Picker/camera, biometrics, account deletion, report/block, Play checklist, store assets, 16 KB CI gate | 5b3dafe |
 | 2026‑09‑13 | Phase 5: `apps/api` NestJS 12 / Fastify 5 / Prisma 7 backend — auth, users, catalog, cart, orders + escrow, wallet, feed, messaging + WS, notifications, account deletion/export, moderation; seed; 25 e2e tests; CI Postgres | 4a63969 |
-| 2026‑09‑14 | Phase 6: ASVS L2 `SECURITY.md`, lockout + audit log + device sessions, CSRF origin check, hardened Helmet, Stripe webhooks (signed + idempotent), signed uploads with MIME sniffing, prod env guardrails, audit/CodeQL/gitleaks CI, Renovate, Android cleartext off | (this commit) |
+| 2026‑09‑14 | Phase 6: ASVS L2 `SECURITY.md`, lockout + audit log + device sessions, CSRF origin check, hardened Helmet, Stripe webhooks (signed + idempotent), signed uploads with MIME sniffing, prod env guardrails, audit/CodeQL/gitleaks CI, Renovate, Android cleartext off | 27ef538 |
+| 2026‑09‑14 | Phase 7: coverage gates (core 96 %, api 87 %), vitest-axe primitives, token contrast tests, Playwright journeys + axe + visual baselines, Lighthouse CI, k6 smoke, Maestro flows, `TESTING.md`; AA contrast fixes across dark theme | (this commit) |

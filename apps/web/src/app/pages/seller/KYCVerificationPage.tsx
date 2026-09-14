@@ -63,7 +63,7 @@ export default function KYCVerificationPage() {
                   <div
                     className={cn(
                       'size-10 rounded-full flex items-center justify-center mb-2 transition-colors',
-                      isCompleted || isActive ? 'bg-primary text-white' : 'bg-background-elevated text-foreground-tertiary'
+                      isCompleted || isActive ? 'bg-primary text-primary-foreground' : 'bg-background-elevated text-foreground-tertiary'
                     )}
                   >
                     <Icon className="size-5" />

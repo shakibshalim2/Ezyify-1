@@ -1,0 +1,28 @@
+# Maestro flow: cold start → onboarding → login → home. Runs against the release APK (see docs/plan/ANDROID_RELEASE.md).
+appId: com.ezyify.app
+---
+- clearState
+- launchApp
+- extendedWaitUntil:
+    visible: "Welcome to Ezyify"
+    timeout: 20000
+- tapOn: "Get started"
+- tapOn: "Tech"
+- tapOn: "Fashion"
+- tapOn: "Continue"
+- tapOn: "Skip for now"
+- assertVisible: "Sign in"
+- tapOn:
+    id: "login-email"
+- inputText: "buyer@ezyify.test"
+- tapOn:
+    id: "login-password"
+- inputText: "Password1"
+- hideKeyboard
+- tapOn: "Sign in"
+- extendedWaitUntil:
+    visible:
+      id: "tab-home"
+    timeout: 20000
+- assertVisible:
+    id: "tab-shop"

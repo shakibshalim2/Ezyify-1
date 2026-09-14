@@ -25,7 +25,7 @@ export function StepBar({ currentStep, steps, onStepClick }: StepBarProps) {
                 onClick={() => onStepClick?.(idx)}
                 className={`w-8 h-8 rounded-full font-semibold text-sm flex items-center justify-center transition-colors ${
                   idx === currentStep
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : idx < currentStep
                     ? 'bg-success text-white'
                     : 'bg-muted text-foreground-secondary'

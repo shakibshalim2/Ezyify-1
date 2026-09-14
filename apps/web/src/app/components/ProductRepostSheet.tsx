@@ -72,7 +72,7 @@ export const ProductRepostSheet = memo(function ProductRepostSheet({
           className={`rounded-xl object-cover ${compact ? 'w-14 h-14' : 'w-16 h-16'}`}
         />
         {discount >= 10 && (
-          <span className="absolute -top-1.5 -left-1.5 text-[9px] font-bold bg-error text-white px-1.5 py-0.5 rounded-full">
+          <span className="absolute -top-1.5 -left-1.5 text-[9px] font-bold bg-error text-error-foreground px-1.5 py-0.5 rounded-full">
             -{discount}%
           </span>
         )}

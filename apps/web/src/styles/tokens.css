@@ -54,7 +54,7 @@
 
   --accent-brand: var(--orange-500);
   --accent-brand-hover: var(--orange-600);
-  --accent-brand-foreground: #ffffff;
+  --accent-brand-foreground: #1a0d05;
   --accent-brand-subtle: var(--orange-50);
 
   --follow: var(--blue-600);
@@ -117,13 +117,15 @@
 
 .dark {
   --brand-blue: var(--blue-400);
-  --brand-gradient: linear-gradient(135deg, var(--blue-400) 0%, var(--blue-600) 100%);
+  --brand-gradient: linear-gradient(135deg, var(--blue-500) 0%, var(--blue-700) 100%); /* white text on this gradient stays ≥ 4.8:1 */
   --brand-gradient-subtle: linear-gradient(135deg, #0d1b33 0%, #23150d 100%);
 
+  /* Dark scheme: lighter primary with a dark on-primary (Material dark rule) — 5.44:1 as a fill with dark
+     text and 5.44:1 as link text on the background. No single blue passes AA both ways with white text. */
   --primary: var(--blue-400);
   --primary-hover: var(--blue-300);
   --primary-active: var(--blue-500);
-  --primary-foreground: #ffffff;
+  --primary-foreground: #0a0d14;
   --primary-subtle: #0f1f3a;
 
   --accent-brand: var(--orange-400);

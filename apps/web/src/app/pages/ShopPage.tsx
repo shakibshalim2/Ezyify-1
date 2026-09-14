@@ -329,9 +329,15 @@ export default function ShopPage() {
             {promoSlides.map((_, idx) => (
               <motion.button
                 key={idx}
+                type="button"
                 onClick={() => setCarouselIndex(idx)}
-                className={cn('rounded-full transition-all', idx === carouselIndex ? 'bg-white w-2 h-2' : 'bg-white/50 w-1.5 h-1.5')}
-              />
+                aria-label={`Go to slide ${idx + 1} of ${promoSlides.length}`}
+                aria-current={idx === carouselIndex ? 'true' : undefined}
+                // 24×24 hit area (WCAG 2.5.8) around a small visual dot.
+                className="flex h-6 w-6 items-center justify-center rounded-full"
+              >
+                <span className={cn('block rounded-full transition-all', idx === carouselIndex ? 'bg-white w-2 h-2' : 'bg-white/50 w-1.5 h-1.5')} />
+              </motion.button>
             ))}
           </div>
         </motion.div>
@@ -383,6 +389,7 @@ export default function ShopPage() {
             <h2 className="font-display text-lg font-semibold text-foreground">{selectedCategory !== 'All' ? selectedCategory : 'All Products'}</h2>
             <select
               value={sortBy}
+              aria-label="Sort products"
               onChange={e => setSortBy(e.target.value)}
               className="px-3 py-2 bg-background-elevated border border-border rounded-xl text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/30"
             >

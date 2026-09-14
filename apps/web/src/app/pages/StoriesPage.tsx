@@ -257,7 +257,7 @@ export default function StoriesPage() {
               whileTap={reduce ? {} : { scale: 0.95 }}
               type="button"
               aria-label="Send reply"
-              className="size-11 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-white/50 outline-none flex-shrink-0"
+              className="size-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-white/50 outline-none flex-shrink-0"
             >
               <svg
                 className="w-5 h-5"

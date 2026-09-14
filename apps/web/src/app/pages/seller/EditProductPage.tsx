@@ -92,7 +92,7 @@ export default function EditProductPage() {
                         </div>
                       )}
                       {i === 1 && (
-                        <button className="absolute top-2 right-2 p-1 bg-error text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove image">
+                        <button className="absolute top-2 right-2 p-1 bg-error text-error-foreground rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove image">
                           <Trash2 className="size-4" />
                         </button>
                       )}

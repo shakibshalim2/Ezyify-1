@@ -150,7 +150,7 @@ export default function Navigation() {
                       className={`relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
                         active
                           ? 'bg-primary/10 text-primary'
-                          : 'text-foreground-secondary/80 hover:text-foreground hover:bg-muted/70'
+                          : 'text-foreground-secondary hover:text-foreground hover:bg-muted/70'
                       }`}
                     >
                       {(link as any).isLive ? (

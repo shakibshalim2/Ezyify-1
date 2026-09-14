@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom/vitest';
+import * as axeMatchers from 'vitest-axe/matchers';
 import { cleanup } from '@testing-library/react';
-import { afterEach } from 'vitest';
+import { afterEach, expect } from 'vitest';
+
+expect.extend(axeMatchers);
 
 afterEach(() => cleanup());
 
@@ -36,4 +39,9 @@ if (!('ResizeObserver' in window)) {
     disconnect() {}
   }
   (window as unknown as { ResizeObserver: unknown }).ResizeObserver = RO;
+}
+
+// axe needs these in jsdom
+if (!HTMLCanvasElement.prototype.getContext) {
+  HTMLCanvasElement.prototype.getContext = () => null as never;
 }

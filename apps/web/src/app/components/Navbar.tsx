@@ -79,7 +79,7 @@ export function Navbar({ onVoiceClick }: NavbarProps) {
 
             <Link to="/cart" aria-label="Cart" className="relative p-2 hover:bg-muted rounded-full transition">
               <ShoppingCart className="w-5 h-5 text-foreground-secondary" />
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary rounded-full flex items-center justify-center text-[10px] font-bold text-white">3</span>
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary rounded-full flex items-center justify-center text-[10px] font-bold text-primary-foreground">3</span>
             </Link>
 
             <button aria-label="Change language" className="hidden md:block p-2 hover:bg-muted rounded-full transition">

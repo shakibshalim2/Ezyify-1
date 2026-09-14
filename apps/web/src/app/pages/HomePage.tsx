@@ -500,7 +500,7 @@ export default function HomePage() {
                 <span className="text-[10px] font-semibold text-error">{streams.length} LIVE</span>
               </span>
             </div>
-            <p className="text-[11px] text-foreground-secondary/70 mt-0.5 leading-none">Watch live streams from creators &amp; stores</p>
+            <p className="text-[11px] text-foreground-secondary mt-0.5 leading-none">Watch live streams from creators &amp; stores</p>
           </div>
         </div>
         <Link to="/live-shopping" className="text-[12px] font-semibold text-primary hover:text-primary/75 transition-colors flex items-center gap-0.5">
@@ -521,7 +521,7 @@ export default function HomePage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
                 {/* Live badge */}
-                <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full bg-error text-white text-[10px] font-black">
+                <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full bg-error text-error-foreground text-[10px] font-black">
                   <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                   LIVE
                 </div>
@@ -584,7 +584,7 @@ export default function HomePage() {
             >
               <Tag className="w-3 h-3 text-primary/70 shrink-0 group-hover:text-primary transition-colors" />
               <span className="text-[12px] font-medium text-foreground/80 group-hover:text-foreground transition-colors">{tag.slice(1)}</span>
-              <span className="text-[10px] text-foreground-secondary/60 font-medium">{cnt}</span>
+              <span className="text-[10px] text-foreground-secondary font-medium">{cnt}</span>
             </Link>
           ))}
         </div>
@@ -606,7 +606,7 @@ export default function HomePage() {
           </div>
           <div>
             <p className="text-[13px] font-semibold text-foreground leading-tight">Trending Products</p>
-            <p className="text-[11px] text-foreground-secondary/70 mt-0.5 leading-none">Picked for you today</p>
+            <p className="text-[11px] text-foreground-secondary mt-0.5 leading-none">Picked for you today</p>
           </div>
         </div>
         <Link to="/shop" className="text-[12px] font-semibold text-primary hover:text-primary/75 transition-colors flex items-center gap-0.5">
@@ -646,12 +646,12 @@ export default function HomePage() {
                 <h4 className="text-[12px] font-medium text-foreground line-clamp-2 mb-1.5 leading-snug">{product.name}</h4>
                 <div className="flex items-baseline gap-1.5 mb-1">
                   <span className="text-[13px] font-bold text-foreground">${product.price}</span>
-                  {product.originalPrice && <span className="text-[11px] text-foreground-secondary/60 line-through">${product.originalPrice}</span>}
+                  {product.originalPrice && <span className="text-[11px] text-foreground-secondary line-through">${product.originalPrice}</span>}
                 </div>
                 <div className="flex items-center gap-1">
                   <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
                   <span className="text-[11px] font-medium text-foreground/70">{product.rating}</span>
-                  {product.sold && <span className="text-[11px] text-foreground-secondary/55">· {fmtCount(product.sold)} sold</span>}
+                  {product.sold && <span className="text-[11px] text-foreground-secondary">· {fmtCount(product.sold)} sold</span>}
                 </div>
               </div>
             </Link>
@@ -684,8 +684,8 @@ export default function HomePage() {
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-600">HOT</span>
               </div>
               <div className="flex items-center gap-1 mt-0.5">
-                <Clock className="w-3 h-3 text-foreground-secondary/60 shrink-0" />
-                <span className="text-[11px] text-foreground-secondary/70 tabular-nums">
+                <Clock className="w-3 h-3 text-foreground-secondary shrink-0" />
+                <span className="text-[11px] text-foreground-secondary tabular-nums">
                   Ends in <span className="font-semibold text-orange-600">{countdown || '—'}</span>
                 </span>
               </div>
@@ -709,7 +709,7 @@ export default function HomePage() {
                 <div className="aspect-[4/3] relative overflow-hidden bg-muted/40">
                   <img loading="lazy" src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
                   {pct && (
-                    <span className="absolute top-2 left-2 text-white px-1.5 py-0.5 rounded-md text-[10px] font-bold leading-none bg-orange-500">
+                    <span className="absolute top-2 left-2 text-accent-brand-foreground px-1.5 py-0.5 rounded-md text-[10px] font-bold leading-none bg-accent-brand">
                       -{pct}%
                     </span>
                   )}
@@ -728,12 +728,12 @@ export default function HomePage() {
                   <h4 className="text-[12px] font-medium text-foreground line-clamp-2 mb-1 leading-snug">{product.name}</h4>
                   <div className="flex items-baseline gap-1.5 mb-1">
                     <span className="text-[13px] font-bold text-orange-600">${product.price}</span>
-                    {product.originalPrice && <span className="text-[11px] text-foreground-secondary/55 line-through">${product.originalPrice}</span>}
+                    {product.originalPrice && <span className="text-[11px] text-foreground-secondary line-through">${product.originalPrice}</span>}
                   </div>
                   <div className="flex items-center gap-1">
                     <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
                     <span className="text-[11px] font-medium text-foreground/70">{product.rating}</span>
-                    {product.sold && <span className="text-[11px] text-foreground-secondary/55">· {fmtCount(product.sold)} sold</span>}
+                    {product.sold && <span className="text-[11px] text-foreground-secondary">· {fmtCount(product.sold)} sold</span>}
                   </div>
                 </div>
               </Link>
@@ -782,9 +782,9 @@ export default function HomePage() {
                 <span className="text-[9px] font-bold px-1.5 py-[2px] rounded-full bg-primary/10 text-primary leading-none">Creator</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] text-foreground-secondary/80">{user.followers} followers</span>
-                <span className="text-foreground-secondary/35 text-[10px]">·</span>
-                <span className="text-[11px] text-foreground-secondary/70">{user.bio}</span>
+                <span className="text-[11px] text-foreground-secondary">{user.followers} followers</span>
+                <span className="text-foreground-secondary text-[10px]">·</span>
+                <span className="text-[11px] text-foreground-secondary">{user.bio}</span>
               </div>
             </div>
           </Link>
@@ -821,6 +821,7 @@ export default function HomePage() {
                     <button
                       type="button"
                       onClick={e => addToCart(e, product.id, product.name)}
+                      aria-label={inCart ? 'In cart' : 'Add to cart'}
                       className={`absolute bottom-2 right-2 w-10 h-10 rounded-full flex items-center justify-center shadow-sm transition-all duration-200 ${
                         inCart ? 'bg-emerald-500 opacity-100' : 'bg-white/90 sm:opacity-0 sm:group-hover:opacity-100 opacity-90'
                       }`}
@@ -832,7 +833,7 @@ export default function HomePage() {
                     <h4 className="text-[12px] font-medium text-foreground line-clamp-2 mb-1 leading-snug">{product.name}</h4>
                     <div className="flex items-baseline gap-1 mb-1">
                       <span className="text-[13px] font-bold text-foreground">${product.price}</span>
-                      {product.originalPrice && <span className="text-[10px] text-foreground-secondary/60 line-through">${product.originalPrice}</span>}
+                      {product.originalPrice && <span className="text-[10px] text-foreground-secondary line-through">${product.originalPrice}</span>}
                     </div>
                     <div className="flex items-center gap-1">
                       <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400 shrink-0" />
@@ -871,7 +872,7 @@ export default function HomePage() {
           </div>
           <div>
             <p className="text-[13px] font-semibold text-foreground leading-tight">Trending Loops</p>
-            <p className="text-[11px] text-foreground-secondary/70 mt-0.5 leading-none">Short videos picked for you</p>
+            <p className="text-[11px] text-foreground-secondary mt-0.5 leading-none">Short videos picked for you</p>
           </div>
         </div>
         <Link to="/loops" className="text-[12px] font-semibold text-primary hover:text-primary/75 transition-colors flex items-center gap-0.5">
@@ -928,7 +929,7 @@ export default function HomePage() {
             <img key={c.id} src={c.avatar} alt={c.name} className="w-6 h-6 rounded-full object-cover ring-2 ring-background" />
           ))}
         </div>
-        <span className="text-[12px] text-foreground-secondary/80">Posts from people you follow</span>
+        <span className="text-[12px] text-foreground-secondary">Posts from people you follow</span>
       </div>
       <Link to="/explore" className="text-[12px] font-semibold text-primary hover:text-primary/75 transition-colors flex items-center gap-0.5">
         Discover <ChevronRight className="w-3.5 h-3.5" />
@@ -967,7 +968,7 @@ export default function HomePage() {
               </div>
               <div className="text-center">
                 <p className="text-[10px] font-semibold text-foreground/80 group-hover:text-foreground transition-colors leading-tight">{label}</p>
-                <p className="text-[9px] text-foreground-secondary/50 tabular-nums">{count}</p>
+                <p className="text-[9px] text-foreground-secondary tabular-nums">{count}</p>
               </div>
             </Link>
           ))}
@@ -990,7 +991,7 @@ export default function HomePage() {
           </div>
           <div>
             <p className="text-[13px] font-semibold text-foreground leading-tight">Community</p>
-            <p className="text-[11px] text-foreground-secondary/70 mt-0.5 leading-none">Real reviews &amp; discussions</p>
+            <p className="text-[11px] text-foreground-secondary mt-0.5 leading-none">Real reviews &amp; discussions</p>
           </div>
         </div>
         <Link to="/explore" className="text-[12px] font-semibold text-primary hover:text-primary/75 transition-colors flex items-center gap-0.5">
@@ -1027,11 +1028,11 @@ export default function HomePage() {
               )}
               <p className="text-[12px] text-foreground/80 leading-snug">{review.text}</p>
               <div className="flex items-center gap-3 mt-1.5">
-                <button type="button" className="flex items-center gap-1 text-[11px] text-foreground-secondary/60 hover:text-like transition-colors">
+                <button type="button" className="flex items-center gap-1 text-[11px] text-foreground-secondary hover:text-like transition-colors">
                   <Heart className="w-3 h-3" /><span>{review.likes}</span>
                 </button>
                 {review.replies !== undefined && review.replies !== null && (
-                  <button type="button" className="flex items-center gap-1 text-[11px] text-foreground-secondary/60 hover:text-foreground transition-colors">
+                  <button type="button" className="flex items-center gap-1 text-[11px] text-foreground-secondary hover:text-foreground transition-colors">
                     <MessageCircle className="w-3 h-3" /><span>{review.replies} replies</span>
                   </button>
                 )}
@@ -1061,7 +1062,7 @@ export default function HomePage() {
           </div>
           <div>
             <p className="text-[13px] font-semibold text-foreground leading-tight">Recommended For You</p>
-            <p className="text-[11px] text-foreground-secondary/70 mt-0.5 leading-none">Based on your interests</p>
+            <p className="text-[11px] text-foreground-secondary mt-0.5 leading-none">Based on your interests</p>
           </div>
         </div>
         <Link to="/explore" className="text-[12px] font-semibold text-primary hover:text-primary/75 transition-colors flex items-center gap-0.5">
@@ -1108,8 +1109,8 @@ export default function HomePage() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="text-[11px] text-primary font-medium">{creator.category}</span>
-                      <span className="text-foreground-secondary/40 text-[10px]">·</span>
-                      <span className="text-[11px] text-foreground-secondary/75">{fmtCount(creator.followers)} followers</span>
+                      <span className="text-foreground-secondary text-[10px]">·</span>
+                      <span className="text-[11px] text-foreground-secondary">{fmtCount(creator.followers)} followers</span>
                     </div>
                   </div>
                 </Link>
@@ -1145,12 +1146,12 @@ export default function HomePage() {
                     {store.verified && <VerifiedBadge variant="seller" size="sm" />}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-foreground-secondary/75">{store.category}</span>
-                    <span className="text-foreground-secondary/35 text-[10px]">·</span>
+                    <span className="text-[11px] text-foreground-secondary">{store.category}</span>
+                    <span className="text-foreground-secondary text-[10px]">·</span>
                     <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400 shrink-0" />
                     <span className="text-[11px] text-foreground/65 font-medium">{store.rating}</span>
-                    <span className="text-foreground-secondary/35 text-[10px]">·</span>
-                    <span className="text-[11px] text-foreground-secondary/65">{store.products} products</span>
+                    <span className="text-foreground-secondary text-[10px]">·</span>
+                    <span className="text-[11px] text-foreground-secondary">{store.products} products</span>
                   </div>
                 </div>
               </Link>
@@ -1217,7 +1218,7 @@ export default function HomePage() {
                     </div>
                   )}
                   {story.isLive && !story.isYou && (
-                    <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 px-1.5 py-px rounded-full bg-error text-white text-[8px] font-black leading-none whitespace-nowrap border border-card">
+                    <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 px-1.5 py-px rounded-full bg-error text-error-foreground text-[8px] font-black leading-none whitespace-nowrap border border-card">
                       LIVE
                     </div>
                   )}
@@ -1333,7 +1334,7 @@ export default function HomePage() {
             {isLoading ? (
               <><span className="w-3.5 h-3.5 border-2 border-muted-foreground/30 border-t-foreground/70 rounded-full animate-spin" />Loading…</>
             ) : (
-              <>Load more posts<span className="text-foreground-secondary/45 group-hover:text-foreground-secondary transition-colors">↓</span></>
+              <>Load more posts<span className="text-foreground-secondary group-hover:text-foreground-secondary transition-colors">↓</span></>
             )}
           </button>
         </div>

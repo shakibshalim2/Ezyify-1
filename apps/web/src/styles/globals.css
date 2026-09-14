@@ -66,8 +66,8 @@
   --background-overlay: rgba(0, 0, 0, 0.4);
 
   --foreground: #0d0f1a;
-  --foreground-secondary: #6b7280;
-  --foreground-tertiary: #9ca3af;
+  --foreground-secondary: #525b6a;
+  --foreground-tertiary: #6b7280;
 
   --card: #ffffff;
   --card-foreground: #0d0f1a;
@@ -183,7 +183,7 @@
 
   --foreground: #f0f2ff;
   --foreground-secondary: #9ca3af;
-  --foreground-tertiary: #6b7280;
+  --foreground-tertiary: #8b93a1;
 
   --card: #151824;
   --card-foreground: #f0f2ff;
@@ -193,7 +193,7 @@
 
   --primary: #6680fa;
   --primary-hover: #7b91fb;
-  --primary-foreground: #ffffff;
+  --primary-foreground: #0a0d14;
   --primary-subtle: #1a2040;
 
   --purple: #9061f9;

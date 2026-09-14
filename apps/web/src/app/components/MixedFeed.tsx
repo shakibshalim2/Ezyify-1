@@ -217,7 +217,7 @@ export function MixedFeed({ filter }: MixedFeedProps) {
                       </div>
                     )}
                     {isLive && (
-                      <div className="w-full py-2.5 mt-2 bg-error text-white text-sm font-semibold rounded-xl text-center hover:bg-error/90 transition-colors">
+                      <div className="w-full py-2.5 mt-2 bg-error text-error-foreground text-sm font-semibold rounded-xl text-center hover:bg-error/90 transition-colors">
                         Join Live Now
                       </div>
                     )}

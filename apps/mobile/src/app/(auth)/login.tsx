@@ -56,11 +56,11 @@ export default function LoginScreen() {
         <Chip label="Phone" icon="call-outline" selected={method === 'phone'} onPress={() => setMethod('phone')} />
       </View>
       {method === 'email' ? (
-        <Field label="Email" icon="mail-outline" placeholder="you@example.com" autoCapitalize="none" autoComplete="email" keyboardType="email-address" value={identifier} onChangeText={setIdentifier} error={errors.identifier} />
+        <Field testID="login-email" label="Email" icon="mail-outline" placeholder="you@example.com" autoCapitalize="none" autoComplete="email" keyboardType="email-address" value={identifier} onChangeText={setIdentifier} error={errors.identifier} />
       ) : (
         <Field label="Phone number" icon="call-outline" placeholder="+62 812 3456 7890" autoComplete="tel" keyboardType="phone-pad" value={identifier} onChangeText={setIdentifier} error={errors.identifier} />
       )}
-      <Field label="Password" icon="lock-closed-outline" placeholder="••••••••" secureTextEntry autoComplete="password" value={password} onChangeText={setPassword} error={errors.password} onSubmitEditing={submit} returnKeyType="go" />
+      <Field testID="login-password" label="Password" icon="lock-closed-outline" placeholder="••••••••" secureTextEntry autoComplete="password" value={password} onChangeText={setPassword} error={errors.password} onSubmitEditing={submit} returnKeyType="go" />
       <Link href="/(auth)/forgot-password" asChild>
         <Pressable accessibilityRole="link" style={{ alignSelf: 'flex-end' }}><Text variant="label" tone="brand">Forgot password?</Text></Pressable>
       </Link>

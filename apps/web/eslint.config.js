@@ -6,7 +6,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules', 'coverage', 'public/service-worker.js', 'src/imports/**', '**/*.timestamp-*.mjs', 'playwright-report', 'test-results'] },
+  { ignores: ['lighthouserc.cjs', 'dist', 'node_modules', 'coverage', 'public/service-worker.js', 'src/imports/**', '**/*.timestamp-*.mjs', 'playwright-report', 'test-results'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -26,7 +26,7 @@ export default tseslint.config(
   // Generated code: lint new/redesigned surfaces strictly, legacy pages leniently until each is redesigned
   {
     files: ['src/app/pages/**', 'src/app/components/**', 'src/app/utils/**', 'src/app/hooks/**', 'src/app/data/**', 'src/app/mocks/**', 'src/app/contexts/**', 'src/app/services/**', 'src/app/*.ts', 'src/app/*.tsx'],
-    ignores: ['src/app/components/primitives/**', 'src/app/features/**'],
+    ignores: ['lighthouserc.cjs', 'src/app/components/primitives/**', 'src/app/features/**'],
     rules: {
       '@typescript-eslint/no-unused-vars': 'off',
       'react-hooks/exhaustive-deps': 'off',

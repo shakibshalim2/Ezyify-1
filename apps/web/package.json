@@ -18,7 +18,10 @@
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",
     "e2e:install": "playwright install --with-deps chromium",
-    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "lighthouse": "lhci autorun",
+    "e2e:update-snapshots": "PW_VISUAL=1 playwright test --update-snapshots",
+    "e2e:visual": "PW_VISUAL=1 playwright test"
   },
   "dependencies": {
     "@ezyify/core": "workspace:*",
@@ -77,6 +80,7 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.17.0",
     "@ezyify/config": "workspace:*",
     "@playwright/test": "^1.63.0",
@@ -89,6 +93,7 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "4.7.0",
     "@vitest/coverage-v8": "^2.1.8",
+    "axe-core": "^4.13.0",
     "eslint": "^9.17.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^5.1.0",
@@ -100,6 +105,8 @@
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.18.1",
     "vite": "6.3.5",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "vitest-axe": "^0.1.0",
+    "@lhci/cli": "^0.15.1"
   }
 }

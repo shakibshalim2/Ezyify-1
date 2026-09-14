@@ -170,7 +170,8 @@ export default function CheckoutPage() {
     setIsProcessing(true);
 
     setTimeout(() => {
-      const randomFail = Math.random();
+      // Demo-mode failure simulation (15 %) so the failure sheets are reachable; disabled for automated runs.
+      const randomFail = localStorage.getItem('ezyify.e2e') === '1' ? 0 : Math.random();
 
       if (randomFail > 0.9) {
         setPaymentError('PAYMENT_GATEWAY_ERROR');

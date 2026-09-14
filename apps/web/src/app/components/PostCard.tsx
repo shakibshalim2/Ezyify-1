@@ -157,7 +157,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
               <img loading="lazy" src={post.user.avatar} alt={post.user.name} className="w-9 h-9 rounded-full object-cover ring-[1.5px] ring-border/60 group-hover:ring-2 group-hover:ring-primary/30 transition-all" />
             )}
             {isLive && (
-              <span className="absolute -bottom-0.5 -right-0.5 px-1 py-px rounded-full text-[8px] font-black text-white leading-none bg-error border border-card">
+              <span className="absolute -bottom-0.5 -right-0.5 px-1 py-px rounded-full text-[8px] font-black text-error-foreground leading-none bg-error border border-card">
                 LIVE
               </span>
             )}
@@ -167,7 +167,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
               <span className="font-semibold text-[13px] text-foreground truncate leading-tight">{post.user.name}</span>
               {post.user.verified && <VerifiedBadge size="sm" />}
             </div>
-            <p className="text-[11px] text-foreground-secondary/70 leading-none">{post.timestamp}</p>
+            <p className="text-[11px] text-foreground-secondary leading-none">{post.timestamp}</p>
           </div>
         </Link>
 
@@ -187,7 +187,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
               ? <><UserCheck className="w-3 h-3" /><span className="ml-0.5">Following</span></>
               : <><UserPlus className="w-3 h-3" /><span className="ml-0.5">Follow</span></>}
           </button>
-          <button type="button" aria-label="More" className="p-1.5 rounded-xl text-foreground-secondary/60 hover:text-foreground hover:bg-muted/80 transition-all">
+          <button type="button" aria-label="More" className="p-1.5 rounded-xl text-foreground-secondary hover:text-foreground hover:bg-muted/80 transition-all">
             <MoreVertical className="w-4 h-4" />
           </button>
         </div>

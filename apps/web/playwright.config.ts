@@ -4,11 +4,16 @@ const PORT = 4173;
 
 export default defineConfig({
   testDir: './e2e',
+  // Visual baselines are rendering-environment specific; they run as their own (non-blocking) CI step.
+  testIgnore: process.env.PW_VISUAL ? undefined : ['**/visual.spec.ts'],
+  grep: process.env.PW_VISUAL ? /visual:/ : undefined,
   timeout: 30_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
+  snapshotPathTemplate: '{testDir}/__screenshots__/{testFilePath}/{arg}{ext}',
+  expect: { toHaveScreenshot: { animations: 'disabled', scale: 'css' } },
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     trace: 'retain-on-failure',

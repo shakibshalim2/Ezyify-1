@@ -91,7 +91,7 @@ function ChatList({ messages, endRef, compact }: { messages: ChatMessage[]; endR
           className={`flex max-w-[92%] items-start gap-2 text-[13px] leading-snug ${compact ? 'drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : ''}`}
         >
           {m.isSystem ? (
-            <span className="rounded-full bg-accent-brand/90 px-2.5 py-1 text-xs font-medium text-white">
+            <span className="rounded-full bg-accent-brand px-2.5 py-1 text-xs font-medium text-accent-brand-foreground">
               {m.message}
             </span>
           ) : (

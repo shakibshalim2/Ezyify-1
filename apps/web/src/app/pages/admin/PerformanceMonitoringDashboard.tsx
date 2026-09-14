@@ -502,7 +502,7 @@ export default function PerformanceMonitoringDashboard() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                          alert.severity === 'critical' ? 'bg-error text-white' :
+                          alert.severity === 'critical' ? 'bg-error text-error-foreground' :
                           alert.severity === 'warning' ? 'bg-warning text-warning-foreground' :
                           'bg-info text-white'
                         }`}>

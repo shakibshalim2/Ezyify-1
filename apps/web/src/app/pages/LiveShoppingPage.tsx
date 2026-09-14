@@ -184,7 +184,7 @@ export default function LiveShoppingPage() {
             
             {/* LIVE badge */}
             {stream.isLive && (
-              <Badge className="absolute top-2 left-2 bg-error text-white animate-pulse">
+              <Badge className="absolute top-2 left-2 bg-error text-error-foreground animate-pulse">
                 <span className="inline-block w-2 h-2 rounded-full bg-white mr-1.5" />
                 LIVE
               </Badge>

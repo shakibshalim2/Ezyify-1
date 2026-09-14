@@ -6,6 +6,8 @@ export const test = base.extend({
     await page.addInitScript(() => {
       window.localStorage.setItem('ezyify.onboarding.seen', 'true');
       window.localStorage.setItem('ezyify.splash.shownAt', String(Date.now()));
+      // Turns off demo-mode randomness (simulated payment failures) so journeys are deterministic.
+      window.localStorage.setItem('ezyify.e2e', '1');
     });
     await provide(page);
   },

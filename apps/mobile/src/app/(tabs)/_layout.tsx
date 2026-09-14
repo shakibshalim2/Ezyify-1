@@ -8,6 +8,8 @@ type IconName = keyof typeof Ionicons.glyphMap;
 
 const tab = (name: IconName, active: IconName, label: string) => ({
   title: label,
+  // Stable hooks for Maestro flows (apps/mobile/.maestro).
+  tabBarButtonTestID: `tab-${label.toLowerCase()}`,
   tabBarIcon: ({ color, focused, size }: { color: ColorValue; focused: boolean; size: number }) => (
     <Ionicons name={focused ? active : name} size={size} color={color} />
   ),

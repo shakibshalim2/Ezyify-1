@@ -106,7 +106,7 @@ export function OfflineIndicator() {
 
       {/* Subtle Offline Top Bar */}
       {!isOnline && (
-        <div className="fixed top-0 left-0 right-0 z-40 bg-error text-white py-1">
+        <div className="fixed top-0 left-0 right-0 z-40 bg-error text-error-foreground py-1">
           <div className="container mx-auto px-4">
             <div className="flex items-center justify-center gap-2 text-xs font-medium">
               <WifiOff className="w-3 h-3" />

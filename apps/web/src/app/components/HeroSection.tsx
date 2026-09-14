@@ -56,7 +56,7 @@ export function HeroSection() {
             Watch Loops
           </Link>
 
-          <Link to="/live/1" className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-sm text-white bg-error hover:bg-error transition-all duration-200 hover:scale-105"
+          <Link to="/live/1" className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-sm text-error-foreground bg-error hover:bg-error transition-all duration-200 hover:scale-105"
             style={{ boxShadow: '0 4px 18px rgba(239,68,68,0.35)' }}>
             <span className="w-2 h-2 bg-white rounded-full live-badge" />
             Join Live Now

@@ -234,7 +234,7 @@ export default function SystemArchitectureVisualizer() {
           onClick={() => setActiveFlow('security')}
           className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
             activeFlow === 'security' 
-              ? 'bg-error text-white shadow-md' 
+              ? 'bg-error text-error-foreground shadow-md' 
               : 'bg-white text-muted-foreground border border-gray-200 hover:border-error/40'
           }`}
         >
