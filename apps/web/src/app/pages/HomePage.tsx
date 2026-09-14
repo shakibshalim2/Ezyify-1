@@ -77,7 +77,7 @@ function ProductTile({ product }: { product: ProductSummary }) {
           onClick={onAdd}
           disabled={pending || !product.inStock}
           aria-label={inCart ? 'In cart' : `Add ${product.name} to cart`}
-          className={`absolute bottom-2 right-2 w-10 h-10 rounded-full flex items-center justify-center shadow-sm transition-all duration-200 ${inCart ? 'bg-emerald-500 opacity-100' : 'bg-white sm:opacity-0 sm:group-hover:opacity-100 opacity-90 hover:bg-primary hover:text-white'}`}
+          className={`absolute bottom-2 right-2 w-10 h-10 rounded-full flex items-center justify-center shadow-sm transition-all duration-200 ${inCart ? 'bg-success opacity-100' : 'bg-white sm:opacity-0 sm:group-hover:opacity-100 opacity-90 hover:bg-primary hover:text-white'}`}
         >
           {inCart ? <Check className="w-3.5 h-3.5 text-white" /> : <ShoppingCart className="w-3.5 h-3.5 text-foreground" />}
         </button>

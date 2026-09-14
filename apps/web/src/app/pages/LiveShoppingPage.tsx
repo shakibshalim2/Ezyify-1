@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
+import { useLiveReminders } from '../lib/reminders';
 
 interface LiveStream {
   id: string;
@@ -77,6 +78,13 @@ export default function LiveShoppingPage() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const reminders = useLiveReminders();
+  const remind = async (stream: UpcomingStream) => {
+    const added = await reminders.toggle({ id: stream.id, title: stream.title, at: null });
+    toast.success(added ? `We’ll remind you: ${stream.title}` : 'Reminder removed', {
+      description: added ? `Starts ${stream.scheduledFor} · ${stream.host}` : undefined,
+    });
+  };
 
   useEffect(() => {
     if ('requestIdleCallback' in window) {
@@ -310,7 +318,7 @@ export default function LiveShoppingPage() {
                 key={stream.id}
                 whileHover={{ x: 4 }}
                 className="group cursor-pointer"
-                onClick={() => toast.success('Reminder set for this stream!')}
+                onClick={() => remind(stream)}
               >
                 <Card className="border-border hover:border-primary/50 transition-colors">
                   <CardContent className="p-4">
@@ -330,17 +338,18 @@ export default function LiveShoppingPage() {
                           </div>
                         </div>
                       </div>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
+                      <Button
+                        size="sm"
+                        variant={reminders.has(stream.id) ? 'default' : 'outline'}
                         className="flex-shrink-0"
+                        aria-pressed={reminders.has(stream.id)}
                         onClick={e => {
                           e.stopPropagation();
-                          toast.success('Reminder set!');
+                          void remind(stream);
                         }}
                       >
-                        <Bell className="w-4 h-4 mr-1" />
-                        Remind
+                        <Bell className={`w-4 h-4 mr-1 ${reminders.has(stream.id) ? 'fill-current' : ''}`} />
+                        {reminders.has(stream.id) ? 'Reminding' : 'Remind'}
                       </Button>
                     </div>
                   </CardContent>

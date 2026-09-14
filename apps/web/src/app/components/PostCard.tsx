@@ -33,7 +33,7 @@ function ProductChip({ id, onAdd, inCart, pending }: { id: string; onAdd: (id: s
         onClick={e => { e.preventDefault(); e.stopPropagation(); onAdd(id, product.name); }}
         disabled={pending || !product.inStock}
         aria-label={inCart ? 'In cart' : `Add ${product.name} to cart`}
-        className={`mr-1 p-1 rounded-lg transition-all duration-200 ${inCart ? 'bg-emerald-500/15 text-emerald-600' : 'hover:bg-primary/10 text-foreground-secondary hover:text-primary'}`}
+        className={`mr-1 p-1 rounded-lg transition-all duration-200 ${inCart ? 'bg-success/15 text-success' : 'hover:bg-primary/10 text-foreground-secondary hover:text-primary'}`}
       >
         {inCart ? <Check className="w-3.5 h-3.5" /> : <ShoppingCart className="w-3.5 h-3.5" />}
       </button>
@@ -173,8 +173,8 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0,
       {/* Reposted-by-you bar */}
       {isReposted && (
         <div className="flex items-center gap-1.5 px-3.5 pt-2.5 pb-0">
-          <Repeat2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-          <span className="text-[11px] font-semibold text-emerald-600">You reposted</span>
+          <Repeat2 className="w-3.5 h-3.5 text-success shrink-0" />
+          <span className="text-[11px] font-semibold text-success">You reposted</span>
         </div>
       )}
 
@@ -413,7 +413,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0,
             aria-label={isReposted ? 'Undo repost' : 'Repost'}
             aria-pressed={isReposted}
             className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 active:scale-[0.88] ${
-              isReposted ? 'text-emerald-500 hover:bg-emerald-500/10' : 'text-foreground-secondary hover:text-foreground hover:bg-muted/60'
+              isReposted ? 'text-success hover:bg-success/10' : 'text-foreground-secondary hover:text-foreground hover:bg-muted/60'
             }`}
           >
             <Repeat2 className="w-[18px] h-[18px] shrink-0" />

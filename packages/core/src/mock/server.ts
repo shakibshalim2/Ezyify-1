@@ -375,6 +375,7 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       if (cat) list = list.filter(p => fx.findProduct(p.id)!.category === cat);
       const seller = c.query.get('seller');
       if (seller) list = list.filter(p => p.seller.username === seller);
+      if (c.query.get('onSale') === 'true') list = list.filter(p => p.compareAtPrice && p.compareAtPrice.amount > p.price.amount);
       if (q) list = list.filter(p => p.name.toLowerCase().includes(q) || fx.findProduct(p.id)!.tags.some(t => t.includes(q)));
       const sort = c.query.get('sort');
       if (sort === 'price_asc') list.sort((a, b) => a.price.amount - b.price.amount);

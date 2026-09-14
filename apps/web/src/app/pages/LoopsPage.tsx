@@ -174,7 +174,7 @@ export default function LoopsPage() {
             <img
               loading="lazy"
               src={loop.content.video || loop.content.images?.[0] || ''}
-              alt=""
+              alt={loop.content.text ? `Loop by @${loop.user.username}: ${loop.content.text}` : `Loop by @${loop.user.username}`}
               className="absolute inset-0 w-full h-full object-cover"
             />
 

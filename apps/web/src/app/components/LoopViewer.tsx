@@ -231,10 +231,10 @@ export function LoopViewer({ loop, onClose }: LoopViewerProps) {
           label={isReposted ? 'Undo repost' : 'Repost'}
           count={fmt(repostCount + (isReposted ? 1 : 0))}
           active={isReposted}
-          activeClass="bg-emerald-500/20 border-emerald-400/30 shadow-[0_0_12px_rgba(52,211,153,0.4)]"
+          activeClass="bg-success/20 border-success/30 shadow-[0_0_12px_color-mix(in_srgb,var(--success)_40%,transparent)]"
         >
           <Repeat2 className={`w-[22px] h-[22px] sm:w-6 sm:h-6 transition-colors duration-200 ${
-            isReposted ? 'text-emerald-400' : 'text-white'
+            isReposted ? 'text-success' : 'text-white'
           }`} />
         </ActionBtn>
 

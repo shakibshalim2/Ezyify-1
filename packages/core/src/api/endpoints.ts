@@ -70,7 +70,7 @@ const Ok = z.object({ ok: z.literal(true) }).or(z.null());
 const Count = z.object({ count: z.number().int().min(0) });
 type PageQuery = { page?: number; pageSize?: number };
 export type FeedQuery = PageQuery & { kind?: 'post' | 'loop' | 'story'; author?: string; hashtag?: string };
-export type ProductQuery = PageQuery & { category?: string; q?: string; sort?: 'popular' | 'newest' | 'price_asc' | 'price_desc' | 'rating'; seller?: string };
+export type ProductQuery = PageQuery & { category?: string; q?: string; sort?: 'popular' | 'newest' | 'price_asc' | 'price_desc' | 'rating'; seller?: string; onSale?: boolean };
 
 const enc = encodeURIComponent;
 
