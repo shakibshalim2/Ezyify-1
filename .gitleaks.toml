@@ -1,0 +1,16 @@
+title = "Ezyify gitleaks config"
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Committed placeholders and generated fixtures"
+paths = [
+  '''apps/api/\.env\.example''',
+  '''apps/api/\.env\.test\.example''',
+  '''apps/mobile/google-services\.example\.json''',
+  '''pnpm-lock\.yaml''',
+]
+regexes = [
+  '''change-me-(access|refresh)''',
+  '''(dev|test|ci)-(access|refresh)-secret-[0-9a-z-]+''',
+]

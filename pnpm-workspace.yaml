@@ -1,2 +1,57 @@
 packages:
-  - '.'
+  - 'apps/*'
+  - 'packages/*'
+
+# apps/mobile is React 19 while apps/web is React 18; these RN libraries type against `react` without declaring
+# @types/react as a peer, so they'd fall back to whichever @types/react pnpm happens to hoist. Declaring the peer
+# makes each resolve the dependent's own @types/react.
+packageExtensions:
+  react-native-reanimated:
+    peerDependencies:
+      '@types/react': '*'
+  react-native-gesture-handler:
+    peerDependencies:
+      '@types/react': '*'
+  react-native-screens:
+    peerDependencies:
+      '@types/react': '*'
+  react-native-safe-area-context:
+    peerDependencies:
+      '@types/react': '*'
+  react-native-worklets:
+    peerDependencies:
+      '@types/react': '*'
+  expo-router:
+    peerDependencies:
+      '@types/react': '*'
+  expo-image:
+    peerDependencies:
+      '@types/react': '*'
+  expo-linear-gradient:
+    peerDependencies:
+      '@types/react': '*'
+  expo-modules-core:
+    peerDependencies:
+      '@types/react': '*'
+  '@expo/vector-icons':
+    peerDependencies:
+      '@types/react': '*'
+  '@react-navigation/native':
+    peerDependencies:
+      '@types/react': '*'
+  '@react-navigation/core':
+    peerDependencies:
+      '@types/react': '*'
+  '@react-navigation/bottom-tabs':
+    peerDependencies:
+      '@types/react': '*'
+  '@react-navigation/native-stack':
+    peerDependencies:
+      '@types/react': '*'
+  '@react-navigation/elements':
+    peerDependencies:
+      '@types/react': '*'
+  # jest-dom's `./vitest` entry imports `vitest` without declaring the peer; pin it to the consumer's own vitest.
+  '@testing-library/jest-dom':
+    peerDependencies:
+      vitest: '*'

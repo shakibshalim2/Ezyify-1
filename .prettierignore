@@ -1,0 +1,11 @@
+dist
+build
+.turbo
+node_modules
+coverage
+pnpm-lock.yaml
+apps/web/src/imports
+apps/mobile/android
+apps/web/src/app/docs
+docs
+*.md

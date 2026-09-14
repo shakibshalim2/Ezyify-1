@@ -1,0 +1,41 @@
+# deps / build
+node_modules/
+dist/
+build/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# env & secrets
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist
+
+# tooling
+.hoplite/artifacts/
+.hoplite/runtime/
+.hoplite/rebases/
+.vite/
+.eslintcache
+playwright-report/
+test-results/
+
+# expo / android
+apps/mobile/.expo/
+apps/mobile/android/app/build/
+apps/mobile/android/build/
+apps/mobile/android/.gradle/
+apps/mobile/android/local.properties
+apps/mobile/ios/build/
+
+# os / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.lighthouseci/

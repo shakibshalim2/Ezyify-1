@@ -1,0 +1,16 @@
+appId: com.ezyify.app
+---
+- launchApp
+- tapOn:
+    id: "tab-shop"
+- extendedWaitUntil:
+    visible: "Wireless Noise-Cancelling Headphones"
+    timeout: 15000
+- tapOn: "Wireless Noise-Cancelling Headphones"
+- assertVisible: "Add to cart"
+- tapOn: "Add to cart"
+- back
+- tapOn:
+    id: "tab-cart"
+- assertVisible: "Wireless Noise-Cancelling Headphones"
+- assertVisible: "Checkout"

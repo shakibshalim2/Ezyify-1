@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Monorepo · lint / typecheck / test / build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ezyify
+          POSTGRES_PASSWORD: ezyify
+          POSTGRES_DB: ezyify_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ezyify" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # apps/api tests migrate + seed this database, then run unit + e2e through the real Fastify stack.
+      DATABASE_URL: postgresql://ezyify:ezyify@localhost:5432/ezyify_test?schema=public
+      JWT_ACCESS_SECRET: ci-access-secret-0000000000000000000000000
+      JWT_REFRESH_SECRET: ci-refresh-secret-000000000000000000000000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run lint typecheck test build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 7
+
+  e2e:
+    name: Web · Playwright smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ezyify/web e2e:install
+      - run: pnpm turbo run e2e --filter=@ezyify/web
+      - name: Visual regression (non-blocking — baselines are rendering-environment specific)
+        run: pnpm --filter @ezyify/web e2e:visual
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 7
+
+  lighthouse:
+    name: Web · Lighthouse budget (perf ≥ 90, a11y ≥ 95)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+      - run: pnpm --filter @ezyify/web lighthouse
