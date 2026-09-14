@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router';
+import { absoluteUrl, isPrivatePath, site } from '../config/site';
 
 export interface SEOProps {
   title?: string;
@@ -17,18 +18,42 @@ export interface SEOProps {
   currency?: string;
   availability?: 'instock' | 'outofstock' | 'preorder';
   jsonLd?: object;
+  /** Force `noindex`. Defaults to true on private routes (`config/site.ts` PRIVATE_PREFIXES). */
+  noindex?: boolean;
 }
 
 const defaultMeta = {
-  siteName: "Ezyify",
-  defaultTitle: 'Ezyify — E-Commerce Social Media Ecosystem',
-  defaultDescription: 'Shop. Talk. Share. Live the Moment. Ezyify is your E-Commerce Social Media Ecosystem — discover and buy products, connect with creators, go live, and share content all in one place.',
-  defaultImage: 'https://ezyify.com/og-image.png',
-  defaultKeywords: 'e-commerce, social media, online shopping, content creation, live shopping, marketplace, creator economy, social selling, shopping community',
-  twitterHandle: '@ezyify',
-  fbAppId: '',
-  baseUrl: 'https://ezyify.com',
+  siteName: site.name,
+  defaultTitle: site.defaultTitle,
+  defaultDescription: site.defaultDescription,
+  defaultImage: site.ogImage,
+  defaultKeywords: 'social commerce, live shopping, escrow checkout, creator marketplace, shoppable video, online shopping',
+  twitterHandle: site.twitterHandle,
+  baseUrl: site.origin,
 };
+
+/** Titles already carrying the brand ("Cart — Ezyify") are kept verbatim; bare titles get the suffix. */
+const withBrand = (title: string) => (/ezyify/i.test(title) ? title : `${title} | ${site.name}`);
+
+function upsertMeta(attr: 'name' | 'property', key: string, content: string) {
+  let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
+  if (!el) {
+    el = document.createElement('meta');
+    el.setAttribute(attr, key);
+    document.head.appendChild(el);
+  }
+  el.content = content;
+}
+
+function upsertLink(rel: string, href: string) {
+  let el = document.head.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+  if (!el) {
+    el = document.createElement('link');
+    el.rel = rel;
+    document.head.appendChild(el);
+  }
+  el.href = href;
+}
 
 export function SEO({
   title,
@@ -46,115 +71,72 @@ export function SEO({
   currency = 'USD',
   availability,
   jsonLd,
+  noindex,
 }: SEOProps) {
   const location = useLocation();
 
-  const fullTitle = title ? `${title} | ${defaultMeta.siteName}` : defaultMeta.defaultTitle;
+  const fullTitle = title ? withBrand(title) : defaultMeta.defaultTitle;
   const metaDescription = description || defaultMeta.defaultDescription;
   const metaKeywords = keywords || defaultMeta.defaultKeywords;
   const metaImage = image || defaultMeta.defaultImage;
-  const metaUrl = url || `${defaultMeta.baseUrl}${location.pathname}`;
+  const metaUrl = url || absoluteUrl(location.pathname);
+  const robots = (noindex ?? isPrivatePath(location.pathname)) ? 'noindex, nofollow' : 'index, follow, max-image-preview:large';
 
   useEffect(() => {
-    // Update document title
     document.title = fullTitle;
 
-    // Helper function to update or create meta tags
-    const updateMeta = (name: string, content: string, property?: boolean) => {
-      const attr = property ? 'property' : 'name';
-      let element = document.querySelector(`meta[${attr}="${name}"]`) as HTMLMetaElement;
-      
-      if (!element) {
-        element = document.createElement('meta');
-        element.setAttribute(attr, name);
-        document.head.appendChild(element);
-      }
-      
-      element.content = content;
-    };
+    upsertMeta('name', 'description', metaDescription);
+    upsertMeta('name', 'keywords', metaKeywords);
+    if (author) upsertMeta('name', 'author', author);
+    upsertMeta('name', 'robots', robots);
 
-    // Basic meta tags
-    updateMeta('description', metaDescription);
-    updateMeta('keywords', metaKeywords);
-    if (author) updateMeta('author', author);
+    upsertMeta('property', 'og:title', fullTitle);
+    upsertMeta('property', 'og:description', metaDescription);
+    upsertMeta('property', 'og:image', metaImage);
+    upsertMeta('property', 'og:url', metaUrl);
+    upsertMeta('property', 'og:type', type);
+    upsertMeta('property', 'og:site_name', defaultMeta.siteName);
+    upsertMeta('property', 'og:locale', site.locale);
 
-    // Open Graph tags
-    updateMeta('og:title', fullTitle, true);
-    updateMeta('og:description', metaDescription, true);
-    updateMeta('og:image', metaImage, true);
-    updateMeta('og:url', metaUrl, true);
-    updateMeta('og:type', type, true);
-    updateMeta('og:site_name', defaultMeta.siteName, true);
-    
-    if (publishedTime) updateMeta('article:published_time', publishedTime, true);
-    if (modifiedTime) updateMeta('article:modified_time', modifiedTime, true);
-    if (section) updateMeta('article:section', section, true);
-    if (tags && tags.length > 0) {
-      tags.forEach(tag => {
-        const tagElement = document.createElement('meta');
-        tagElement.setAttribute('property', 'article:tag');
-        tagElement.content = tag;
-        document.head.appendChild(tagElement);
-      });
-    }
+    if (publishedTime) upsertMeta('property', 'article:published_time', publishedTime);
+    if (modifiedTime) upsertMeta('property', 'article:modified_time', modifiedTime);
+    if (section) upsertMeta('property', 'article:section', section);
+    document.head.querySelectorAll('meta[property="article:tag"]').forEach(el => el.remove());
+    tags?.forEach(tag => {
+      const el = document.createElement('meta');
+      el.setAttribute('property', 'article:tag');
+      el.content = tag;
+      document.head.appendChild(el);
+    });
 
-    // Twitter Card tags
-    updateMeta('twitter:card', 'summary_large_image');
-    updateMeta('twitter:site', defaultMeta.twitterHandle);
-    updateMeta('twitter:creator', author || defaultMeta.twitterHandle);
-    updateMeta('twitter:title', fullTitle);
-    updateMeta('twitter:description', metaDescription);
-    updateMeta('twitter:image', metaImage);
+    upsertMeta('name', 'twitter:card', 'summary_large_image');
+    upsertMeta('name', 'twitter:site', defaultMeta.twitterHandle);
+    upsertMeta('name', 'twitter:creator', author || defaultMeta.twitterHandle);
+    upsertMeta('name', 'twitter:title', fullTitle);
+    upsertMeta('name', 'twitter:description', metaDescription);
+    upsertMeta('name', 'twitter:image', metaImage);
 
-    // Product specific meta (if type is product)
     if (type === 'product' && price) {
-      updateMeta('product:price:amount', price, true);
-      updateMeta('product:price:currency', currency, true);
-      if (availability) {
-        updateMeta('product:availability', availability, true);
-      }
+      upsertMeta('property', 'product:price:amount', price);
+      upsertMeta('property', 'product:price:currency', currency);
+      if (availability) upsertMeta('property', 'product:availability', availability);
     }
 
-    // Mobile web app tags
-    updateMeta('mobile-web-app-capable', 'yes');
-    updateMeta('apple-mobile-web-app-capable', 'yes');
-    updateMeta('apple-mobile-web-app-status-bar-style', 'black-translucent');
-    updateMeta('theme-color', '#7c3aed');
+    upsertLink('canonical', metaUrl);
 
-    // Additional SEO tags
-    updateMeta('robots', 'index, follow');
-    updateMeta('googlebot', 'index, follow');
-    updateMeta('format-detection', 'telephone=no');
-
-    // Update canonical link
-    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
-    if (!canonical) {
-      canonical = document.createElement('link');
-      canonical.rel = 'canonical';
-      document.head.appendChild(canonical);
-    }
-    canonical.href = metaUrl;
-
-    // Add JSON-LD structured data
+    let script = document.head.querySelector<HTMLScriptElement>('script[type="application/ld+json"][data-seo]');
     if (jsonLd) {
-      let script = document.querySelector('script[type="application/ld+json"]') as HTMLScriptElement | null;
       if (!script) {
         script = document.createElement('script');
         script.type = 'application/ld+json';
+        script.dataset.seo = '1';
         document.head.appendChild(script);
       }
       script.textContent = JSON.stringify(jsonLd);
+    } else {
+      script?.remove();
     }
-
-    // Cleanup function to remove dynamic tags
-    return () => {
-      // Remove article tags if they exist
-      if (tags && tags.length > 0) {
-        const tagElements = document.querySelectorAll('meta[property="article:tag"]');
-        tagElements.forEach(el => el.remove());
-      }
-    };
-  }, [fullTitle, metaDescription, metaKeywords, metaImage, metaUrl, type, author, publishedTime, modifiedTime, section, tags, price, currency, availability, jsonLd]);
+  }, [fullTitle, metaDescription, metaKeywords, metaImage, metaUrl, type, author, publishedTime, modifiedTime, section, tags, price, currency, availability, jsonLd, robots]);
 
   return null;
 }
@@ -466,7 +448,7 @@ export const generateStructuredData = {
     name: defaultMeta.siteName,
     description: defaultMeta.defaultDescription,
     url: defaultMeta.baseUrl,
-    logo: `${defaultMeta.baseUrl}/logo.png`,
+    logo: `${defaultMeta.baseUrl}/icons/icon-512.png`,
     sameAs: [
       'https://www.facebook.com/ezyify',
       'https://twitter.com/ezyify',
@@ -486,7 +468,7 @@ export const generateStructuredData = {
       price: product.price,
       priceCurrency: product.currency,
       availability: `https://schema.org/${product.availability === 'instock' ? 'InStock' : 'OutOfStock'}`,
-      url: window.location.href,
+      url: typeof window === 'undefined' ? defaultMeta.baseUrl : window.location.href,
     },
     ...(product.rating && {
       aggregateRating: {
@@ -514,7 +496,7 @@ export const generateStructuredData = {
       name: defaultMeta.siteName,
       logo: {
         '@type': 'ImageObject',
-        url: `${defaultMeta.baseUrl}/logo.png`,
+        url: `${defaultMeta.baseUrl}/icons/icon-512.png`,
       },
     },
     ...(article.section && { articleSection: article.section }),

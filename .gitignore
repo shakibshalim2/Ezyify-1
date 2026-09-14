@@ -22,6 +22,7 @@ GoogleService-Info.plist
 .vite/
 .eslintcache
 playwright-report/
+apps/web/dev-dist/
 test-results/
 
 # expo / android

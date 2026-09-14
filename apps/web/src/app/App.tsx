@@ -15,12 +15,10 @@ import InstallPrompt from './components/InstallPrompt';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { RouteAwareLoader } from './components/RouteAwareLoader';
-import { WorldClassPerformanceMonitor } from './components/WorldClassPerformanceMonitor';
-import { registerServiceWorker } from './utils/serviceWorkerRegistration';
+import { CookieConsent } from './components/CookieConsent';
+import { registerPwa } from './pwa';
 import { initializeOptimizations } from './utils/advancedPerformance';
-import { loadFontsOptimized } from './utils/fontLoader';
 import { initializeManualTriggers } from './utils/systemTriggers';
-import { APP_VERSION } from './version';
 import { logPlatformStatus } from './console-status';
 import { displayLaunchStatusBanner, showLaunchReminder } from './utils/launchStatusBanner';
 import { markInitializationComplete } from './utils/initializationGuard';
@@ -262,10 +260,7 @@ export default function App() {
     // All heavy services deferred — never block the render pipeline
     const init = () => {
       try { initializeManualTriggers(); } catch (e) {}
-      try { loadFontsOptimized(); } catch (e) {}
-      try {
-        if (typeof navigator !== 'undefined') registerServiceWorker();
-      } catch (e) {}
+      try { registerPwa(); } catch (e) {}
       try { initializeOptimizations(); } catch (e) {}
       if (import.meta.env.DEV) {
         try { logPlatformStatus(); } catch (e) {}
@@ -296,19 +291,18 @@ export default function App() {
           <Toaster />
           {/* Wrapped in error boundaries - never blocks UI */}
           <ErrorBoundary fallback={null}>
-            <Analytics />
-          </ErrorBoundary>
-          <ErrorBoundary fallback={null}>
             <InstallPrompt />
           </ErrorBoundary>
           <ErrorBoundary fallback={null}>
             <OfflineIndicator />
           </ErrorBoundary>
-          {/* Performance monitor wrapped in error boundary - never blocks UI */}
-          <ErrorBoundary fallback={null}>
-            <WorldClassPerformanceMonitor />
-          </ErrorBoundary>
           <AuthProvider>
+          <ErrorBoundary fallback={null}>
+            <Analytics />
+          </ErrorBoundary>
+          <ErrorBoundary fallback={null}>
+            <CookieConsent />
+          </ErrorBoundary>
           <Suspense fallback={<RouteAwareLoader />}>
             <Routes>
               <Route path="/welcome" element={<OnboardingPage />} />

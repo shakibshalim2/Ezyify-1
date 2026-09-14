@@ -80,7 +80,7 @@ tested, ◐ = implemented, verification pending, ☐ = planned. Re-audit before 
 | 8.3.4 | Users can delete their account in-app; soft delete → sessions/devices revoked immediately → hard purge after 30 days (cron); restorable for 14 days | `account.controller.ts`, `orders.service.ts#housekeeping` | ☑ |
 | 8.3.5 | Data-safety mapping for Play Console (collected: email, name, phone(opt), photos (UGC), purchase history, device token; shared: payment processor) | `docs/plan/PLAY_STORE_CHECKLIST.md` | ☑ |
 | 8.3.7 | Money never as floats — integer minor units end to end | `core/schemas/common.ts#MoneySchema` | ☑ |
-| 8.3.8 | Cookie/consent preferences on web (analytics off by default) | — | ☐ Phase 8 with analytics |
+| 8.3.8 | Cookie/consent preferences on web: analytics/marketing **off by default**, GPC/DNT honoured as opt-out, PostHog only loads after consent, Sentry sends no PII without it; banner + `/privacy-preferences` | `apps/web/src/app/lib/consent.ts`, `lib/telemetry.ts`, `components/CookieConsent.tsx` | ☑ unit + e2e |
 
 ## V9 Communications
 
@@ -132,6 +132,7 @@ tested, ◐ = implemented, verification pending, ☐ = planned. Re-audit before 
 | # | Control | Where | Status |
 |---|---------|-------|--------|
 | 14.2 | Dependencies pinned via lockfile; latest stable majors (NestJS 12, Prisma 7, Expo 57, Vite 6/8) | `pnpm-lock.yaml` | ☑ |
+| 14.4.w | Web origin: CSP `default-src 'self'; script-src 'self'` (no inline scripts — theme bootstrap is `/theme-init.js`), `object-src 'none'`, `frame-ancestors 'none'`, HSTS preload, `nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` — emitted as `<meta>` in the build and as `_headers` for Cloudflare Pages/Netlify | `apps/web/vite/seo.ts` | ☑ e2e |
 | 14.4 | Helmet: `X-Content-Type-Options`, `X-Frame-Options`/`frame-ancestors 'none'`, `Referrer-Policy: no-referrer`, CSP `default-src 'none'` (prod), no `X-Powered-By`, `Cross-Origin-Resource-Policy` | `bootstrap.ts` | ☑ e2e |
 | 14.5 | CORS: explicit origins, credentials, allowed headers `Authorization, Content-Type, Idempotency-Key, X-Client` | `bootstrap.ts` | ☑ |
 | 14.5.2 | Production refuses `*`/localhost origins and placeholder secrets at boot | `config.ts` | ☑ unit |
@@ -140,7 +141,7 @@ tested, ◐ = implemented, verification pending, ☐ = planned. Re-audit before 
 ## Threat model highlights
 
 - **Token theft on device** → refresh token in Keystore, 7-day expiry, rotation + reuse detection, user-visible session list with revoke.
-- **XSS on web** → access token in memory only (never `localStorage`), refresh in `HttpOnly` cookie, React escaping, CSP planned for the web origin in Phase 8.
+- **XSS on web** → access token in memory only (never `localStorage`), refresh in `HttpOnly` cookie, React escaping, web CSP (`script-src 'self'`, no inline) shipped in Phase 8.5.
 - **CSRF** → refresh is the only cookie-authenticated endpoint; `SameSite=Lax` + Origin allow-list; everything else is bearer.
 - **Payment tampering** → prices come from the DB at checkout, never the client; wallet and escrow move in one transaction; webhooks signed + idempotent.
 - **Account enumeration** → identical responses/timing for unknown accounts on login/forgot.

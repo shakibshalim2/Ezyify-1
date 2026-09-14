@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { captureError } from '../lib/telemetry';
 
 interface Props {
   children: ReactNode;
@@ -62,6 +63,8 @@ export class ErrorBoundary extends Component<Props, State> {
       stack: error.stack,
       componentStack: errorInfo.componentStack,
     });
+
+    captureError(error, { componentStack: errorInfo.componentStack });
 
     // Track error count to prevent infinite error loops
     this.setState(prev => ({ errorCount: prev.errorCount + 1 }));

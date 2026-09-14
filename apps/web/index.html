@@ -1,22 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Ezyify — Shop. Talk. Share. Live the Moment.</title>
+    <meta name="description" content="Ezyify is a social commerce super-app: discover products from creators you trust, buy with escrow-protected checkout, chat with sellers and shop live." />
+    <meta name="application-name" content="Ezyify" />
+    <meta name="apple-mobile-web-app-title" content="Ezyify" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#0F66C7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0A0D14" />
+    <meta name="color-scheme" content="dark light" />
 
-  <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Ezyify</title>
-      <meta name="description" content="EZYIFY is a cutting-edge social commerce platform that seamlessly integrates social media and e-commerce, allowing users to discover, share, and purchase products effortlessly while engaging with creators and content." />
-      <meta name="robots" content="noindex, nofollow" />
-      <style>html, body { height: 100%; margin: 0; } #root { height: 100%; }</style>
-      
-    </head>
+    <meta property="og:site_name" content="Ezyify" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="Ezyify — Shop. Talk. Share. Live the Moment." />
+    <meta property="og:description" content="Ezyify is a social commerce super-app: discover products from creators you trust, buy with escrow-protected checkout, chat with sellers and shop live." />
+    <meta property="og:url" content="https://ezyify.app/" />
+    <meta property="og:image" content="https://ezyify.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@ezyify" />
+    <meta name="twitter:title" content="Ezyify — Shop. Talk. Share. Live the Moment." />
+    <meta name="twitter:description" content="Ezyify is a social commerce super-app: discover products from creators you trust, buy with escrow-protected checkout, chat with sellers and shop live." />
+    <meta name="twitter:image" content="https://ezyify.app/og-image.png" />
+    <link rel="canonical" href="https://ezyify.app/" />
 
-    <body>
-      
-      <div id="root"></div>
-      <script type="module" src="/src/main.tsx"></script>
-      
-    </body>
-  </html>
-  
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="icon" href="/favicon-16.png" sizes="16x16" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Splash-safe background before CSS arrives; the class flips with ThemeContext. -->
+    <style>
+      html, body { height: 100%; margin: 0; background: #0a0d14; }
+      html.light, html.light body { background: #f8f9fc; }
+      #root { height: 100%; }
+    </style>
+    <script src="/theme-init.js"></script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <div style="font-family: system-ui, sans-serif; padding: 2rem; color: #e6e9ef; text-align: center">
+        <h1 style="margin: 0 0 0.5rem">Ezyify</h1>
+        <p>Ezyify needs JavaScript to run. Please enable it, or install the Android app from Google Play.</p>
+      </div>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

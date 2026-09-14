@@ -6,7 +6,8 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 
 export default tseslint.config(
-  { ignores: ['lighthouserc.cjs', 'dist', 'node_modules', 'coverage', 'public/service-worker.js', 'src/imports/**', '**/*.timestamp-*.mjs', 'playwright-report', 'test-results'] },
+  { ignores: ['lighthouserc.cjs', 'dist', 'node_modules', 'coverage', 'public/theme-init.js', 'src/imports/**', '**/*.timestamp-*.mjs', 'playwright-report', 'test-results', 'dev-dist'] },
+  { files: ['scripts/**/*.mjs', 'vite/**/*.ts'], languageOptions: { globals: { ...globals.node } } },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
