@@ -6,6 +6,7 @@ import { getLoops } from '../data/posts';
 import { getProductById } from '../data/products';
 import { SEO, SEOConfigs } from '../components/SEO';
 import { CommentSheet } from '../components/CommentSheet';
+import { toCorePost } from '../data/posts';
 import { LoopProgressBar } from '../components/loops/LoopProgressBar';
 import { LoopCaption } from '../components/loops/LoopCaption';
 import { LoopActionRail } from '../components/loops/LoopActionRail';
@@ -273,7 +274,7 @@ export default function LoopsPage() {
       <CommentSheet
         open={commentSheetOpen}
         onOpenChange={setCommentSheetOpen}
-        post={currentLoop}
+        post={toCorePost(currentLoop)}
       />
 
       {/* Product sheet */}

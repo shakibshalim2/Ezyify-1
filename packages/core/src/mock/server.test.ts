@@ -81,6 +81,41 @@ describe('mock API server', () => {
     expect(s.refreshToken).toBeUndefined();
   });
 
+  it('web: the cookie jar carries the refresh token — silent refresh works, logout clears it', async () => {
+    let cookie: string | null = null;
+    const jar = { get: () => cookie, set: (v: string | null) => void (cookie = v) };
+    const fetch = createMockFetch({ latencyMs: 0, cookieJar: jar });
+    let access: string | null = null;
+    const client = createApiClient({
+      baseUrl: 'https://api.test/v1',
+      fetch,
+      tokens: {
+        getAccessToken: () => access,
+        setAccessToken: t => void (access = t),
+        refresh: async () => {
+          const res = await fetch('https://api.test/v1/auth/refresh', { method: 'POST', body: '{}' });
+          if (!res.ok) return null;
+          const json = (await res.json()) as { data: { accessToken: string } };
+          access = json.data.accessToken;
+          return access;
+        },
+      },
+      retries: 0,
+    });
+    const api = createEndpoints(client);
+    await expect(api.auth.refresh()).rejects.toMatchObject({ code: 'UNAUTHORIZED' }); // no cookie yet
+    const s = await api.auth.login({ identifier: MOCK_CREDENTIALS.email, password: MOCK_CREDENTIALS.password });
+    access = s.accessToken;
+    expect(cookie).toMatch(/^mockrt\./);
+    const first = cookie;
+    access = 'mock.expired';
+    expect((await api.users.me()).username).toBe('buyer'); // 401 → cookie refresh → retry
+    expect(cookie).not.toBe(first); // rotated
+    await api.auth.logout();
+    expect(cookie).toBeNull();
+    await expect(api.auth.refresh()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
   it('signup requires OTP; 000000 is rejected, any other 6 digits verifies', async () => {
     const { api } = harness();
     const r = await api.auth.signup({ name: 'New Person', email: 'new@ezyify.test', password: 'Password1', acceptTerms: true });
@@ -195,5 +230,25 @@ describe('mock API server', () => {
     await expect(api.cart.get()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     const r = await fetch('https://api.test/v1/nope');
     expect(r.status).toBe(404);
+  });
+
+  it('persists a snapshot after mutations and restores it (cart survives a reload in demo mode)', async () => {
+    let saved: string | null = null;
+    const persist = { load: () => saved, save: (v: string) => void (saved = v) };
+    const first = createMockFetch({ latencyMs: 0, persist });
+    const login = async (fetch: typeof first) => {
+      let access: string | null = null;
+      const client = createApiClient({ baseUrl: 'https://api.test/v1', fetch, headers: { 'X-Client': 'native' }, tokens: { getAccessToken: () => access, setAccessToken: t => void (access = t), refresh: async () => null }, retries: 0 });
+      const api = createEndpoints(client);
+      const s = await api.auth.login({ identifier: MOCK_CREDENTIALS.email, password: MOCK_CREDENTIALS.password });
+      access = s.accessToken;
+      return api;
+    };
+    const api = await login(first);
+    await api.cart.add('prod-003', 2);
+    expect(saved).toBeTruthy();
+    const second = createMockFetch({ latencyMs: 0, persist });
+    const api2 = await login(second);
+    expect((await api2.cart.get()).items.map(i => [i.productId, i.quantity])).toEqual([['prod-003', 2]]);
   });
 });

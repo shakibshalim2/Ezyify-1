@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useSearchParams, Link } from 'react-router';
+import { formatMoney, type Money } from '@ezyify/core';
 import { CheckCircle, Home, ArrowRight, Share2 } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { Button } from '../components/primitives/Button';
@@ -38,26 +38,12 @@ function OrderSuccessSkeleton() {
 export default function OrderSuccessPage() {
   const reduce = useReducedMotion();
   const [searchParams] = useSearchParams();
-  const [isLoading, setIsLoading] = useState(true);
-  const [orderId, setOrderId] = useState('');
+  const orderNumbers = (searchParams.get('orders') ?? searchParams.get('orderId') ?? '').split(',').filter(Boolean);
+  const totalAmount = Number(searchParams.get('total'));
+  const total: Money | null = Number.isFinite(totalAmount) && totalAmount > 0 ? { amount: totalAmount, currency: (searchParams.get('currency') as Money['currency']) || 'USD' } : null;
+  const pendingPayment = searchParams.get('status') === 'pending_payment';
 
-  useEffect(() => {
-    const loadOrderData = () => {
-      const id = searchParams.get('orderId') || 'EZY' + Math.random().toString(36).substr(2, 9).toUpperCase();
-      setOrderId(id);
-      setIsLoading(false);
-    };
-
-    if ('requestIdleCallback' in window) {
-      requestIdleCallback(() => loadOrderData(), { timeout: 100 });
-    } else {
-      setTimeout(loadOrderData, 16);
-    }
-  }, [searchParams]);
-
-  if (isLoading) {
-    return <OrderSuccessSkeleton />;
-  }
+  if (orderNumbers.length === 0) return <OrderSuccessSkeleton />;
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -111,9 +97,15 @@ export default function OrderSuccessPage() {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between pb-3 border-b border-border">
-                  <span className="text-sm text-foreground-secondary">Order ID</span>
-                  <code className="font-mono text-sm font-semibold text-foreground">{orderId}</code>
+                  <span className="text-sm text-foreground-secondary">{orderNumbers.length > 1 ? 'Orders' : 'Order'}</span>
+                  <code className="font-mono text-sm font-semibold text-foreground text-right">{orderNumbers.join(', ')}</code>
                 </div>
+                {total && (
+                  <div className="flex items-center justify-between pb-3 border-b border-border">
+                    <span className="text-sm text-foreground-secondary">{pendingPayment ? 'Amount due' : 'Held in escrow'}</span>
+                    <span className="font-display text-sm font-bold text-foreground">{formatMoney(total)}</span>
+                  </div>
+                )}
 
                 <div className="flex items-start gap-3 p-3 bg-accent-brand-subtle rounded-lg">
                   <div className="size-8 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
@@ -131,7 +123,7 @@ export default function OrderSuccessPage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-info">100% Buyer Protection</p>
-                    <p className="text-xs text-info/70">Your payment is held in escrow until delivery</p>
+                    <p className="text-xs text-info/70">{pendingPayment ? 'Complete the payment to move your order into escrow' : 'Your payment is held in escrow until you confirm delivery'}</p>
                   </div>
                 </div>
               </div>
@@ -149,8 +141,8 @@ export default function OrderSuccessPage() {
                 {[
                   {
                     num: 1,
-                    title: 'Order Confirmation',
-                    desc: "We've sent a confirmation email with your order details"
+                    title: pendingPayment ? 'Complete payment' : 'Order confirmed',
+                    desc: pendingPayment ? 'Finish the transfer from your orders page — the seller ships once it lands' : 'The seller has been notified and your receipt is in your inbox'
                   },
                   {
                     num: 2,
@@ -188,7 +180,7 @@ export default function OrderSuccessPage() {
             className="shadow-brand"
             rightIcon={<ArrowRight className="size-4" />}
           >
-            <Link to="/user/orders">View Order Details</Link>
+            <Link to="/orders">View my orders</Link>
           </Button>
 
           <Button

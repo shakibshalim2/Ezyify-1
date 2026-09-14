@@ -13,7 +13,30 @@ export interface MockServerOptions {
   /** Prefix stripped from request paths, e.g. `/v1`. Any `/v1` or `/api/v1` prefix is also tolerated. */
   basePath?: string;
   now?: () => number;
+  /**
+   * Stand-in for the browser's httpOnly refresh cookie. Web clients (no `X-Client: native`) never see the
+   * refresh token: login/verify/refresh write it here and `/auth/refresh` reads it back, exactly like the API.
+   */
+  cookieJar?: { get(): string | null; set(value: string | null): void };
+  /**
+   * Optional snapshot store so demo state (cart, orders, likes…) survives a page reload on web.
+   * Loaded once at creation; saved after every mutating request.
+   */
+  persist?: { load(): string | null; save(snapshot: string): void };
 }
+
+const TAG = '__ezm';
+const replacer = (_k: string, v: unknown) => (v instanceof Map ? { [TAG]: 'map', v: [...v.entries()] } : v instanceof Set ? { [TAG]: 'set', v: [...v] } : v);
+const reviver = (_k: string, v: unknown) => {
+  if (v && typeof v === 'object' && TAG in (v as Record<string, unknown>)) {
+    const t = v as { [TAG]: string; v: unknown[] };
+    return t[TAG] === 'map' ? new Map(t.v as [unknown, unknown][]) : new Set(t.v);
+  }
+  return v;
+};
+/** Serialise / restore a `MockState` (Maps and Sets included). */
+export const serializeMockState = (state: MockState) => JSON.stringify(state, replacer);
+export const deserializeMockState = (snapshot: string): MockState => JSON.parse(snapshot, reviver) as MockState;
 
 type Json = Record<string, unknown> | unknown[] | null;
 type Handler = (ctx: Ctx) => Json | Promise<Json>;
@@ -69,7 +92,20 @@ export function createMockState() {
 }
 export type MockState = ReturnType<typeof createMockState>;
 
-export function createMockFetch(options: MockServerOptions = {}, state: MockState = createMockState()): typeof fetch & { state: MockState } {
+function restore(persist: MockServerOptions['persist']): MockState | null {
+  try {
+    const raw = persist?.load();
+    if (!raw) return null;
+    const parsed = deserializeMockState(raw);
+    // Fixtures may have gained new collections since the snapshot; never resurrect a stale shape.
+    return Object.keys(createMockState()).every(k => k in parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function createMockFetch(options: MockServerOptions = {}, initialState?: MockState): typeof fetch & { state: MockState } {
+  const state: MockState = initialState ?? restore(options.persist) ?? createMockState();
   const latency = options.latencyMs ?? 250;
   const now = options.now ?? Date.now;
   // Random suffix: two independent states must never mint the same token string (see refresh-after-reset test).
@@ -98,12 +134,14 @@ export function createMockFetch(options: MockServerOptions = {}, state: MockStat
     const start = (page - 1) * pageSize;
     return { items: items.slice(start, start + pageSize), pagination: { page, pageSize, total: items.length, hasMore: start + pageSize < items.length } };
   };
+  const jar = options.cookieJar;
   const session = (user: fx.SeedUser, native: boolean) => {
     const accessToken = `mock.${user.id}.${nextId('at')}`;
     // User id is embedded so a refresh token still resolves after the in-memory state resets (app restart in demo mode).
     const refreshToken = `mockrt.${user.id}.${nextId('rt')}`;
     state.sessions.set(accessToken, user.id);
     state.refreshTokens.set(refreshToken, user.id);
+    if (!native) jar?.set(refreshToken);
     return { accessToken, expiresIn: 900, user: fx.summary(user), ...(native ? { refreshToken } : {}) };
   };
   const profileOf = (target: fx.SeedUser, viewer: fx.SeedUser | null): UserProfile => {
@@ -132,6 +170,16 @@ export function createMockFetch(options: MockServerOptions = {}, state: MockStat
       state.comments.set(p.id, list);
     }
     return list;
+  };
+
+  // Saved synchronously after every mutation: a full-page navigation right after a POST must still see the change.
+  const persistSoon = () => {
+    if (!options.persist) return;
+    try {
+      options.persist.save(serializeMockState(state));
+    } catch {
+      /* quota / private mode */
+    }
   };
 
   const routes: [string, string, Handler][] = [
@@ -164,20 +212,27 @@ export function createMockFetch(options: MockServerOptions = {}, state: MockStat
       return session(user, c.headers.get('x-client') === 'native');
     }],
     ['POST', '/auth/refresh', c => {
-      const rt = typeof c.body.refreshToken === 'string' ? c.body.refreshToken : null;
+      const native = c.headers.get('x-client') === 'native';
+      const rt = typeof c.body.refreshToken === 'string' ? c.body.refreshToken : native ? null : (jar?.get() ?? null);
       const userId = rt ? (state.refreshTokens.get(rt) ?? (state.revoked.has(rt) ? null : rt.split('.')[1])) : null;
-      if (!rt || !userId || !state.users.some(u => u.id === userId)) throw new MockApiError(401, 'UNAUTHORIZED', 'Session expired');
+      if (!rt || !userId || !state.users.some(u => u.id === userId)) {
+        if (!native) jar?.set(null);
+        throw new MockApiError(401, 'UNAUTHORIZED', 'Session expired');
+      }
       state.revoked.add(rt);
       state.refreshTokens.delete(rt);
       const user = state.users.find(u => u.id === userId)!;
-      const s = session(user, true);
-      return c.headers.get('x-client') === 'native' ? { accessToken: s.accessToken, expiresIn: s.expiresIn, refreshToken: s.refreshToken } : { accessToken: s.accessToken, expiresIn: s.expiresIn };
+      const s = session(user, native);
+      return native ? { accessToken: s.accessToken, expiresIn: s.expiresIn, refreshToken: s.refreshToken } : { accessToken: s.accessToken, expiresIn: s.expiresIn };
     }],
     ['POST', '/auth/logout', c => {
-      if (typeof c.body.refreshToken === 'string') {
-        state.refreshTokens.delete(c.body.refreshToken);
-        state.revoked.add(c.body.refreshToken);
+      const fromJar = c.headers.get('x-client') === 'native' ? null : jar?.get();
+      const rt = typeof c.body.refreshToken === 'string' ? c.body.refreshToken : fromJar;
+      if (rt) {
+        state.refreshTokens.delete(rt);
+        state.revoked.add(rt);
       }
+      if (fromJar !== undefined) jar?.set(null);
       const auth = c.headers.get('authorization')?.replace(/^Bearer /, '');
       if (auth) state.sessions.delete(auth);
       return { ok: true };
@@ -264,6 +319,7 @@ export function createMockFetch(options: MockServerOptions = {}, state: MockStat
       if (sort === 'price_asc') list.sort((a, b) => a.price.amount - b.price.amount);
       if (sort === 'price_desc') list.sort((a, b) => b.price.amount - a.price.amount);
       if (sort === 'newest') list.reverse();
+      if (sort === 'rating') list.sort((a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount);
       if (sort === 'popular' || !sort) list.sort((a, b) => b.reviewCount - a.reviewCount);
       return paginate(list, c.query);
     }],
@@ -633,6 +689,7 @@ export function createMockFetch(options: MockServerOptions = {}, state: MockStat
         (state.messages[convo.id] ??= []).push(reply);
         convo.lastMessage = { text: reply.text!, at: reply.createdAt, fromMe: false };
         msg.status = 'read';
+        persistSoon();
       }, 1500);
       c.status(201);
       return msg;
@@ -721,6 +778,7 @@ export function createMockFetch(options: MockServerOptions = {}, state: MockStat
       let status = 200;
       try {
         const data = await r.handler({ params, query: url.searchParams, body, headers, user, status: s => (status = s) });
+        if (method !== 'GET') persistSoon();
         return new Response(JSON.stringify({ success: true, data }), { status, headers: { 'Content-Type': 'application/json' } });
       } catch (e) {
         if (e instanceof MockApiError) return envelopeError(e.status, e.code, e.message, e.details);

@@ -10,7 +10,7 @@ import { fadeUp, staggerContainer, DURATION, EASE_EMPHASIZED } from '../../lib/m
 type FilterTab = 'all' | 'unread' | 'sellers' | 'creators';
 
 interface ConvListItem {
-  id: number;
+  id: string;
   user: {
     name: string;
     username: string;
@@ -31,8 +31,8 @@ interface ConvListItem {
 interface ConversationListProps {
   conversations: ConvListItem[];
   isLoading?: boolean;
-  activeConvId?: number;
-  onSelectConversation: (id: number) => void;
+  activeConvId?: string;
+  onSelectConversation: (id: string) => void;
 }
 
 export function ConversationList({

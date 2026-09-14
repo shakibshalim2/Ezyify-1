@@ -9,6 +9,9 @@ import { Field } from '../../components/primitives/Field';
 import { SocialButton } from '../../components/primitives/SocialButton';
 import { AuthDivider, AuthLayout } from '../../features/auth/AuthLayout';
 import { useAuth } from '../../contexts/AuthContext';
+import { formErrors } from '../../lib/apiErrors';
+import { API_MODE } from '../../runtime';
+import { MOCK_CREDENTIALS } from '@ezyify/core/mock';
 import { fadeUp } from '../../lib/motion';
 import { cn } from '../../components/ui/utils';
 
@@ -51,8 +54,9 @@ export default function LoginPage() {
       await login(identifier.trim(), password);
       toast.success('Welcome back!');
       navigate('/');
-    } catch {
-      setErrors({ form: 'Incorrect email or password. Try again or reset your password.' });
+    } catch (err) {
+      const { fields, message } = formErrors(err, 'Incorrect email or password. Try again or reset your password.');
+      setErrors({ identifier: fields.identifier, password: fields.password, form: message ?? undefined });
     } finally {
       setSubmitting(false);
     }
@@ -74,6 +78,22 @@ export default function LoginPage() {
       }
     >
       <SEO title="Sign in — Ezyify" description="Sign in to your Ezyify account." />
+
+      {API_MODE === 'mock' && (
+        <button
+          type="button"
+          onClick={() => {
+            setMode('email');
+            setIdentifier(MOCK_CREDENTIALS.email);
+            setPassword(MOCK_CREDENTIALS.password);
+            setErrors({});
+          }}
+          className="mb-5 flex w-full items-center justify-between rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-3 text-left text-sm transition-colors hover:bg-primary/10"
+        >
+          <span className="font-semibold text-primary">Demo mode</span>
+          <span className="text-foreground-secondary">Tap to fill the demo account ({MOCK_CREDENTIALS.email})</span>
+        </button>
+      )}
 
       <motion.div variants={fadeUp} className="grid grid-cols-3 gap-3">
         <SocialButton provider="google" compact onClick={() => social('Google')} />

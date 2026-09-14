@@ -24,7 +24,8 @@ export default defineConfig({
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
   ],
   webServer: {
-    command: `pnpm build && pnpm preview --port ${PORT} --strictPort`,
+    // Journeys run against the in-process mock API unless E2E_API_URL points at a real backend.
+    command: process.env.E2E_API_URL ? `VITE_API_BASE_URL=${process.env.E2E_API_URL} pnpm build && pnpm preview --port ${PORT} --strictPort` : `VITE_API_MODE=mock pnpm build && pnpm preview --port ${PORT} --strictPort`,
     url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

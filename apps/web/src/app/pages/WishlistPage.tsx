@@ -4,6 +4,7 @@ import { EmptyWishlist } from '../components/EmptyStates';
 import { Heart, ShoppingCart, Trash2, ArrowLeft } from 'lucide-react';
 import { products } from '../data/products';
 import { ProductCard } from '../components/shop/ProductCard';
+import { toProductSummary } from '../data/products';
 import { Skeleton } from '../components/ui/skeleton';
 import { SEO, SEOConfigs } from '../components/SEO';
 import { toast } from 'sonner';
@@ -204,14 +205,8 @@ export default function WishlistPage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {wishlistProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                isLiked={true}
-                inCart={cartItems.has(product.id)}
-                onToggleLike={handleToggleLike}
-                onAddToCart={handleAddToCart}
-              />
+              <ProductCard key={product.id}
+                product={toProductSummary(product)} />
             ))}
           </div>
         )}

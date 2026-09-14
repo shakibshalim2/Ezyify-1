@@ -8,9 +8,13 @@ import { Field } from '../../components/primitives/Field';
 import { PasswordStrength, isStrongPassword } from '../../components/primitives/PasswordStrength';
 import { AuthLayout } from '../../features/auth/AuthLayout';
 import { fadeUp, springSoft } from '../../lib/motion';
+import { useRuntime } from '@ezyify/core';
+import { formErrors } from '../../lib/apiErrors';
+import { toast } from 'sonner';
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
+  const { api } = useRuntime();
   const [params] = useSearchParams();
   const token = params.get('token');
 
@@ -36,9 +40,16 @@ export default function ResetPasswordPage() {
     setTouchedConfirm(true);
     if (Object.keys(next).length) return;
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 900));
-    setSubmitting(false);
-    setDone(true);
+    try {
+      await api.auth.resetPassword(token!, password);
+      setDone(true);
+    } catch (err) {
+      const e = formErrors(err, 'This reset link is no longer valid. Request a new one.');
+      if (e.fields.password) setErrors({ password: e.fields.password });
+      else toast.error(e.message ?? 'This reset link is no longer valid. Request a new one.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const confirmOk = touchedConfirm && confirm.length > 0 && confirm === password;

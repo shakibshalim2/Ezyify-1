@@ -80,4 +80,13 @@ describe('createApiClient', () => {
     expect(h.Authorization).toBe('Bearer t');
     expect(h['Content-Type']).toBe('application/json');
   });
+
+  it('resolves a relative baseUrl against the page origin (same-origin deploys) or keeps it relative in Node', async () => {
+    const fetch = vi.fn(async () => ok(null));
+    const api = createApiClient({ baseUrl: '/api/v1', tokens: tokens(null), fetch });
+    await api.get('/products', z.null(), { query: { page: 2 } });
+    const [url] = fetch.mock.calls[0] as unknown as [string];
+    const origin = globalThis.location?.origin;
+    expect(url).toBe(origin ? `${origin}/api/v1/products?page=2` : '/api/v1/products?page=2');
+  });
 });

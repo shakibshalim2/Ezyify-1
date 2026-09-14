@@ -25,7 +25,8 @@ interface ReviewsSectionProps {
   stats: {
     average: number;
     total: number;
-    distribution: Record<number, number>;
+    /** Omitted when the API only exposes the aggregate. */
+    distribution?: Record<number, number>;
   };
 }
 
@@ -73,10 +74,10 @@ export function ReviewsSection({ reviews, stats }: ReviewsSectionProps) {
         </Card>
 
         {/* Distribution */}
-        <Card>
+        {stats.distribution && <Card>
           <div className="p-4 space-y-1.5">
             {[5, 4, 3, 2, 1].map(rating => {
-              const count = stats.distribution[rating as keyof typeof stats.distribution] || 0;
+              const count = stats.distribution?.[rating] || 0;
               const percentage = stats.total > 0 ? (count / stats.total) * 100 : 0;
               return (
                 <div key={rating} className="flex items-center gap-2 text-xs">
@@ -96,7 +97,7 @@ export function ReviewsSection({ reviews, stats }: ReviewsSectionProps) {
               );
             })}
           </div>
-        </Card>
+        </Card>}
       </div>
 
       {/* Individual reviews */}
@@ -106,6 +107,11 @@ export function ReviewsSection({ reviews, stats }: ReviewsSectionProps) {
         animate="visible"
         className="space-y-4"
       >
+        {reviews.length === 0 && (
+          <p className="rounded-card border border-dashed border-border px-4 py-6 text-center text-sm text-foreground-secondary">
+            No written reviews yet — be the first after your order is delivered.
+          </p>
+        )}
         {firstThree.map(review => (
           <motion.div key={review.id} variants={fadeUp}>
             <Card className="p-4">

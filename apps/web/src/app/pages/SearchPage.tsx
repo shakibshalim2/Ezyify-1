@@ -12,6 +12,7 @@ import { Skeleton } from '../components/primitives/Skeleton';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { ProductCard } from '../components/shop/ProductCard';
+import { toProductSummary } from '../data/products';
 import { EmptySearchResults } from '../components/EmptyStates';
 import {
   fadeUp, staggerContainer, DURATION, EASE_EMPHASIZED,
@@ -407,13 +408,7 @@ export default function SearchPage() {
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4">
                       {state.filteredProducts.slice(0, 4).map(product => (
                         <motion.div key={product.id} variants={fadeUp}>
-                          <ProductCard
-                            product={product}
-                            isLiked={likedProducts.has(product.id)}
-                            inCart={cartItems.has(product.id)}
-                            onToggleLike={() => toggleLike(product.id)}
-                            onAddToCart={() => toggleCart(product.id)}
-                          />
+                          <ProductCard product={toProductSummary(product)} />
                         </motion.div>
                       ))}
                     </div>
@@ -461,13 +456,7 @@ export default function SearchPage() {
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4">
                     {state.filteredProducts.map(product => (
                       <motion.div key={product.id} variants={fadeUp}>
-                        <ProductCard
-                          product={product}
-                          isLiked={likedProducts.has(product.id)}
-                          inCart={cartItems.has(product.id)}
-                          onToggleLike={() => toggleLike(product.id)}
-                          onAddToCart={() => toggleCart(product.id)}
-                        />
+                        <ProductCard product={toProductSummary(product)} />
                       </motion.div>
                     ))}
                   </div>

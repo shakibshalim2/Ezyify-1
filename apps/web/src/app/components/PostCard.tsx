@@ -5,19 +5,39 @@ import {
   UserPlus, UserCheck, ShoppingBag, ShoppingCart, Check,
   Repeat2, Play, Zap, ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import { getProductById } from '../data/products';
+import { useNavigate } from 'react-router';
+import { formatCompactNumber as fmtCount, formatMoney, formatRelativeTime, useProduct, useProfile, useToggleFollow, useToggleLike, useToggleSave, type Post } from '@ezyify/core';
 import { VerifiedBadge } from './VerifiedBadge';
 import { CommentSheet } from './CommentSheet';
 import { RepostSheet } from './RepostSheet';
 import { toast } from 'sonner';
+import { useAddLine, useAuthed, useInCart } from '../lib/data';
+import { formErrors } from '../lib/apiErrors';
 
-const LIVE_USERNAMES = new Set(['stylehub_official', 'fashionista_maya', 'tech_reviews_pro']);
+const avatarOf = (u: { avatarUrl: string | null; name: string }) => u.avatarUrl ?? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.name)}`;
 
-function fmtCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 10_000)    return `${Math.round(n / 1_000)}K`;
-  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
-  return n.toString();
+/** Tagged-product chip: the post only carries ids. */
+function ProductChip({ id, onAdd, inCart, pending }: { id: string; onAdd: (id: string, name: string) => void; inCart: boolean; pending: boolean }) {
+  const { data: product } = useProduct(id);
+  if (!product) return null;
+  return (
+    <div className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-muted/30 overflow-hidden">
+      <Link to={`/product/${id}`} onClick={e => e.stopPropagation()} className="flex items-center gap-1.5 pl-2 pr-1 py-1.5 hover:bg-muted/60 transition-colors">
+        <ShoppingBag className="w-3 h-3 text-primary/70 shrink-0" />
+        <span className="text-[11px] font-medium text-foreground/80 truncate max-w-[90px]">{product.name}</span>
+        <span className="text-[11px] font-bold text-primary shrink-0">{formatMoney(product.price)}</span>
+      </Link>
+      <button
+        type="button"
+        onClick={e => { e.preventDefault(); e.stopPropagation(); onAdd(id, product.name); }}
+        disabled={pending || !product.inStock}
+        aria-label={inCart ? 'In cart' : `Add ${product.name} to cart`}
+        className={`mr-1 p-1 rounded-lg transition-all duration-200 ${inCart ? 'bg-emerald-500/15 text-emerald-600' : 'hover:bg-primary/10 text-foreground-secondary hover:text-primary'}`}
+      >
+        {inCart ? <Check className="w-3.5 h-3.5" /> : <ShoppingCart className="w-3.5 h-3.5" />}
+      </button>
+    </div>
+  );
 }
 
 function parseCaption(
@@ -32,21 +52,27 @@ function parseCaption(
 }
 
 interface PostCardProps {
-  post: any;
+  post: Post;
   animationDelay?: number;
+  /** Hide the follow pill (e.g. on the author's own profile). */
+  hideFollow?: boolean;
 }
 
-export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 }: PostCardProps) {
-  const [isLiked,         setIsLiked]         = useState(!!post.isLiked);
-  const [isSaved,         setIsSaved]         = useState(!!post.isSaved);
-  const [isFollowing,     setIsFollowing]     = useState(false);
+/** Feed card on the shared `Post`; like / save / follow are optimistic core mutations, guests get bounced to login. */
+export const PostCard = React.memo(function PostCard({ post, animationDelay = 0, hideFollow }: PostCardProps) {
+  const navigate = useNavigate();
+  const authed = useAuthed();
+  const like = useToggleLike();
+  const save = useToggleSave();
+  const follow = useToggleFollow();
+  const profile = useProfile(hideFollow ? undefined : post.author.username);
+  const { add, pending } = useAddLine();
+  const inCart = useInCart();
   const [isReposted,      setIsReposted]      = useState(false);
-  const [likeCount,       setLikeCount]       = useState<number>(post.likes ?? 0);
-  const [repostCount,     setRepostCount]     = useState<number>(Math.round((post.shares ?? 0) * 0.4));
+  const [repostCount,     setRepostCount]     = useState<number>(Math.round((post.engagement.shares ?? 0) * 0.4));
   const [carouselIdx,     setCarouselIdx]     = useState(0);
   const [expandedCaption, setExpandedCaption] = useState(false);
   const [justLiked,       setJustLiked]       = useState(false);
-  const [cartItems,       setCartItems]       = useState<Set<string>>(new Set());
   const [commentSheetOpen,  setCommentSheetOpen]  = useState(false);
   const [repostSheetOpen,   setRepostSheetOpen]   = useState(false);
 
@@ -54,50 +80,60 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
   const touchStartXRef = useRef(0);
   const touchStartYRef = useRef(0);
 
-  const isLoop      = post.type === 'loop';
-  const hasShop     = (post.taggedProducts?.length ?? 0) > 0;
-  const isLive      = LIVE_USERNAMES.has(post.user?.username ?? '');
-  const images      = (post.content?.images ?? []) as string[];
+  const isLiked     = post.engagement.isLiked;
+  const isSaved     = post.engagement.isSaved;
+  const likeCount   = post.engagement.likes;
+  const isFollowing = !!profile.data?.isFollowing;
+  const isLoop      = post.kind === 'loop';
+  const hasShop     = post.taggedProductIds.length > 0;
+  const isLive      = false;
+  const images      = post.media.map(m => (m.type === 'video' && m.thumbnailUrl ? m.thumbnailUrl : m.url));
   const hasMultiple = images.length > 1;
+  const caption     = post.caption;
+
+  const requireAuth = () => {
+    if (authed) return true;
+    navigate('/login', { state: { next: `/post/${post.id}` } });
+    return false;
+  };
 
   const handleLike = useCallback((e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
-    setIsLiked(prev => {
-      const next = !prev;
-      setLikeCount(c => next ? c + 1 : Math.max(0, c - 1));
-      if (next) {
-        setJustLiked(true);
-        setTimeout(() => setJustLiked(false), 800);
-      }
-      return next;
-    });
-  }, []);
+    if (!requireAuth()) return;
+    if (!isLiked) {
+      setJustLiked(true);
+      setTimeout(() => setJustLiked(false), 800);
+    }
+    like.mutate({ id: post.id, liked: isLiked });
+     
+  }, [authed, isLiked, post.id]);
 
-  const handleDoubleTap = useCallback((e: React.MouseEvent) => {
+  const handleDoubleTap = useCallback((_e: React.MouseEvent) => {
     const now = Date.now();
-    if (now - lastTapRef.current < 350) {
-      setIsLiked(prev => {
-        if (!prev) {
-          setLikeCount(c => c + 1);
-          setJustLiked(true);
-          setTimeout(() => setJustLiked(false), 800);
-          return true;
-        }
-        return prev;
-      });
+    if (now - lastTapRef.current < 350 && authed && !isLiked) {
+      setJustLiked(true);
+      setTimeout(() => setJustLiked(false), 800);
+      like.mutate({ id: post.id, liked: false });
     }
     lastTapRef.current = now;
-  }, []);
+     
+  }, [authed, isLiked, post.id]);
 
   const handleSave = useCallback((e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
-    setIsSaved(prev => !prev);
-  }, []);
+    if (!requireAuth()) return;
+    save.mutate({ id: post.id, saved: isSaved });
+    if (!isSaved) toast.success('Saved to collection');
+     
+  }, [authed, isSaved, post.id]);
 
   const handleFollow = useCallback((e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
-    setIsFollowing(prev => !prev);
-  }, []);
+    if (!requireAuth()) return;
+    follow.mutate({ username: post.author.username, following: isFollowing });
+    if (!isFollowing) toast.success(`Following @${post.author.username}`);
+     
+  }, [authed, isFollowing, post.author.username]);
 
   const handleShare = useCallback((e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
@@ -109,16 +145,14 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
     }
   }, [post.id]);
 
-  const handleAddToCart = useCallback((e: React.MouseEvent, productId: string, productName?: string) => {
-    e.preventDefault(); e.stopPropagation();
-    setCartItems(prev => {
-      const s = new Set(prev);
-      const was = s.has(productId);
-      was ? s.delete(productId) : s.add(productId);
-      toast.success(was ? 'Removed from cart' : `${productName ?? 'Item'} added to cart!`);
-      return s;
-    });
-  }, []);
+  const handleAddToCart = useCallback(async (productId: string, productName: string) => {
+    try {
+      await add(productId, 1);
+      toast.success(`${productName} added to cart`);
+    } catch (err) {
+      toast.error(formErrors(err).message ?? 'Couldn’t add to cart');
+    }
+  }, [add]);
 
   const goPrev = useCallback((e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
@@ -145,16 +179,16 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
 
       {/* Header */}
       <div className="flex items-center justify-between gap-2.5 px-3.5 pt-3 pb-2.5">
-        <Link to={`/profile/${post.user.username}`} className="flex items-center gap-2.5 min-w-0 flex-1 group">
+        <Link to={`/profile/${post.author.username}`} className="flex items-center gap-2.5 min-w-0 flex-1 group">
           <div className="relative shrink-0">
             {isLive ? (
               <div className="p-[2.5px] rounded-full" style={{ background: 'linear-gradient(135deg, var(--error), var(--orange-500))' }}>
                 <div className="bg-card p-[2px] rounded-full">
-                  <img loading="lazy" src={post.user.avatar} alt={post.user.name} className="w-9 h-9 rounded-full object-cover" />
+                  <img loading="lazy" src={avatarOf(post.author)} alt={post.author.name} className="w-9 h-9 rounded-full object-cover" />
                 </div>
               </div>
             ) : (
-              <img loading="lazy" src={post.user.avatar} alt={post.user.name} className="w-9 h-9 rounded-full object-cover ring-[1.5px] ring-border/60 group-hover:ring-2 group-hover:ring-primary/30 transition-all" />
+              <img loading="lazy" src={avatarOf(post.author)} alt={post.author.name} className="w-9 h-9 rounded-full object-cover ring-[1.5px] ring-border/60 group-hover:ring-2 group-hover:ring-primary/30 transition-all" />
             )}
             {isLive && (
               <span className="absolute -bottom-0.5 -right-0.5 px-1 py-px rounded-full text-[8px] font-black text-error-foreground leading-none bg-error border border-card">
@@ -164,15 +198,15 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1 mb-px">
-              <span className="font-semibold text-[13px] text-foreground truncate leading-tight">{post.user.name}</span>
-              {post.user.verified && <VerifiedBadge size="sm" />}
+              <span className="font-semibold text-[13px] text-foreground truncate leading-tight">{post.author.name}</span>
+              {post.author.verified && <VerifiedBadge size="sm" />}
             </div>
-            <p className="text-[11px] text-foreground-secondary leading-none">{post.timestamp}</p>
+            <p className="text-[11px] text-foreground-secondary leading-none">{formatRelativeTime(post.createdAt)}{post.location ? ` · ${post.location}` : ''}</p>
           </div>
         </Link>
 
         <div className="flex items-center gap-1 shrink-0">
-          <button
+          {!hideFollow && <button
             type="button"
             onClick={handleFollow}
             aria-label={isFollowing ? 'Unfollow' : 'Follow'}
@@ -186,10 +220,10 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
             {isFollowing
               ? <><UserCheck className="w-3 h-3" /><span className="ml-0.5">Following</span></>
               : <><UserPlus className="w-3 h-3" /><span className="ml-0.5">Follow</span></>}
-          </button>
-          <button type="button" aria-label="More" className="p-1.5 rounded-xl text-foreground-secondary hover:text-foreground hover:bg-muted/80 transition-all">
+          </button>}
+          <Link to={`/report?type=post&id=${post.id}`} aria-label="More options" className="p-1.5 rounded-xl text-foreground-secondary hover:text-foreground hover:bg-muted/80 transition-all">
             <MoreVertical className="w-4 h-4" />
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -228,7 +262,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
                   <img
                     loading={i === 0 ? 'eager' : 'lazy'}
                     src={src}
-                    alt={i === 0 ? (post.content?.text || '') : ''}
+                    alt={i === 0 ? caption : ''}
                     className={`w-full h-full object-cover ${!hasMultiple ? 'transition-transform duration-500 ease-out group-hover:scale-[1.025]' : ''}`}
                   />
                 </div>
@@ -253,9 +287,9 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
           )}
 
           {/* Views badge */}
-          {post.views && (
+          {!!post.engagement.views && (
             <div className="absolute bottom-3 left-3 z-10 text-white text-[11px] font-medium px-2 py-1 rounded-full tabular-nums" style={{ background: 'rgba(0,0,0,0.48)', backdropFilter: 'blur(6px)' }}>
-              {fmtCount(post.views)} views
+              {fmtCount(post.engagement.views)} views
             </div>
           )}
 
@@ -266,7 +300,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
               style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
             >
               <ShoppingBag className="w-3 h-3" />
-              <span>{post.taggedProducts.length} {post.taggedProducts.length === 1 ? 'item' : 'items'}</span>
+              <span>{post.taggedProductIds.length} {post.taggedProductIds.length === 1 ? 'item' : 'items'}</span>
             </div>
           )}
 
@@ -318,12 +352,12 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
       {/* Body */}
       <div className="px-3.5 pt-2.5 pb-3">
         {/* Caption with inline expand */}
-        {post.content?.text && (() => {
-          const isLong = post.content.text.length > 120;
+        {caption && (() => {
+          const isLong = caption.length > 120;
           return (
             <div className="mb-2.5">
               <p className={`text-[13px] text-foreground/90 leading-[1.55] ${!expandedCaption && isLong ? 'line-clamp-2' : ''}`}>
-                {parseCaption(post.content.text, (href, label, key) => (
+                {parseCaption(caption, (href, label, key) => (
                   <Link key={key} to={href} onClick={e => e.stopPropagation()} className="text-primary/75 hover:text-primary font-medium transition-colors">{label}</Link>
                 ))}
               </p>
@@ -343,32 +377,9 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
         {/* Tagged products — inline chips before actions */}
         {hasShop && (
           <div className="mb-2.5 flex flex-wrap gap-1.5">
-            {post.taggedProducts.slice(0, 2).map((pid: string) => {
-              const product = getProductById(pid);
-              if (!product) return null;
-              const inCart = cartItems.has(pid);
-              return (
-                <div key={pid} className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-muted/30 overflow-hidden">
-                  <Link
-                    to={`/product/${pid}`}
-                    onClick={e => e.stopPropagation()}
-                    className="flex items-center gap-1.5 pl-2 pr-1 py-1.5 hover:bg-muted/60 transition-colors"
-                  >
-                    <ShoppingBag className="w-3 h-3 text-primary/70 shrink-0" />
-                    <span className="text-[11px] font-medium text-foreground/80 truncate max-w-[90px]">{product.name}</span>
-                    <span className="text-[11px] font-bold text-primary shrink-0">${product.price}</span>
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={e => handleAddToCart(e, pid, product.name)}
-                    aria-label="Add to cart"
-                    className={`mr-1 p-1 rounded-lg transition-all duration-200 ${inCart ? 'bg-emerald-500/15 text-emerald-600' : 'hover:bg-primary/10 text-foreground-secondary hover:text-primary'}`}
-                  >
-                    {inCart ? <Check className="w-3.5 h-3.5" /> : <ShoppingCart className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              );
-            })}
+            {post.taggedProductIds.slice(0, 2).map(pid => (
+              <ProductChip key={pid} id={pid} inCart={inCart.has(pid)} pending={pending} onAdd={(id, name) => void handleAddToCart(id, name)} />
+            ))}
           </div>
         )}
 
@@ -393,7 +404,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
             className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[13px] font-medium text-foreground-secondary hover:text-foreground hover:bg-muted/60 transition-all duration-150 active:scale-[0.88]"
           >
             <MessageCircle className="w-[18px] h-[18px] shrink-0" />
-            <span className="tabular-nums text-[12px]">{fmtCount(post.comments)}</span>
+            <span className="tabular-nums text-[12px]">{fmtCount(post.engagement.comments)}</span>
           </button>
           <button
             type="button"
@@ -414,7 +425,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
             className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[13px] font-medium text-foreground-secondary hover:text-foreground hover:bg-muted/60 transition-all duration-150 active:scale-[0.88]"
           >
             <Share2 className="w-[18px] h-[18px] shrink-0" />
-            <span className="tabular-nums text-[12px]">{fmtCount(post.shares)}</span>
+            <span className="tabular-nums text-[12px]">{fmtCount(post.engagement.shares)}</span>
           </button>
           <button
             type="button"
@@ -441,7 +452,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0 
       <RepostSheet
         open={repostSheetOpen}
         onOpenChange={setRepostSheetOpen}
-        post={post}
+        post={{ id: post.id, user: { name: post.author.name, username: post.author.username, avatar: avatarOf(post.author), verified: post.author.verified }, content: { text: caption, images } }}
         isReposted={isReposted}
         onRepost={quoteText => {
           setIsReposted(true);

@@ -51,12 +51,18 @@ interface RequestOptions<T extends z.ZodTypeAny> {
 
 const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504]);
 
+/** Relative bases (`/api/v1`, same-origin deploys) resolve against the page origin; elsewhere a placeholder keeps `URL` happy. */
+const ORIGIN_FALLBACK = 'http://relative.invalid';
 function buildUrl(baseUrl: string, path: string, query?: RequestOptions<z.ZodTypeAny>['query']) {
-  const url = new URL(path.replace(/^\//, ''), baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`);
+  const base = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  const relative = base.startsWith('/');
+  const origin = relative ? (globalThis.location?.origin ?? ORIGIN_FALLBACK) : undefined;
+  const url = new URL(path.replace(/^\//, ''), relative ? `${origin}${base}` : base);
   if (query) {
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, String(v));
   }
-  return url.toString();
+  const out = url.toString();
+  return out.startsWith(ORIGIN_FALLBACK) ? out.slice(ORIGIN_FALLBACK.length) : out;
 }
 
 /**

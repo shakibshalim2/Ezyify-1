@@ -18,6 +18,7 @@ import { SEO } from '../components/SEO';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { ProductCard } from '../components/shop/ProductCard';
+import { toProductSummary } from '../data/products';
 import { Button } from '../components/primitives/Button';
 import { Card } from '../components/primitives/Card';
 import { EmptyState } from '../components/primitives/EmptyState';
@@ -183,14 +184,8 @@ export default function SellerStorePage() {
               {storeProducts.length ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {storeProducts.map((product) => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      isLiked={liked.has(product.id)}
-                      inCart={cart.has(product.id)}
-                      onToggleLike={toggleLike}
-                      onAddToCart={addToCart}
-                    />
+                    <ProductCard key={product.id}
+                      product={toProductSummary(product)} />
                   ))}
                 </div>
               ) : (

@@ -13,13 +13,13 @@ interface ProductCard {
 }
 
 interface ReplyRef {
-  id: number;
+  id: string;
   text: string;
   senderName: string;
 }
 
 interface MessageBubbleProps {
-  id: number;
+  id: string;
   sender: 'you' | 'them';
   type: 'text' | 'image' | 'product' | 'order' | 'system';
   text?: string;
