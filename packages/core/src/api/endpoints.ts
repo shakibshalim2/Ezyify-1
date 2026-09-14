@@ -14,6 +14,8 @@ import {
   FinalizedUploadSchema,
   ForgotPasswordRequestSchema,
   LoginRequestSchema,
+  LiveTokenRequestSchema,
+  LiveTokenSchema,
   LoginResponseSchema,
   MessageSchema,
   NotificationSchema,
@@ -26,6 +28,7 @@ import {
   RegisterDeviceRequestSchema,
   ReportRequestSchema,
   ResetPasswordRequestSchema,
+  SearchResponseSchema,
   SendMessageRequestSchema,
   SignUploadRequestSchema,
   SignedUploadSchema,
@@ -43,9 +46,11 @@ import {
   type CreateAddressRequest,
   type CreatePostRequest,
   type DeleteAccountRequest,
+  type LiveTokenRequest,
   type LoginRequest,
   type RegisterDeviceRequest,
   type ReportRequest,
+  type SearchType,
   type SendMessageRequest,
   type SignUploadRequest,
   type SignupRequest,
@@ -91,6 +96,17 @@ export function createEndpoints(api: ApiClient) {
       product: (id: string) => api.get(`/products/${enc(id)}`, ProductDetailSchema, { auth: false }),
       categories: () => api.get('/categories', z.array(CategorySchema), { auth: false }),
       search: (q: string, query: PageQuery = {}) => api.get('/search', paginated(ProductSummarySchema), { query: { q, ...query }, auth: false }),
+    },
+    search: {
+      /** Unified products + users + posts search (Meilisearch or Postgres fallback server-side). */
+      all: (q: string, query: { type?: SearchType; limit?: number; cursor?: string } = {}) =>
+        api.get('/search', SearchResponseSchema, { query: { q, ...query }, auth: false }),
+    },
+    live: {
+      /** LiveKit access token for a live-shopping room. 503 `details.code = LIVE_UNAVAILABLE` when the provider is not configured. */
+      token: (body: LiveTokenRequest) => api.post('/live/token', LiveTokenRequestSchema.parse(body), LiveTokenSchema),
+      /** 1:1 voice/video call token; the caller must be a member of the conversation. */
+      callToken: (conversationId: string) => api.post('/live/call-token', { conversationId }, LiveTokenSchema),
     },
     cart: {
       get: () => api.get('/cart', CartSchema),

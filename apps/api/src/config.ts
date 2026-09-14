@@ -15,6 +15,13 @@ const EnvSchema = z.object({
   PLATFORM_FEE_BPS: z.coerce.number().int().min(0).max(10_000).default(500),
   FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
+  MAIL_FROM: z.string().default('Ezyify <no-reply@ezyify.app>'),
+  WEB_APP_URL: z.string().url().default('https://ezyify.app'),
+  MEILISEARCH_HOST: z.string().url().optional(),
+  MEILISEARCH_API_KEY: z.string().optional(),
+  LIVEKIT_URL: z.string().url().optional(),
+  LIVEKIT_API_KEY: z.string().optional(),
+  LIVEKIT_API_SECRET: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   S3_BUCKET: z.string().optional(),
@@ -24,6 +31,12 @@ const EnvSchema = z.object({
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_PUBLIC_BASE_URL: z.string().url().optional(),
 }).superRefine((env, ctx) => {
+  // A half-configured LiveKit deployment would mint tokens the server can't sign or point clients nowhere.
+  if (env.LIVEKIT_API_KEY) {
+    if (!env.LIVEKIT_API_SECRET) ctx.addIssue({ code: 'custom', path: ['LIVEKIT_API_SECRET'], message: 'required when LIVEKIT_API_KEY is set' });
+    if (!env.LIVEKIT_URL) ctx.addIssue({ code: 'custom', path: ['LIVEKIT_URL'], message: 'required when LIVEKIT_API_KEY is set' });
+  }
+  if (env.MEILISEARCH_HOST && !env.MEILISEARCH_API_KEY) ctx.addIssue({ code: 'custom', path: ['MEILISEARCH_API_KEY'], message: 'required when MEILISEARCH_HOST is set' });
   // Production must never run with placeholder secrets or a permissive CORS list.
   if (env.NODE_ENV !== 'production') return;
   for (const k of ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'] as const) {

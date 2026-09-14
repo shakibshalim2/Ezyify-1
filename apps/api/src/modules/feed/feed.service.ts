@@ -7,6 +7,7 @@ import { PageQuerySchema, page, skipTake } from '../../common/pagination.js';
 import type { Prisma } from '../../generated/prisma/client.js';
 import type { PostKind } from '../../generated/prisma/enums.js';
 import { toUserSummary } from '../users/users.mapper.js';
+import { SearchIndexer } from '../search/search.indexer.js';
 
 export const CreatePostSchema = z.object({
   kind: z.enum(['post', 'loop', 'story']).default('post'),
@@ -25,7 +26,7 @@ export const FeedQuerySchema = PageQuerySchema.extend({ kind: z.enum(['post', 'l
 export const postInclude = { author: true, media: { orderBy: { position: 'asc' } }, products: { select: { productId: true } } } satisfies Prisma.PostInclude;
 type PostRow = Prisma.PostGetPayload<{ include: typeof postInclude }>;
 
-const toPost = (p: PostRow, liked: Set<string>, saved: Set<string>): Post => ({
+export const toPost = (p: PostRow, liked: Set<string>, saved: Set<string>): Post => ({
   id: p.id,
   kind: p.kind,
   author: toUserSummary(p.author),
@@ -40,7 +41,7 @@ const toPost = (p: PostRow, liked: Set<string>, saved: Set<string>): Post => ({
 
 @Injectable()
 export class FeedService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly indexer: SearchIndexer) {}
 
   /**
    * Feed ranking v1: followed authors first, then recency with an engagement boost. Blocked users (either direction)
@@ -108,6 +109,7 @@ export class FeedService {
       },
       include: postInclude,
     });
+    this.indexer.post(row.id);
     return toPost(row, new Set(), new Set());
   }
 
@@ -116,6 +118,7 @@ export class FeedService {
     if (!post) throw notFound('Post');
     if (post.authorId !== userId && !['admin', 'superadmin'].includes(role)) throw forbidden();
     await this.prisma.post.update({ where: { id }, data: { deletedAt: new Date() } });
+    this.indexer.post(id);
     return { ok: true as const };
   }
 

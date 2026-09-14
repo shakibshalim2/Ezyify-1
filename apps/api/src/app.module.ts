@@ -22,6 +22,8 @@ import { ModerationModule } from './modules/moderation/moderation.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
 import { UploadsModule } from './modules/uploads/uploads.module.js';
 import { HealthController } from './modules/health/health.controller.js';
+import { SearchModule } from './modules/search/search.module.js';
+import { LiveModule } from './modules/live/live.module.js';
 
 export function buildAppModule(env: Env = loadEnv()) {
   @Module({
@@ -38,6 +40,7 @@ export function buildAppModule(env: Env = loadEnv()) {
       ScheduleModule.forRoot(),
       EnvModule.forRoot(env),
       PrismaModule,
+      SearchModule,
       AuthModule,
       UsersModule,
       CatalogModule,
@@ -51,6 +54,7 @@ export function buildAppModule(env: Env = loadEnv()) {
       ModerationModule,
       PaymentsModule,
       UploadsModule,
+      LiveModule,
     ],
     controllers: [HealthController],
     providers: [

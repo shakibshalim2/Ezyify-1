@@ -25,9 +25,4 @@ export class CatalogController {
   categories() {
     return this.catalog.categories();
   }
-
-  @Get('search')
-  search(@Query(zod(ProductQuerySchema)) q: z.infer<typeof ProductQuerySchema>) {
-    return this.catalog.list(q);
-  }
 }

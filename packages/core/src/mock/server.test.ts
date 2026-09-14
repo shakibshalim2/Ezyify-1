@@ -47,6 +47,26 @@ describe('mock API server', () => {
     expect((await api.catalog.search('serum')).items[0].id).toBe('prod-006');
   });
 
+  it('unified search returns products, users and posts sections; live tokens need a session', async () => {
+    const { api, login } = harness();
+    const res = await api.search.all('serum');
+    expect(res.products.items[0].id).toBe('prod-006');
+    expect(res.users.items).toEqual([]);
+    expect(res.posts.total).toBeGreaterThanOrEqual(0);
+    const onlyUsers = await api.search.all('maya', { type: 'users' });
+    expect(onlyUsers.products.items).toEqual([]);
+    expect(onlyUsers.users.items.some(u => u.username.includes('maya'))).toBe(true);
+
+    await expect(api.live.token({ room: 'live-maya', role: 'viewer' })).rejects.toMatchObject({ status: 401 });
+    await login();
+    const t = await api.live.token({ room: 'live-maya', role: 'viewer' });
+    expect(t.room).toBe('live-maya');
+    expect(t.url).toMatch(/^wss:/);
+    await expect(api.live.callToken('nope')).rejects.toMatchObject({ status: 404 });
+    const convo = (await api.messaging.conversations())[0];
+    expect((await api.live.callToken(convo.id)).room).toBe(`call-${convo.id}`);
+  });
+
   it('login → native refresh rotation → protected route; rejects bad credentials', async () => {
     const { api, login, tokens, setAccess } = harness();
     await expect(api.auth.login({ identifier: 'buyer@ezyify.test', password: 'nope' })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });

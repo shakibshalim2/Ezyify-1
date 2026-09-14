@@ -24,13 +24,15 @@ src/config.ts             zod-validated env — refuses to boot on bad secrets
 src/common/               envelope interceptor, error filter (spec codes), zod pipe, pagination
 src/modules/auth          argon2id, JWT access (15 min) + rotating refresh (7 d, reuse detection), OTP, cookie (web) / body (native)
 src/modules/users         profiles, follow, block-aware visibility
-src/modules/catalog       products, categories, search, sort/filter
+src/modules/catalog       products, categories, sort/filter
 src/modules/cart          server cart, coupons, pricing (shared with checkout)
 src/modules/orders        checkout fan-out per seller, escrow state machine, idempotency, auto-release cron
 src/modules/wallet        balances + double-entry style transactions
 src/modules/feed          posts/loops/stories, likes/saves/comments, blocked-author filtering
 src/modules/messaging     conversations + Socket.IO gateway (/realtime)
-src/modules/notifications in-app notifications, device (FCM) registration
+src/modules/notifications in-app notifications, device registration, FCM HTTP v1 push
+src/modules/search        GET /search → products/users/posts; Meilisearch or Postgres fallback + indexer
+src/modules/live          LiveKit tokens for live shopping rooms and 1:1 calls
 src/modules/account       Play-policy account deletion (soft, 30-day purge), data export, addresses
 src/modules/moderation    reports, block/unblock, admin review queue
 ```
@@ -42,6 +44,31 @@ src/modules/moderation    reports, block/unblock, admin review queue
 - Native clients send `X-Client: native` and receive the refresh token in the body; web gets an httpOnly cookie.
 - Payment/checkout endpoints accept `Idempotency-Key`.
 - Tests: `pnpm test` (vitest; migrates + seeds `ezyify_test`, then unit + e2e through the real Fastify stack).
+
+## Providers
+
+Every third-party integration is an adapter behind env vars; unset means "degrade, don't crash" so dev/test never
+need network access.
+
+| Provider | Env | When unset |
+| --- | --- | --- |
+| Postgres | `DATABASE_URL` | required |
+| Stripe (cards, top-ups, webhooks) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | card flows → `Payments unavailable` |
+| S3 / R2 / MinIO uploads | `S3_*` | upload endpoints → `Storage unavailable` |
+| FCM HTTP v1 push (`fcm.provider.ts`) | `FCM_SERVICE_ACCOUNT_JSON` (service-account JSON, one line) | `push()` logs the payload; devices still register |
+| Resend email (`mail.provider.ts`) | `RESEND_API_KEY`, `MAIL_FROM`, `WEB_APP_URL` | OTP / reset link logged in non-production; warning only in production |
+| Meilisearch (`search/`) | `MEILISEARCH_HOST`, `MEILISEARCH_API_KEY` | Postgres `ILIKE` fallback (block-aware); `pnpm search:reindex` rebuilds Meilisearch from Postgres |
+| LiveKit (`live/`) | `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (all three or none) | `POST /live/token`, `/live/call-token` → `503` with `details.code = LIVE_UNAVAILABLE` |
+| SMS OTP | — | not yet: phone-channel codes are logged outside production |
+
+- Push: one FCM v1 POST per device with `notification` + `data` + Android channel id; tokens reported
+  `UNREGISTERED`/`NOT_FOUND` are deleted. OAuth2 access tokens come from `google-auth-library`'s JWT client.
+- Search: `GET /search?q=&type=products|users|posts|all&limit=&cursor=` → `{ products, users, posts }` sections
+  (`items`, `nextCursor`, `total`) plus a legacy `items`/`pagination` view of products for the older
+  `api.catalog.search` client. Blocks (either direction) filter users and posts for signed-in viewers. Product, user
+  and post writes call `SearchIndexer` fire-and-forget so an index outage never fails the write.
+- Live: hosts get `roomCreate` + `canPublish`; viewers get `canSubscribe` + `canPublishData` (live chat). Call tokens
+  require conversation membership and use room `call-<conversationId>`.
 
 ## Security
 

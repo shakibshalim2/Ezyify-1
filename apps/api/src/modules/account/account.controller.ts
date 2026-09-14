@@ -12,6 +12,7 @@ import { CurrentUser } from '../auth/current-user.decorator.js';
 import type { AccessClaims } from '../auth/auth.guard.js';
 import { zod } from '../../common/zod.pipe.js';
 import { notFound, unauthorized } from '../../common/errors.js';
+import { SearchIndexer } from '../search/search.indexer.js';
 
 export const AddressSchema = z.object({
   label: z.string().min(1).max(30),
@@ -30,7 +31,7 @@ export const AddressSchema = z.object({
 @ApiTags('account')
 @Controller()
 export class AccountController {
-  constructor(private readonly prisma: PrismaService, private readonly auth: AuthService, private readonly audit: AuditService) {}
+  constructor(private readonly prisma: PrismaService, private readonly auth: AuthService, private readonly audit: AuditService, private readonly indexer: SearchIndexer) {}
 
   /** Soft-delete with 30-day purge (housekeeping cron); all sessions revoked immediately; re-auth when a password is supplied. */
   @Post('account/delete')
@@ -43,6 +44,7 @@ export class AccountController {
       this.prisma.device.deleteMany({ where: { userId: user.sub } }),
     ]);
     await this.auth.logoutAll(user.sub);
+    this.indexer.user(user.sub);
     await this.audit.log('account.deleted', { userId: user.sub, ip: req.ip, userAgent: req.headers['user-agent'], meta: { reason: body.reason } });
     return { ok: true as const, purgeAfterDays: 30, cancelWithinDays: 14 };
   }
@@ -51,6 +53,7 @@ export class AccountController {
   @Post('account/restore')
   async restore(@CurrentUser() user: AccessClaims) {
     await this.prisma.user.update({ where: { id: user.sub }, data: { deletedAt: null, deletionReason: null } });
+    this.indexer.user(user.sub);
     return { ok: true as const };
   }
 

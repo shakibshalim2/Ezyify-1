@@ -9,6 +9,8 @@ import { ApiException, conflict, unauthorized, validation } from '../../common/e
 import type { AccessClaims } from './auth.guard.js';
 import { toUserSummary } from '../users/users.mapper.js';
 import { AuditService } from '../../common/audit.service.js';
+import { MAILER, type Mailer } from './mail.provider.js';
+import { SearchIndexer } from '../search/search.indexer.js';
 
 const ARGON = { type: argon2.argon2id, memoryCost: 19_456, timeCost: 2, parallelism: 1 } as const; // OWASP 2025 minimums
 const OTP_TTL_MS = 10 * 60_000;
@@ -28,7 +30,7 @@ export interface SessionResult {
 @Injectable()
 export class AuthService {
   private readonly log = new Logger(AuthService.name);
-  constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService, private readonly audit: AuditService, @Inject(ENV) private readonly env: Env) {}
+  constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService, private readonly audit: AuditService, @Inject(MAILER) private readonly mailer: Mailer, private readonly indexer: SearchIndexer, @Inject(ENV) private readonly env: Env) {}
 
   async signup(body: SignupRequest) {
     const email = body.email.toLowerCase();
@@ -38,6 +40,7 @@ export class AuthService {
     const user = await this.prisma.user.create({
       data: { email, name: body.name, username, passwordHash: await argon2.hash(body.password, ARGON), wallet: { create: {} }, cart: { create: {} } },
     });
+    this.indexer.user(user.id);
     const otp = await this.issueOtp(user.id, 'email', 'verify');
     this.deliverOtp(user.email, otp);
     return { userId: user.id, email: user.email, name: user.name, requiresOTP: true, otpSentTo: 'email' as const };
@@ -166,9 +169,17 @@ export class AuthService {
     return code;
   }
 
-  /** Email/SMS providers plug in here (Resend / Twilio). Until configured, codes are logged in non-production only. */
-  private deliverOtp(to: string, code: string, purpose: 'verify' | 'reset' = 'verify') {
-    if (this.env.NODE_ENV !== 'production') this.log.log(`[${purpose}] OTP for ${to}: ${code}`);
+  /**
+   * Fire-and-forget delivery so the request never waits on (or reveals timing of) the mail provider. Phone channel is
+   * a later adapter (SMS provider); until then phone codes are only logged outside production.
+   */
+  private deliverOtp(to: string, code: string, purpose: 'verify' | 'reset' = 'verify', channel: 'email' | 'phone' = 'email') {
+    if (channel === 'phone') {
+      if (this.env.NODE_ENV !== 'production') this.log.log(`[${purpose}] SMS OTP for ${to}: ${code}`);
+      return;
+    }
+    const send = purpose === 'reset' ? this.mailer.sendResetLink(to, code) : this.mailer.sendOtp(to, code);
+    void send.catch((e: Error) => this.log.error(`[${purpose}] email to ${to} failed: ${e.message}`));
   }
 
   private async uniqueUsername(name: string) {

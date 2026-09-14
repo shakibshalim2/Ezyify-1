@@ -330,8 +330,31 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
     }],
     ['GET', '/categories', () => fx.categories],
     ['GET', '/search', c => {
-      const q = (c.query.get('q') ?? '').toLowerCase();
-      return paginate(fx.products.filter(p => p.name.toLowerCase().includes(q) || p.tags.some(t => t.includes(q)) || p.category.includes(q)).map(fx.productSummary), c.query);
+      const q = (c.query.get('q') ?? '').toLowerCase().trim();
+      const type = c.query.get('type') ?? 'all';
+      const limit = Math.min(50, Math.max(1, Number(c.query.get('limit') ?? c.query.get('pageSize') ?? 20)));
+      const wants = (t: string) => type === 'all' || type === t;
+      const products = wants('products') && q ? fx.products.filter(p => p.name.toLowerCase().includes(q) || p.tags.some(t => t.includes(q)) || p.category.includes(q)).map(fx.productSummary) : [];
+      const users = wants('users') && q ? state.users.filter(u => u.username.includes(q) || u.name.toLowerCase().includes(q)).filter(u => !c.user || !set(state.blocks, c.user.id).has(u.id)).map(fx.summary) : [];
+      const posts = wants('posts') && q ? visiblePosts(c.user).filter(p => p.caption.toLowerCase().includes(q) || p.hashtags.some(h => h.toLowerCase().includes(q))) : [];
+      const section = <T>(items: T[]) => ({ items: items.slice(0, limit), nextCursor: null, total: items.length });
+      // Legacy `items`/`pagination` keeps the older `api.catalog.search` contract valid alongside the sectioned shape.
+      return { products: section(products), users: section(users), posts: section(posts), ...paginate(products, c.query) };
+    }],
+
+    // ---- live (LiveKit tokens) — demo builds mint an unsigned placeholder so the UI can render the player chrome
+    ['POST', '/live/token', c => {
+      const u = requireUser(c);
+      const room = String(c.body.room ?? '');
+      if (!/^[\w.-]{1,64}$/.test(room)) throw validation({ room: 'Invalid room name' });
+      if (c.body.role !== 'host' && c.body.role !== 'viewer') throw validation({ role: 'Role must be host or viewer' });
+      return { token: `mock.livekit.${u.id}.${room}.${c.body.role}`, url: 'wss://live.mock.ezyify.app', room, identity: u.id };
+    }],
+    ['POST', '/live/call-token', c => {
+      const u = requireUser(c);
+      const id = String(c.body.conversationId ?? '');
+      if (!convosOf(u.id).some(cv => cv.id === id)) throw notFound('Conversation');
+      return { token: `mock.livekit.${u.id}.call-${id}`, url: 'wss://live.mock.ezyify.app', room: `call-${id}`, identity: u.id };
     }],
 
     // ---- cart
