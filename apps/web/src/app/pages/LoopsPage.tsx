@@ -1,288 +1,165 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { ChevronLeft, Search, VolumeX, Volume2 } from 'lucide-react';
-import { getLoops } from '../data/posts';
-import { getProductById } from '../data/products';
+import { motion, useReducedMotion } from 'motion/react';
+import { ChevronLeft, Search, Volume2, VolumeX } from 'lucide-react';
+import { avatarUrlFor, flattenPages, formatCompactNumber, useAuth, useLoops, useToggleFollow, useToggleLike, useToggleSave, type Post } from '@ezyify/core';
+import { toast } from 'sonner';
 import { SEO, SEOConfigs } from '../components/SEO';
 import { CommentSheet } from '../components/CommentSheet';
-import { toCorePost } from '../data/posts';
+import { EmptyContent } from '../components/EmptyStates';
+import { Skeleton } from '../components/primitives/Skeleton';
+import { QueryError } from '../components/QueryError';
 import { LoopProgressBar } from '../components/loops/LoopProgressBar';
 import { LoopCaption } from '../components/loops/LoopCaption';
 import { LoopActionRail } from '../components/loops/LoopActionRail';
 import { ShoppableProductSheet } from '../components/loops/ShoppableProductSheet';
-import { toast } from 'sonner';
+
+function LoopsSkeleton() {
+  return <div className="fixed inset-0 bg-background p-4"><Skeleton className="h-full w-full rounded-card" /></div>;
+}
 
 export default function LoopsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const reduce = useReducedMotion();
-
-  const loops = getLoops();
-  const startingIndex = Math.max(
-    0,
-    loops.findIndex(l => l.id === searchParams.get('v'))
-  );
-
-  const [currentIndex, setCurrentIndex] = useState(startingIndex);
+  const loopsQuery = useLoops();
+  const authStatus = useAuth(state => state.status);
+  const toggleLike = useToggleLike();
+  const toggleSave = useToggleSave();
+  const toggleFollow = useToggleFollow();
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
-  const [likedLoops, setLikedLoops] = useState<Set<string>>(new Set());
-  const [savedLoops, setSavedLoops] = useState<Set<string>>(new Set());
-  const [followingLoops, setFollowingLoops] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState(0);
   const [tab, setTab] = useState<'following' | 'for-you'>('for-you');
   const [commentSheetOpen, setCommentSheetOpen] = useState(false);
   const [productSheetOpen, setProductSheetOpen] = useState(false);
-  const [hiddenLoops, setHiddenLoops] = useState<Set<string>>(new Set());
-
+  const [following, setFollowing] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
-  const loopRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  const currentLoop = loops[currentIndex];
-  const filteredLoops = tab === 'following'
-    ? loops.filter(l => followingLoops.has(l.user.id))
-    : loops;
+  const allLoops = flattenPages<Post>(loopsQuery.data);
+  const startId = searchParams.get('start') ?? searchParams.get('v');
+  const orderedLoops = useMemo(() => {
+    const start = startId ? allLoops.find(loop => loop.id === startId) : undefined;
+    return start ? [start, ...allLoops.filter(loop => loop.id !== start.id)] : allLoops;
+  }, [allLoops, startId]);
+  const displayedLoops = tab === 'following' ? orderedLoops.filter(loop => following.has(loop.author.username)) : orderedLoops;
+  const currentLoop = displayedLoops[currentIndex];
 
-  // Hide hidden loops from display
-  const displayedLoops = filteredLoops.filter(l => !hiddenLoops.has(l.id));
-
-  // Auto-progress through loop
   useEffect(() => {
-    const duration = 5000;
-    const interval = 50;
-    const increment = (interval / duration) * 100;
+    setCurrentIndex(index => Math.min(index, Math.max(0, displayedLoops.length - 1)));
+  }, [displayedLoops.length]);
 
-    const timer = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          // Move to next loop
-          const nextIdx = currentIndex + 1;
-          if (nextIdx < displayedLoops.length) {
-            setCurrentIndex(nextIdx);
-          }
-          return 0;
-        }
-        return prev + increment;
+  useEffect(() => {
+    if (!currentLoop || reduce) return;
+    const timer = window.setInterval(() => {
+      setProgress(value => {
+        if (value < 100) return value + 1;
+        if (currentIndex < displayedLoops.length - 1) setCurrentIndex(currentIndex + 1);
+        return 0;
       });
-    }, interval);
+    }, 50);
+    return () => window.clearInterval(timer);
+  }, [currentIndex, currentLoop, displayedLoops.length, reduce]);
 
-    return () => clearInterval(timer);
-  }, [currentIndex, displayedLoops.length]);
+  useEffect(() => {
+    if (currentIndex === displayedLoops.length - 1 && loopsQuery.hasNextPage && !loopsQuery.isFetchingNextPage) {
+      void loopsQuery.fetchNextPage();
+    }
+  }, [currentIndex, displayedLoops.length, loopsQuery]);
 
-  // Snap scroll behavior
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-
-    const handleScroll = () => {
-      const scrollTop = container.scrollTop;
-      const viewportHeight = container.clientHeight;
-      const newIndex = Math.round(scrollTop / viewportHeight);
-      if (newIndex !== currentIndex) {
-        setCurrentIndex(newIndex);
+    const onScroll = () => {
+      const index = Math.round(container.scrollTop / container.clientHeight);
+      if (index !== currentIndex) {
+        setCurrentIndex(index);
         setProgress(0);
       }
     };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => container.removeEventListener('scroll', handleScroll);
+    container.addEventListener('scroll', onScroll, { passive: true });
+    return () => container.removeEventListener('scroll', onScroll);
   }, [currentIndex]);
 
-  // Keyboard navigation
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const newIdx = Math.max(0, currentIndex - 1);
-        setCurrentIndex(newIdx);
-        setProgress(0);
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const newIdx = Math.min(displayedLoops.length - 1, currentIndex + 1);
-        setCurrentIndex(newIdx);
-        setProgress(0);
-      }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+      event.preventDefault();
+      const delta = event.key === 'ArrowDown' ? 1 : -1;
+      const next = Math.min(Math.max(0, currentIndex + delta), Math.max(0, displayedLoops.length - 1));
+      setCurrentIndex(next);
+      setProgress(0);
+      containerRef.current?.children[next]?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
     };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [currentIndex, displayedLoops.length, reduce]);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentIndex, displayedLoops.length]);
+  const requireAuth = useCallback((next: string) => {
+    if (authStatus === 'authenticated') return true;
+    navigate('/login', { state: { next } });
+    return false;
+  }, [authStatus, navigate]);
 
-  const handleToggleLike = useCallback(() => {
-    setLikedLoops(prev => {
-      const next = new Set(prev);
-      if (next.has(currentLoop.id)) {
-        next.delete(currentLoop.id);
-      } else {
-        next.add(currentLoop.id);
-      }
-      return next;
-    });
-  }, [currentLoop.id]);
+  const share = useCallback(async (loop: Post) => {
+    const url = `${window.location.origin}/loops?start=${loop.id}`;
+    try {
+      if (navigator.share) await navigator.share({ title: `Loop by ${loop.author.name}`, url });
+      else await navigator.clipboard.writeText(url);
+      toast.success('Link copied');
+    } catch {
+      // Sharing can be cancelled by the user.
+    }
+  }, []);
 
-  const handleToggleSave = useCallback(() => {
-    setSavedLoops(prev => {
-      const next = new Set(prev);
-      if (next.has(currentLoop.id)) {
-        next.delete(currentLoop.id);
-      } else {
-        next.add(currentLoop.id);
-      }
-      return next;
-    });
-  }, [currentLoop.id]);
-
-  const handleToggleFollow = useCallback(() => {
-    setFollowingLoops(prev => {
-      const next = new Set(prev);
-      if (next.has(currentLoop.user.id)) {
-        next.delete(currentLoop.user.id);
-        toast.success(`Unfollowed @${currentLoop.user.username}`);
-      } else {
-        next.add(currentLoop.user.id);
-        toast.success(`Following @${currentLoop.user.username}`);
-      }
-      return next;
-    });
-  }, [currentLoop.user.id, currentLoop.user.username]);
-
-  const handleShare = useCallback(() => {
-    const url = `${window.location.origin}/loops?v=${currentLoop.id}`;
-    navigator.clipboard.writeText(url).catch(() => {});
-    toast.success('Link copied!');
-  }, [currentLoop.id]);
+  if (loopsQuery.isLoading && !allLoops.length) return <LoopsSkeleton />;
+  if (loopsQuery.error && !allLoops.length) return <div className="fixed inset-0 grid place-items-center bg-background p-4"><QueryError error={loopsQuery.error} onRetry={() => void loopsQuery.refetch()} /></div>;
+  if (!allLoops.length) return <div className="fixed inset-0 grid place-items-center bg-background p-4"><EmptyContent /></div>;
 
   return (
-    <div className="fixed inset-0 bg-black overflow-hidden">
+    <div className="fixed inset-0 overflow-hidden bg-black">
       <SEO {...SEOConfigs.loops} />
-
-      {/* Full-height snap scroll container */}
-      <div
-        ref={containerRef}
-        className="h-dvh overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
-      >
-        {displayedLoops.map((loop, idx) => (
-          <motion.div
-            key={loop.id}
-            ref={el => (loopRefs.current[idx] = el)}
-            className="relative h-dvh w-full snap-start flex items-center justify-center overflow-hidden"
-            initial={reduce ? {} : { opacity: 0 }}
-            animate={idx === currentIndex ? { opacity: 1 } : { opacity: 0.5 }}
-            transition={{ duration: 0.3 }}
-          >
-            {/* Video/Image fill */}
-            <img
-              loading="lazy"
-              src={loop.content.video || loop.content.images?.[0] || ''}
-              alt={loop.content.text ? `Loop by @${loop.user.username}: ${loop.content.text}` : `Loop by @${loop.user.username}`}
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-
-            {/* Gradient overlays */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 z-[5]" />
-
-            {/* Top overlay with tabs and search */}
-            <div className="absolute left-0 right-0 z-20 px-4 flex items-center justify-between" style={{ top: 'calc(var(--safe-top) + 12px)' }}>
-              <button
-                onClick={() => navigate(-1)}
-                className="w-11 h-11 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/30 transition-colors focus-visible:ring-2 focus-visible:ring-white/50 outline-none"
-                aria-label="Back"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              {/* Following | For You tabs */}
-              <div className="flex gap-1 bg-black/30 backdrop-blur-md rounded-full p-1" role="tablist">
-                {(['following', 'for-you'] as const).map(t => (
-                  <button
-                    key={t}
-                    role="tab"
-                    aria-selected={tab === t}
-                    onClick={() => setTab(t)}
-                    className={`h-9 px-4 rounded-full text-sm font-semibold transition-all ${
-                      tab === t
-                        ? 'bg-white/90 text-black'
-                        : 'text-white/80 hover:text-white'
-                    }`}
-                  >
-                    {t === 'following' ? 'Following' : 'For You'}
-                  </button>
-                ))}
+      <div ref={containerRef} className="h-dvh snap-y snap-mandatory overflow-y-scroll scrollbar-hide">
+        {displayedLoops.map((loop, index) => {
+          const media = loop.media[0];
+          const active = index === currentIndex;
+          const description = loop.caption ? `Loop by @${loop.author.username}: ${loop.caption}` : `Loop by @${loop.author.username}`;
+          return (
+            <motion.article
+              key={loop.id}
+              className="relative flex h-dvh w-full snap-start items-center justify-center overflow-hidden"
+              initial={reduce ? false : { opacity: 0 }}
+              animate={{ opacity: active ? 1 : 0.5 }}
+              transition={{ duration: 0.3 }}
+              aria-label={description}
+            >
+              {media.type === 'video' ? (
+                <video autoPlay={active} muted={isMuted} loop playsInline poster={media.thumbnailUrl ?? undefined} aria-label={description} className="absolute inset-0 size-full object-cover">
+                  <source src={media.url} />
+                </video>
+              ) : (
+                <img src={media.url} alt={description} className="absolute inset-0 size-full object-cover" />
+              )}
+              <div className="absolute inset-0 z-[5] bg-gradient-to-t from-black/70 via-transparent to-black/30" />
+              <div className="absolute left-0 right-0 z-20 flex items-center justify-between px-4" style={{ top: 'calc(var(--safe-top) + 12px)' }}>
+                <button onClick={() => navigate(-1)} className="flex size-11 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition-colors hover:bg-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Back"><ChevronLeft className="size-5" /></button>
+                <div className="flex gap-1 rounded-full bg-black/30 p-1 backdrop-blur-md" role="tablist">
+                  {(['following', 'for-you'] as const).map(value => <button key={value} role="tab" aria-selected={tab === value} onClick={() => { setTab(value); setCurrentIndex(0); }} className={`h-9 rounded-full px-4 text-sm font-semibold transition-all ${tab === value ? 'bg-white/90 text-black' : 'text-white/80 hover:text-white'}`}>{value === 'following' ? 'Following' : 'For You'}</button>)}
+                </div>
+                <button onClick={() => navigate('/search')} className="flex size-11 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition-colors hover:bg-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Search"><Search className="size-5" /></button>
               </div>
-
-              {/* Search icon */}
-              <button
-                onClick={() => navigate('/search')}
-                className="w-11 h-11 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/30 transition-colors focus-visible:ring-2 focus-visible:ring-white/50 outline-none"
-                aria-label="Search"
-              >
-                <Search className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Mute toggle at bottom right of progress bar area */}
-            <div className="absolute bottom-2 right-4 z-20">
-              <button
-                onClick={() => setIsMuted(!isMuted)}
-                className="w-11 h-11 rounded-full bg-black/30 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-black/50 transition-colors focus-visible:ring-2 focus-visible:ring-white/50 outline-none"
-                aria-label={isMuted ? 'Unmute' : 'Mute'}
-              >
-                {isMuted ? (
-                  <VolumeX className="w-4 h-4" />
-                ) : (
-                  <Volume2 className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-
-            {/* Caption block - bottom left */}
-            <LoopCaption
-              username={loop.user.username}
-              verified={loop.user.verified}
-              text={loop.content.text}
-              sound={`Original sound`}
-            />
-
-            {/* Action rail - right side */}
-            {idx === currentIndex && (
-              <LoopActionRail
-                avatar={loop.user.avatar}
-                username={loop.user.username}
-                isFollowing={followingLoops.has(loop.user.id)}
-                likes={loop.likes}
-                isLiked={likedLoops.has(loop.id)}
-                comments={loop.comments}
-                isSaved={savedLoops.has(loop.id)}
-                productCount={loop.taggedProducts?.length || 0}
-                onToggleFollow={handleToggleFollow}
-                onToggleLike={handleToggleLike}
-                onOpenComments={() => setCommentSheetOpen(true)}
-                onToggleSave={handleToggleSave}
-                onShare={handleShare}
-                onOpenProducts={() => setProductSheetOpen(true)}
-              />
-            )}
-
-            {/* Progress bar */}
-            {idx === currentIndex && (
-              <LoopProgressBar progress={progress} />
-            )}
-          </motion.div>
-        ))}
+              <div className="absolute bottom-2 right-4 z-20"><button onClick={() => setIsMuted(value => !value)} className="flex size-11 items-center justify-center rounded-full border border-white/20 bg-black/30 text-white backdrop-blur-sm transition-colors hover:bg-black/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50" aria-label={isMuted ? 'Unmute' : 'Mute'}>{isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}</button></div>
+              <LoopCaption username={loop.author.username} verified={loop.author.verified} text={`${loop.caption} ${loop.hashtags.map(tag => `#${tag}`).join(' ')}`} sound="Original sound" />
+              {active && <LoopActionRail avatar={avatarUrlFor(loop.author)} username={loop.author.username} isFollowing={following.has(loop.author.username)} likes={loop.engagement.likes} isLiked={loop.engagement.isLiked} comments={loop.engagement.comments} isSaved={loop.engagement.isSaved} productCount={loop.taggedProductIds.length} onToggleFollow={() => { if (!requireAuth(`/loops?start=${loop.id}`)) return; const isFollowing = following.has(loop.author.username); setFollowing(items => { const next = new Set(items); isFollowing ? next.delete(loop.author.username) : next.add(loop.author.username); return next; }); toggleFollow.mutate({ username: loop.author.username, following: isFollowing }); }} onToggleLike={() => { if (requireAuth(`/loops?start=${loop.id}`)) toggleLike.mutate({ id: loop.id, liked: loop.engagement.isLiked }); }} onOpenComments={() => setCommentSheetOpen(true)} onToggleSave={() => { if (requireAuth(`/loops?start=${loop.id}`)) toggleSave.mutate({ id: loop.id, saved: loop.engagement.isSaved }); }} onShare={() => void share(loop)} onOpenProducts={() => setProductSheetOpen(true)} />}
+              {active && <LoopProgressBar progress={progress} />}
+              {active && <span className="sr-only">{formatCompactNumber(loop.engagement.views ?? 0)} views</span>}
+            </motion.article>
+          );
+        })}
+        {tab === 'following' && !displayedLoops.length && <div className="grid h-dvh place-items-center bg-background p-4"><EmptyContent /></div>}
       </div>
-
-      {/* Comment sheet */}
-      <CommentSheet
-        open={commentSheetOpen}
-        onOpenChange={setCommentSheetOpen}
-        post={toCorePost(currentLoop)}
-      />
-
-      {/* Product sheet */}
-      <ShoppableProductSheet
-        open={productSheetOpen}
-        onOpenChange={setProductSheetOpen}
-        productIds={currentLoop.taggedProducts || []}
-      />
+      {currentLoop && <CommentSheet open={commentSheetOpen} onOpenChange={setCommentSheetOpen} post={currentLoop} />}
+      {currentLoop && <ShoppableProductSheet open={productSheetOpen} onOpenChange={setProductSheetOpen} productIds={currentLoop.taggedProductIds} />}
     </div>
   );
 }

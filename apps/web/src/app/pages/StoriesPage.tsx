@@ -1,315 +1,144 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router';
-import { users } from '../data/users';
-import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
+import { motion, useReducedMotion } from 'motion/react';
+import { ChevronLeft, ChevronRight, Heart, Send, X } from 'lucide-react';
+import { avatarUrlFor, formatRelativeTime, useApi, useAuth, useStories, useToggleLike, type Post } from '@ezyify/core';
 import { toast } from 'sonner';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { SEO } from '../components/SEO';
+import { EmptyState } from '../components/primitives/EmptyState';
 import { Field } from '../components/primitives/Field';
 import { Button } from '../components/primitives/Button';
+
+const IMAGE_DURATION = 5_000;
+
+type StoryGroup = { username: string; author: Post['author']; stories: Post[] };
+
+function groupStories(stories: Post[] | undefined): StoryGroup[] {
+  return (stories ?? []).reduce<StoryGroup[]>((groups, story) => {
+    const current = groups.find(group => group.username === story.author.username);
+    if (current) current.stories.push(story);
+    else groups.push({ username: story.author.username, author: story.author, stories: [story] });
+    return groups;
+  }, []);
+}
 
 export default function StoriesPage() {
   const { username } = useParams();
   const navigate = useNavigate();
   const reduce = useReducedMotion();
-
-  const [isPaused, setIsPaused] = useState(false);
-  const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
+  const storiesQuery = useStories();
+  const api = useApi();
+  const authStatus = useAuth(state => state.status);
+  const toggleLike = useToggleLike();
+  const groups = useMemo(() => groupStories(storiesQuery.data), [storiesQuery.data]);
+  const [groupIndex, setGroupIndex] = useState(0);
+  const [storyIndex, setStoryIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState('');
-  const [isLiked, setIsLiked] = useState(false);
   const [dragY, setDragY] = useState(0);
+  const [sending, setSending] = useState(false);
 
-  // Resolve the story owner from mock users; fall back to a generic creator
-  const owner = users.find(u => u.username === username);
-  const stories = [
-    {
-      username: username || 'techguru',
-      displayName: owner?.name ?? 'TechGuru',
-      avatar:
-        owner?.avatar ?? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop',
-      timestamp: '2h ago',
-      stories: [
-        {
-          id: 1,
-          url: 'https://images.unsplash.com/photo-1526948128573-703ee1aeb6fa?w=800&h=1600&fit=crop',
-          views: 1234,
-        },
-        {
-          id: 2,
-          url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=1600&fit=crop',
-          views: 2345,
-        },
-      ],
-    },
-  ];
-
-  const currentStory = stories[0].stories[currentStoryIndex];
-  const totalStories = stories[0].stories.length;
-
-  // Auto-progress timer
   useEffect(() => {
-    if (isPaused) return;
+    const index = groups.findIndex(group => group.username === username);
+    setGroupIndex(index >= 0 ? index : 0);
+    setStoryIndex(0);
+    setProgress(0);
+  }, [groups, username]);
 
-    const duration = 5000;
-    const interval = 50;
-    const increment = (interval / duration) * 100;
-
-    const timer = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          if (currentStoryIndex < totalStories - 1) {
-            setCurrentStoryIndex(currentStoryIndex + 1);
-            return 0;
-          } else {
-            navigate('/');
-            return 100;
-          }
-        }
-        return prev + increment;
-      });
-    }, interval);
-
-    return () => clearInterval(timer);
-  }, [currentStoryIndex, isPaused, totalStories, navigate]);
-
-  const handlePrevious = () => {
-    if (currentStoryIndex > 0) {
-      setCurrentStoryIndex(currentStoryIndex - 1);
-      setProgress(0);
+  const group = groups[groupIndex];
+  const currentStory = group?.stories[storyIndex];
+  const close = () => navigate('/');
+  const next = () => {
+    if (!group) return close();
+    setProgress(0);
+    if (storyIndex < group.stories.length - 1) return setStoryIndex(index => index + 1);
+    if (groupIndex < groups.length - 1) {
+      setGroupIndex(index => index + 1);
+      setStoryIndex(0);
+      return;
     }
+    close();
+  };
+  const previous = () => {
+    setProgress(0);
+    if (storyIndex > 0) return setStoryIndex(index => index - 1);
+    if (groupIndex > 0) {
+      const previousGroup = groups[groupIndex - 1];
+      setGroupIndex(index => index - 1);
+      setStoryIndex(Math.max(0, (previousGroup?.stories.length ?? 1) - 1));
+      return;
+    }
+    close();
   };
 
-  const handleNext = () => {
-    if (currentStoryIndex < totalStories - 1) {
-      setCurrentStoryIndex(currentStoryIndex + 1);
-      setProgress(0);
-    } else {
-      navigate('/');
-    }
-  };
+  useEffect(() => {
+    if (!currentStory || paused || reduce) return;
+    const duration = currentStory.media[0]?.durationMs ?? IMAGE_DURATION;
+    const started = Date.now() - progress * duration;
+    const timer = window.setInterval(() => {
+      const value = (Date.now() - started) / duration;
+      if (value >= 1) {
+        window.clearInterval(timer);
+        next();
+      } else setProgress(value);
+    }, 50);
+    return () => window.clearInterval(timer);
+  }, [currentStory?.id, paused, reduce]);
 
-  const handleSendMessage = () => {
-    if (message.trim()) {
-      toast.success(`Message sent to ${stories[0].displayName}`);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowRight') { event.preventDefault(); next(); }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); previous(); }
+      if (event.key === 'Escape') close();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [groupIndex, storyIndex, groups.length]);
+
+  const sendReply = async () => {
+    const text = message.trim();
+    if (!text || !group || sending) return;
+    if (authStatus !== 'authenticated') {
+      navigate('/login', { state: { next: `/stories/${group.username}` } });
+      return;
+    }
+    setSending(true);
+    try {
+      const conversation = await api.messaging.start(group.username);
+      await api.messaging.send(conversation.id, { text });
       setMessage('');
+      toast.success(`Reply sent to ${group.author.name}`);
+    } catch {
+      toast.error('Reply could not be sent. Please try again.');
+    } finally {
+      setSending(false);
     }
   };
 
-  const handleDragEnd = () => {
-    const delta = dragY;
-    if (delta > 100) {
-      // Swipe down to close
-      navigate('/');
-    }
-    setDragY(0);
-  };
+  if (storiesQuery.isLoading) return <div className="fixed inset-0 grid place-items-center bg-black text-white">Loading stories…</div>;
+  if (storiesQuery.error) return <div className="fixed inset-0 grid place-items-center bg-background p-4"><EmptyState kind="error" title="Stories are unavailable" description="Please try again in a moment." action={<Button onClick={() => void storiesQuery.refetch()}>Try again</Button>} /></div>;
+  if (!currentStory || !group) return <div className="min-h-screen bg-background px-4 py-10"><EmptyState kind="search" title="No stories right now" description="Stories disappear after 24 hours. Explore fresh posts while you wait." action={<Button asChild><Link to="/">Back home</Link></Button>} /></div>;
 
+  const media = currentStory.media[0];
+  const mediaUrl = media.thumbnailUrl ?? media.url;
+  const alt = currentStory.caption ? `Story by @${group.username}: ${currentStory.caption}` : `Story by @${group.username}`;
   return (
-    <motion.div
-      className="fixed inset-0 bg-black z-50 flex items-center justify-center"
-      onDrag={(_, info) => {
-        if (info.offset.y > 0) {
-          setDragY(info.offset.y);
-        }
-      }}
-      onDragEnd={handleDragEnd}
-      initial={reduce ? {} : { y: 16, opacity: 0 }}
-      animate={{ y: dragY, opacity: 1 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-    >
-      <SEO title="Stories — Ezyify" description="Watch stories" />
-
-      {/* Background Image */}
-      <div className="absolute inset-0">
-        <img
-          loading="eager"
-          src={currentStory.url}
-          alt="Story background"
-          className="w-full h-full object-cover blur-xl opacity-40"
-        />
-      </div>
-
-      {/* Container */}
-      <div className="relative w-full h-full max-w-md mx-auto flex flex-col">
-        {/* Progress Bars */}
-        <div className="absolute left-0 right-0 z-20 flex gap-1 px-3" style={{ top: 'calc(var(--safe-top) + 8px)' }}>
-          {stories[0].stories.map((_, idx) => (
-            <motion.div
-              key={idx}
-              className="flex-1 h-[3px] bg-white/30 rounded-full overflow-hidden"
-              initial={reduce ? {} : { scaleX: 0 }}
-              animate={{ scaleX: 1 }}
-              transition={{ duration: 0.3 }}
-            >
-              <motion.div
-                className="h-full bg-white/90"
-                initial={{ width: '0%' }}
-                animate={{
-                  width:
-                    idx < currentStoryIndex
-                      ? '100%'
-                      : idx === currentStoryIndex
-                        ? `${progress}%`
-                        : '0%',
-                }}
-                transition={{ duration: 0.05 }}
-              />
-            </motion.div>
-          ))}
+    <motion.div drag="y" dragConstraints={{ top: 0, bottom: 180 }} dragElastic={0.2} onDrag={(_, info) => setDragY(Math.max(0, info.offset.y))} onDragEnd={() => { if (dragY > 100) close(); setDragY(0); }} className="fixed inset-0 z-50 flex items-center justify-center bg-black" initial={reduce ? false : { y: 16, opacity: 0 }} animate={{ y: dragY, opacity: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 25 }}>
+      <SEO title={`${group.author.name}'s stories`} description="Watch stories on Ezyify" />
+      <div className="absolute inset-0 overflow-hidden"><img src={mediaUrl} alt="" className="size-full scale-110 object-cover opacity-40 blur-xl" /></div>
+      <div className="relative flex size-full max-w-md flex-col">
+        <div className="absolute left-0 right-0 z-20 flex gap-1 px-3" style={{ top: 'calc(var(--safe-top) + 8px)' }} aria-label="Story progress">
+          {group.stories.map((story, index) => <div key={story.id} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/30"><div className="h-full bg-white/90" style={{ width: `${index < storyIndex ? 100 : index === storyIndex ? Math.min(100, progress * 100) : 0}%` }} /></div>)}
         </div>
-
-        {/* Header */}
-        <div className="absolute left-0 right-0 z-20 px-4 flex items-center justify-between" style={{ top: 'calc(var(--safe-top) + 20px)' }}>
-          <div className="flex items-center gap-2">
-            <img
-              loading="lazy"
-              src={stories[0].avatar}
-              alt={stories[0].displayName}
-              className="w-10 h-10 rounded-full border-2 border-white/60 object-cover"
-            />
-            <div>
-              <p className="text-white font-semibold text-sm">
-                {stories[0].displayName}
-              </p>
-              <p className="text-white/70 text-xs">{stories[0].timestamp}</p>
-            </div>
-          </div>
-          <button
-            onClick={() => navigate('/')}
-            aria-label="Close stories"
-            className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-white/15 transition-colors focus-visible:ring-2 focus-visible:ring-white/50 outline-none"
-          >
-            <X className="w-5 h-5 text-white" />
-          </button>
-        </div>
-
-        {/* Story Content */}
-        <div className="absolute inset-0 flex items-center justify-center z-10">
-          <img
-            loading="eager"
-            src={currentStory.url}
-            alt="Story"
-            className="max-w-full max-h-full object-contain"
-          />
-          <div aria-hidden className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/70 to-transparent" />
-        </div>
-
-        {/* Navigation Areas */}
-        <div className="absolute inset-0 flex z-15">
-          <button
-            onClick={handlePrevious}
-            className="flex-1 focus-visible:ring-2 focus-visible:ring-white/50 outline-none"
-            aria-label="Previous story"
-          />
-          <button
-            onClick={handleNext}
-            className="flex-1 focus-visible:ring-2 focus-visible:ring-white/50 outline-none"
-            aria-label="Next story"
-          />
-        </div>
-
-        {/* Navigation Indicators */}
-        {currentStoryIndex > 0 && (
-          <button
-            onClick={handlePrevious}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-2 hover:bg-white/15 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-white/50 outline-none"
-            aria-label="Previous story"
-          >
-            <ChevronLeft className="w-6 h-6 text-white" />
-          </button>
-        )}
-        {currentStoryIndex < totalStories - 1 && (
-          <button
-            onClick={handleNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-2 hover:bg-white/15 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-white/50 outline-none"
-            aria-label="Next story"
-          >
-            <ChevronRight className="w-6 h-6 text-white" />
-          </button>
-        )}
-
-        {/* Footer - Reply */}
-        <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/80 to-transparent p-4 pb-safe">
-          <form
-            onSubmit={e => {
-              e.preventDefault();
-              handleSendMessage();
-            }}
-            className="flex items-end gap-2"
-          >
-            <div className="flex-1">
-              <Field
-                label="Message"
-                hideLabel
-                placeholder={`Reply to ${stories[0].displayName}...`}
-                value={message}
-                onChange={e => setMessage(e.target.value)}
-                onFocus={() => setIsPaused(true)}
-                onBlur={() => setIsPaused(false)}
-                containerClassName="mb-0"
-                className="bg-white/15 border-white/20 text-white placeholder:text-white/50 focus:bg-white/20 focus:border-white/40"
-              />
-            </div>
-            <motion.button
-              onClick={handleSendMessage}
-              disabled={!message.trim()}
-              whileTap={reduce ? {} : { scale: 0.95 }}
-              type="button"
-              aria-label="Send reply"
-              className="size-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-white/50 outline-none flex-shrink-0"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                />
-              </svg>
-            </motion.button>
-            <motion.button
-              onClick={() => {
-                setIsLiked(!isLiked);
-                if (!isLiked) toast.success('Liked!');
-              }}
-              whileTap={reduce ? {} : { scale: 0.95 }}
-              type="button"
-              aria-label="Like story"
-              className={`size-11 rounded-full flex items-center justify-center transition-colors focus-visible:ring-2 focus-visible:ring-white/50 outline-none flex-shrink-0 ${
-                isLiked
-                  ? 'bg-like/40 border border-like/60'
-                  : 'bg-white/15 border border-white/20 hover:bg-white/25'
-              }`}
-            >
-              <svg
-                className={`w-5 h-5 ${isLiked ? 'fill-like text-like' : 'text-white'}`}
-                fill={isLiked ? 'currentColor' : 'none'}
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                />
-              </svg>
-            </motion.button>
-          </form>
-
-          {/* Views count */}
-          <div className="mt-2 flex items-center gap-1 justify-center">
-            <p className="text-white/70 text-xs">
-              {currentStory.views.toLocaleString()} views
-            </p>
-          </div>
-        </div>
+        <header className="absolute left-0 right-0 z-20 flex items-center justify-between px-4" style={{ top: 'calc(var(--safe-top) + 20px)' }}>
+          <Link to={`/profile/${group.username}`} className="flex items-center gap-2"><img src={avatarUrlFor(group.author)} alt={group.author.name} className="size-10 rounded-full border-2 border-white/60 object-cover" /><div><p className="text-sm font-semibold text-white">{group.author.name}</p><p className="text-xs text-white/70">@{group.username} · {formatRelativeTime(currentStory.createdAt)}</p></div></Link>
+          <button onClick={close} aria-label="Close stories" className="flex size-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"><X className="size-5" /></button>
+        </header>
+        <div className="absolute inset-0 z-10 flex items-center justify-center">{media.type === 'video' ? <video autoPlay muted loop playsInline poster={media.thumbnailUrl ?? undefined} aria-label={alt} className="size-full object-contain"><source src={media.url} /></video> : <img src={media.url} alt={alt} className="size-full object-contain" />}<div aria-hidden className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/70 to-transparent" /></div>
+        <div className="absolute inset-y-28 left-0 z-15 flex w-[30%]" onPointerDown={() => setPaused(true)} onPointerUp={() => setPaused(false)}><button onClick={previous} aria-label="Previous story" className="flex-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"><ChevronLeft className="sr-only" /></button></div>
+        <div className="absolute inset-y-28 right-0 z-15 flex w-[70%]" onPointerDown={() => setPaused(true)} onPointerUp={() => setPaused(false)}><button onClick={next} aria-label="Next story" className="flex-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"><ChevronRight className="sr-only" /></button></div>
+        <div className="absolute bottom-0 left-0 right-0 z-20 p-4 pb-safe"><p className="mb-3 text-sm text-white drop-shadow">{currentStory.caption}</p><form onSubmit={event => { event.preventDefault(); void sendReply(); }} className="flex items-end gap-2"><Field label="Reply to story" hideLabel value={message} onChange={event => setMessage(event.target.value)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)} placeholder={`Reply to ${group.username}…`} containerClassName="mb-0 flex-1" className="border-white/20 bg-white/15 text-white placeholder:text-white/50 focus:border-white/40 focus:bg-white/20" /><button type="submit" disabled={!message.trim() || sending} aria-label="Send reply" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"><Send className="size-5" /></button><button type="button" aria-label={currentStory.engagement.isLiked ? 'Unlike story' : 'Like story'} onClick={() => { if (authStatus !== 'authenticated') { navigate('/login', { state: { next: `/stories/${group.username}` } }); return; } toggleLike.mutate({ id: currentStory.id, liked: currentStory.engagement.isLiked }); }} className={`flex size-11 shrink-0 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${currentStory.engagement.isLiked ? 'border-like/60 bg-like/40 text-like' : 'border-white/20 bg-white/15 text-white hover:bg-white/25'}`}><Heart className={currentStory.engagement.isLiked ? 'fill-current size-5' : 'size-5'} /></button></form></div>
       </div>
     </motion.div>
   );
