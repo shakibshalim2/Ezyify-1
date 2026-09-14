@@ -15,6 +15,7 @@ import { formErrors } from '@/lib/auth';
 import { pickFromLibrary } from '@/lib/media';
 import { uploadMedia } from '@/lib/uploads';
 import { useTheme } from '@/theme';
+import { goBack } from '@/lib/links';
 
 type Form = { name: string; username: string; bio: string; website: string; location: string };
 
@@ -59,9 +60,10 @@ export default function EditProfileScreen() {
     if (form.website !== (me.data.website ?? '')) body.website = form.website.trim() ? (/^https?:\/\//.test(form.website) ? form.website.trim() : `https://${form.website.trim()}`) : null;
     if (form.location !== (me.data.location ?? '')) body.location = form.location.trim() || null;
     if (avatarUrl !== undefined) body.avatarUrl = avatarUrl;
-    if (!Object.keys(body).length) return router.back();
+    const done = () => goBack(router, '/settings');
+    if (!Object.keys(body).length) return done();
     const ok = await update.mutateAsync(body).catch(() => undefined);
-    if (ok) router.back();
+    if (ok) done();
   };
 
   if (me.error) {

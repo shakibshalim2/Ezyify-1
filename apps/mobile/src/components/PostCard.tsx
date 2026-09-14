@@ -100,7 +100,7 @@ export function PostCard({ post }: { post: Post }) {
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, paddingTop: 2 }}>
-        <Pressable accessibilityRole="button" accessibilityLabel={liked ? 'Unlike' : 'Like'} accessibilityState={{ selected: liked }} onPress={like} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 44, paddingHorizontal: 10 }}>
+        <Pressable accessibilityRole="button" accessibilityLabel={liked ? 'Unlike' : 'Like'} aria-selected={liked} onPress={like} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 44, paddingHorizontal: 10 }}>
           <Animated.View style={heartStyle}><Ionicons name={liked ? 'heart' : 'heart-outline'} size={24} color={liked ? colors.error : colors.foreground} /></Animated.View>
           <Text variant="label">{formatCompactNumber(post.engagement.likes)}</Text>
         </Pressable>

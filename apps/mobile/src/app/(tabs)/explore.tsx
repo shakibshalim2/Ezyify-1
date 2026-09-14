@@ -46,7 +46,7 @@ export default function ExploreScreen() {
   // A hashtag filter (category name) narrows both feeds server-side; "Loops" only shows loops.
   const hashtag = BASE_FILTERS.includes(filter as (typeof BASE_FILTERS)[number]) ? undefined : filter.toLowerCase();
   const posts = useFeed(hashtag ? { hashtag } : {});
-  const loops = useLoops();
+  const loops = useLoops(hashtag ? { hashtag } : {});
   const search = useSearch(query);
   const postList = useInfiniteList<Post>(posts);
   const loopList = useInfiniteList<Post>(loops);
@@ -82,6 +82,7 @@ export default function ExploreScreen() {
 
       {filter === 'Creators' ? (
         <FlatList
+          key="creators"
           data={creators}
           keyExtractor={u => u.id}
           contentContainerStyle={{ paddingHorizontal: 16, gap: 10, paddingBottom: 24 }}
@@ -101,6 +102,7 @@ export default function ExploreScreen() {
         <EmptyState icon="videocam-outline" title="No one is live right now" body="Follow creators to get notified when they go live with new drops." actionLabel="Browse creators" onAction={() => setFilter('Creators')} />
       ) : (
         <FlatList
+          key="grid"
           data={grid}
           keyExtractor={i => i.post.id}
           numColumns={2}

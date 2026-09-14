@@ -173,7 +173,7 @@ export default function ProfileScreen() {
             </View>
             <View style={{ flexDirection: 'row', marginTop: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
               {TABS.filter(t => (t.id === 'saved' ? isMe : t.id === 'shop' ? showShopTab : true)).map(t => (
-                <Pressable key={t.id} accessibilityRole="tab" accessibilityLabel={t.id} accessibilityState={{ selected: tab === t.id }} onPress={() => setTab(t.id)} style={{ flex: 1, height: 48, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: tab === t.id ? colors.primary : 'transparent' }}>
+                <Pressable key={t.id} accessibilityRole="tab" accessibilityLabel={t.id} aria-selected={tab === t.id} onPress={() => setTab(t.id)} style={{ flex: 1, height: 48, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: tab === t.id ? colors.primary : 'transparent' }}>
                   <Ionicons name={t.icon} size={22} color={tab === t.id ? colors.primary : colors.foregroundTertiary} />
                 </Pressable>
               ))}

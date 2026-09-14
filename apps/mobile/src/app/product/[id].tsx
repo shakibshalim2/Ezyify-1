@@ -175,7 +175,7 @@ export default function ProductScreen() {
                       {values.map(v => {
                         const on = current === v;
                         return (
-                          <Pressable key={v} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={`${axis} ${v}`} onPress={() => setSelection(s => ({ ...s, [axis]: v }))} style={{ height: 40, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: on ? 2 : 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primarySubtle : colors.card, justifyContent: 'center' }}>
+                          <Pressable key={v} accessibilityRole="radio" aria-checked={on} accessibilityLabel={`${axis} ${v}`} onPress={() => setSelection(s => ({ ...s, [axis]: v }))} style={{ height: 40, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: on ? 2 : 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primarySubtle : colors.card, justifyContent: 'center' }}>
                             <Text variant="label" style={{ color: on ? colors.primary : colors.foreground }}>{v}</Text>
                           </Pressable>
                         );

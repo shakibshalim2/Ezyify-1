@@ -13,6 +13,7 @@ import { authenticate } from '@/lib/biometrics';
 import { useAppStore } from '@/store/app';
 import { formErrors, useMobileRuntime } from '@/lib/auth';
 import { useTheme } from '@/theme';
+import { goBack } from '@/lib/links';
 
 const REASONS: { id: DeleteAccountRequest['reason']; label: string }[] = [
   { id: 'not_useful', label: "I don't find it useful" },
@@ -84,7 +85,7 @@ export default function DeleteAccountScreen() {
           {REASONS.map(r => {
             const on = reason === r.id;
             return (
-              <Pressable key={r.id} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setReason(r.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.card, borderWidth: on ? 2 : 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primarySubtle : colors.card }}>
+              <Pressable key={r.id} accessibilityRole="radio" aria-checked={on} onPress={() => setReason(r.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.card, borderWidth: on ? 2 : 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primarySubtle : colors.card }}>
                 <Ionicons name={on ? 'radio-button-on' : 'radio-button-off'} size={20} color={on ? colors.primary : colors.borderStrong} />
                 <Text style={{ flex: 1 }}>{r.label}</Text>
               </Pressable>
@@ -97,7 +98,7 @@ export default function DeleteAccountScreen() {
       </ScrollView>
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 16, paddingBottom: insets.bottom + 16, backgroundColor: colors.backgroundElevated, borderTopWidth: 1, borderTopColor: colors.border, gap: 8 }}>
         <Button label="Delete my account" variant="destructive" size="lg" fullWidth disabled={!ready} loading={busy} onPress={submit} />
-        <Button label="Keep my account" variant="ghost" size="md" fullWidth onPress={() => router.back()} />
+        <Button label="Keep my account" variant="ghost" size="md" fullWidth onPress={() => goBack(router, '/settings')} />
       </View>
     </View>
   );

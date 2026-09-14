@@ -45,11 +45,13 @@ export interface MobileRuntime extends EzyifyRuntime {
   restoreSession(): Promise<boolean>;
 }
 
+const mockFetch = API_MODE === 'mock' ? createMockFetch({ latencyMs: 350 }) : undefined;
+/** Transport for signed direct-to-bucket uploads: the in-process mock bucket in demo mode, the network otherwise. */
+export const uploadFetch: typeof fetch = mockFetch ?? ((input, init) => fetch(input, init));
+
 export function createMobileRuntime(): MobileRuntime {
   const auth = createAuthStore(secureStorage);
   const cart = createCartStore(secureStorage);
-
-  const mockFetch = API_MODE === 'mock' ? createMockFetch({ latencyMs: 350 }) : undefined;
 
   const tokens: TokenStore = {
     getAccessToken: () => auth.getState().accessToken,

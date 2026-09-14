@@ -88,7 +88,7 @@ export default function SignupScreen() {
           </View>
         )}
       </View>
-      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: terms }} onPress={() => setTerms(t => !t)} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+      <Pressable accessibilityRole="checkbox" aria-checked={terms} onPress={() => setTerms(t => !t)} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
         <View style={{ width: 22, height: 22, borderRadius: radius.sm - 2, borderWidth: 1.5, borderColor: terms ? colors.primary : colors.borderStrong, backgroundColor: terms ? colors.primary : 'transparent', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
           {terms && <Ionicons name="checkmark" size={16} color={colors.primaryForeground} />}
         </View>

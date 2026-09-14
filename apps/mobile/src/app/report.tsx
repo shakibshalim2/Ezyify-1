@@ -10,6 +10,7 @@ import { Text } from '@/components/Text';
 import { Button } from '@/components/Button';
 import { Field } from '@/components/Field';
 import { useTheme } from '@/theme';
+import { goBack } from '@/lib/links';
 
 const REASONS: { id: ReportRequest['reason']; label: string; hint: string }[] = [
   { id: 'spam', label: 'Spam or misleading', hint: 'Fake engagement, repetitive posts, clickbait' },
@@ -61,7 +62,7 @@ export default function ReportScreen() {
   if (done) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <Header title="Report" back={false} right={<Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={8}><Text variant="label" tone="brand">Done</Text></Pressable>} />
+        <Header title="Report" back={false} right={<Pressable accessibilityRole="button" onPress={() => goBack(router)} hitSlop={8}><Text variant="label" tone="brand">Done</Text></Pressable>} />
         <View style={{ padding: 24, alignItems: 'center', gap: 16 }}>
           <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: colors.successSubtle, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="shield-checkmark" size={40} color={colors.success} /></View>
           <Text variant="title" style={{ textAlign: 'center' }}>Thanks for letting us know</Text>
@@ -79,13 +80,13 @@ export default function ReportScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header title={`Report ${type ?? 'content'}`} back={false} right={<Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={8}><Text variant="label" tone="secondary">Cancel</Text></Pressable>} />
+      <Header title={`Report ${type ?? 'content'}`} back={false} right={<Pressable accessibilityRole="button" onPress={() => goBack(router)} hitSlop={8}><Text variant="label" tone="secondary">Cancel</Text></Pressable>} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
         <Text variant="heading">What’s wrong with it?</Text>
         {REASONS.map(r => {
           const on = reason === r.id;
           return (
-            <Pressable key={r.id} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setReason(r.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.card, borderWidth: on ? 2 : 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primarySubtle : colors.card }}>
+            <Pressable key={r.id} accessibilityRole="radio" aria-checked={on} onPress={() => setReason(r.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.card, borderWidth: on ? 2 : 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primarySubtle : colors.card }}>
               <View style={{ flex: 1 }}>
                 <Text variant="bodyMedium">{r.label}</Text>
                 {r.hint ? <Text variant="caption" tone="secondary">{r.hint}</Text> : null}

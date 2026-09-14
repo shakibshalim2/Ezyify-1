@@ -2,6 +2,7 @@ import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 import type { Endpoints, Media, SignUploadRequest } from '@ezyify/core';
 import type { PickedMedia } from './media';
+import { uploadFetch } from './runtime';
 
 const MIME_BY_EXT: Record<string, SignUploadRequest['contentType']> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', mp4: 'video/mp4', mov: 'video/quicktime' };
 
@@ -36,7 +37,7 @@ export async function uploadMedia(api: Endpoints, asset: PickedMedia, purpose: S
   onProgress?.(0.1);
   const signed = await api.uploads.sign({ contentType, sizeBytes: size, purpose });
   onProgress?.(0.2);
-  const res = await fetch(signed.url, { method: signed.method, headers: signed.headers, body: bytes as BodyInit });
+  const res = await uploadFetch(signed.url, { method: signed.method, headers: signed.headers, body: bytes as BodyInit });
   if (!res.ok) throw new Error(`Upload failed (${res.status})`);
   onProgress?.(0.85);
   const done = await api.uploads.finalize(signed.key);

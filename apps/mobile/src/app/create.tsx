@@ -155,7 +155,7 @@ export default function CreateScreen() {
                       {suggested.map(m => {
                         const on = has(m.url);
                         return (
-                          <Pressable key={m.url} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => toggleSuggested(m)} style={{ width: '31.5%', aspectRatio: kind === 'loop' ? 9 / 16 : 1, borderRadius: radius.sm, overflow: 'hidden', borderWidth: on ? 3 : 0, borderColor: colors.primary }}>
+                          <Pressable key={m.url} accessibilityRole="checkbox" aria-checked={on} onPress={() => toggleSuggested(m)} style={{ width: '31.5%', aspectRatio: kind === 'loop' ? 9 / 16 : 1, borderRadius: radius.sm, overflow: 'hidden', borderWidth: on ? 3 : 0, borderColor: colors.primary }}>
                             <Image source={{ uri: m.thumbnailUrl ?? m.url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                             {on && <View style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="checkmark" size={14} color="#fff" /></View>}
                           </Pressable>
@@ -186,7 +186,7 @@ export default function CreateScreen() {
               {productItems.slice(0, 8).map(p => {
                 const on = tagged.includes(p.id);
                 return (
-                  <Pressable key={p.id} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => setTagged(t => (on ? t.filter(x => x !== p.id) : [...t, p.id].slice(0, 10)))} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: radius.card, backgroundColor: on ? colors.primarySubtle : colors.card, borderWidth: 1, borderColor: on ? colors.primary : colors.borderSubtle }}>
+                  <Pressable key={p.id} accessibilityRole="checkbox" aria-checked={on} onPress={() => setTagged(t => (on ? t.filter(x => x !== p.id) : [...t, p.id].slice(0, 10)))} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: radius.card, backgroundColor: on ? colors.primarySubtle : colors.card, borderWidth: 1, borderColor: on ? colors.primary : colors.borderSubtle }}>
                     <Image source={{ uri: p.imageUrl }} style={{ width: 48, height: 48, borderRadius: radius.sm }} />
                     <View style={{ flex: 1 }}><Text variant="bodyMedium" numberOfLines={1}>{p.name}</Text><Text variant="caption" tone="secondary">{formatMoney(p.price)} · {p.seller.name}</Text></View>
                     <Ionicons name={on ? 'checkbox' : 'square-outline'} size={22} color={on ? colors.primary : colors.borderStrong} />

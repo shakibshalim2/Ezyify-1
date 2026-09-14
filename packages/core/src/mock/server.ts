@@ -124,6 +124,16 @@ export function createMockFetch(options: MockServerOptions = {}, state: MockStat
   };
   const convosOf = (userId: string) => state.conversations.get(userId) ?? (state.conversations.set(userId, []), state.conversations.get(userId)!);
 
+  // Canned comments are only seeded for fixture posts that advertise a comment count; fresh posts start empty.
+  const commentsFor = (p: Post): Comment[] => {
+    let list = state.comments.get(p.id);
+    if (!list) {
+      list = p.engagement.comments > 0 ? fx.comments(p.id) : [];
+      state.comments.set(p.id, list);
+    }
+    return list;
+  };
+
   const routes: [string, string, Handler][] = [
     // ---- auth
     ['POST', '/auth/signup', c => {
@@ -490,7 +500,9 @@ export function createMockFetch(options: MockServerOptions = {}, state: MockStat
     ['GET', '/loops', c => {
       let list = visiblePosts(c.user, 'loop');
       const author = c.query.get('author');
+      const tag = c.query.get('hashtag')?.replace(/^#/, '').toLowerCase();
       if (author) list = list.filter(p => p.author.username === author);
+      if (tag) list = list.filter(p => p.hashtags.some(h => h.toLowerCase() === tag));
       return paginate(list, c.query);
     }],
     ['GET', '/stories', c => visiblePosts(c.user, 'story').filter(p => now() - +new Date(p.createdAt) < 24 * 3600_000)],
@@ -564,15 +576,15 @@ export function createMockFetch(options: MockServerOptions = {}, state: MockStat
       return { ok: true };
     }],
     ['GET', '/posts/:id/comments', c => {
-      if (!state.posts.some(p => p.id === c.params.id)) throw notFound('Post');
-      const list = state.comments.get(c.params.id) ?? (state.comments.set(c.params.id, fx.comments(c.params.id)), state.comments.get(c.params.id)!);
-      return paginate(list, c.query);
+      const p = state.posts.find(x => x.id === c.params.id);
+      if (!p) throw notFound('Post');
+      return paginate(commentsFor(p), c.query);
     }],
     ['POST', '/posts/:id/comments', c => {
       const u = requireUser(c);
       const p = state.posts.find(x => x.id === c.params.id);
       if (!p) throw notFound('Post');
-      const list = state.comments.get(p.id) ?? (state.comments.set(p.id, fx.comments(p.id)), state.comments.get(p.id)!);
+      const list = commentsFor(p);
       const comment: Comment = { id: nextId('c'), author: fx.summary(u), text: String(c.body.text ?? ''), likes: 0, createdAt: iso() };
       list.unshift(comment);
       p.engagement.comments++;

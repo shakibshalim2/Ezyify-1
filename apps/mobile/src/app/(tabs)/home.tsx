@@ -1,7 +1,7 @@
 import { FlatList, RefreshControl, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFeed, useUnreadCount, type Post } from '@ezyify/core';
+import { useConversations, useFeed, useUnreadCount, type Post } from '@ezyify/core';
 import { Text } from '@/components/Text';
 import { IconButton } from '@/components/IconButton';
 import { BrandMark, BrandWordmark } from '@/components/BrandMark';
@@ -43,6 +43,8 @@ export default function HomeScreen() {
   const { colors } = useTheme();
   const cartCount = useBadgeCount();
   const unread = useUnreadCount();
+  const convos = useConversations();
+  const unreadMessages = convos.data?.reduce((n, c) => n + c.unreadCount, 0) ?? 0;
   const feed = useFeed();
   const { items, loadMore, loadingMore } = useInfiniteList<Post>(feed);
   const { refreshing, onRefresh } = useRefresh(feed.refetch);
@@ -56,6 +58,10 @@ export default function HomeScreen() {
         <View>
           <IconButton icon="notifications-outline" label="Notifications" onPress={() => router.push('/notifications')} />
           <CountBadge count={unread.data} />
+        </View>
+        <View>
+          <IconButton icon="chatbubble-ellipses-outline" label="Messages" onPress={() => router.push('/messages')} />
+          <CountBadge count={unreadMessages} />
         </View>
         <View>
           <IconButton icon="bag-handle-outline" label="Cart" onPress={() => router.push('/cart')} />

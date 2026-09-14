@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { Text } from './Text';
 import { IconButton } from './IconButton';
+import { goBack } from '@/lib/links';
 
 interface HeaderProps {
   title?: string;
@@ -28,7 +29,7 @@ export function Header({ title, back = true, right, transparent }: HeaderProps) 
         gap: 4,
       }}
     >
-      {back ? <IconButton icon="chevron-back" label="Back" variant={transparent ? 'overlay' : 'ghost'} onPress={() => router.back()} /> : <View style={{ width: 44 }} />}
+      {back ? <IconButton icon="chevron-back" label="Back" variant={transparent ? 'overlay' : 'ghost'} onPress={() => goBack(router)} /> : <View style={{ width: 44 }} />}
       <Text variant="heading" style={{ flex: 1, textAlign: 'center' }} numberOfLines={1}>
         {title ?? ''}
       </Text>

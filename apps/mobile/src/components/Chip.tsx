@@ -15,7 +15,7 @@ export function Chip({ label, selected, icon, onPress }: ChipProps) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ selected: !!selected }}
+      aria-selected={!!selected}
       onPress={onPress}
       style={({ pressed }) => ({
         flexDirection: 'row',

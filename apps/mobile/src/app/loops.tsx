@@ -14,7 +14,7 @@ import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/QueryState';
 import { useInfiniteList } from '@/lib/data';
-import { shareUrl } from '@/lib/links';
+import { shareUrl, goBack } from '@/lib/links';
 import { useTheme } from '@/theme';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -132,7 +132,7 @@ export default function LoopsScreen() {
         renderItem={({ item, index }) => <LoopItem loop={item} active={index === active} />}
       />
       <View style={{ position: 'absolute', top: insets.top, left: 8, right: 8, flexDirection: 'row', alignItems: 'center' }}>
-        <IconButton icon="chevron-back" label="Back" variant="overlay" onPress={() => router.back()} />
+        <IconButton icon="chevron-back" label="Back" variant="overlay" onPress={() => goBack(router)} />
         <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'center', gap: 18 }}>
           <Text variant="label" style={{ color: 'rgba(255,255,255,0.6)' }}>Following</Text>
           <Text variant="label" style={{ color: '#fff' }}>For You</Text>

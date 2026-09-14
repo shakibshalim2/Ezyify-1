@@ -138,7 +138,7 @@ export default function CheckoutScreen() {
               {addressList.map(a => {
                 const on = a.id === address?.id;
                 return (
-                  <Pressable key={a.id} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => { setChosen(a.id); setPicking(false); }} style={{ flexDirection: 'row', gap: 12, alignItems: 'center', padding: 14, borderRadius: radius.card, borderWidth: on ? 2 : 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primarySubtle : colors.card }}>
+                  <Pressable key={a.id} accessibilityRole="radio" aria-checked={on} onPress={() => { setChosen(a.id); setPicking(false); }} style={{ flexDirection: 'row', gap: 12, alignItems: 'center', padding: 14, borderRadius: radius.card, borderWidth: on ? 2 : 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primarySubtle : colors.card }}>
                     <Ionicons name={on ? 'radio-button-on' : 'radio-button-off'} size={20} color={on ? colors.primary : colors.borderStrong} />
                     <View style={{ flex: 1 }}>
                       <Text variant="bodyMedium">{a.label} · {a.recipient}</Text>
@@ -181,7 +181,7 @@ export default function CheckoutScreen() {
             {METHODS.map(m => {
               const on = method === m.id;
               return (
-                <Pressable key={m.id} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setMethod(m.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.card, borderWidth: on ? 2 : 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primarySubtle : colors.card }}>
+                <Pressable key={m.id} accessibilityRole="radio" aria-checked={on} onPress={() => setMethod(m.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.card, borderWidth: on ? 2 : 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primarySubtle : colors.card }}>
                   <Ionicons name={m.icon} size={22} color={on ? colors.primary : colors.foregroundSecondary} />
                   <View style={{ flex: 1 }}>
                     <Text variant="bodyMedium">{m.label}</Text>

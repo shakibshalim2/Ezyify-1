@@ -127,6 +127,10 @@ describe('mock API server', () => {
     await login();
     const feed = await api.feed.home();
     expect(feed.items.every(p => PostSchema.safeParse(p).success)).toBe(true);
+    expect(feed.items.every(p => p.kind === 'post')).toBe(true);
+    const tech = await api.feed.loops({ hashtag: 'tech' });
+    expect(tech.items.length).toBeGreaterThan(0);
+    expect(tech.items.every(p => p.kind === 'loop' && p.hashtags.some(h => h.toLowerCase() === 'tech'))).toBe(true);
     const first = feed.items[0];
     await api.feed.like(first.id);
     await api.feed.save(first.id);
@@ -153,7 +157,7 @@ describe('mock API server', () => {
   });
 
   it('messaging, notifications, uploads, create post, profile update', async () => {
-    const { api, login } = harness();
+    const { api, login, fetch } = harness();
     await login();
     const convos = await api.messaging.conversations();
     expect(convos[0].unreadCount).toBe(2);
@@ -168,10 +172,14 @@ describe('mock API server', () => {
     await api.notifications.markAllRead();
     expect((await api.notifications.unreadCount()).count).toBe(0);
     const signed = await api.uploads.sign({ contentType: 'image/jpeg', sizeBytes: 1000, purpose: 'post' });
+    // The signed PUT goes through the same mock fetch so demo builds can upload without a bucket.
+    const put = await fetch(signed.url, { method: signed.method, headers: signed.headers, body: new Uint8Array(1000) });
+    expect(put.ok).toBe(true);
     const fin = await api.uploads.finalize(signed.key);
     expect(fin.kind).toBe('image');
     const post = await api.feed.create({ caption: 'hi', media: [{ type: 'image', url: fin.url, thumbnailUrl: null, width: null, height: null, durationMs: null }] });
     expect((await api.feed.home()).items[0].id).toBe(post.id);
+    expect((await api.feed.comments(post.id)).items).toHaveLength(0);
     await api.feed.remove(post.id);
     await expect(api.feed.post(post.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
     const me = await api.users.updateMe({ name: 'Renamed', bio: 'hey' });
