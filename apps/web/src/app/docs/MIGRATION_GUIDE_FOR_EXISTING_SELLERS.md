@@ -2,7 +2,7 @@
 
 **Effective Date:** [To Be Announced]  
 **Transition Period:** 30 Days  
-**Support:** seller-support@ezyify.com
+**Support:** seller-support@ezyify.app
 
 ---
 
@@ -294,7 +294,7 @@ All fees clearly disclosed upfront:
 - **Quick Reference:** See `/docs/ESCROW_SYSTEM_QUICK_REFERENCE.md`
 
 ### Contact Support
-- **Email:** seller-support@ezyify.com
+- **Email:** seller-support@ezyify.app
 - **Live Chat:** Available in dashboard (9 AM - 9 PM EST)
 - **Phone:** 1-800-EZYIFY-1 (for urgent issues)
 - **Response Time:** Within 24 hours
@@ -398,7 +398,7 @@ Once you've completed the checklist above, you're all set for the new escrow sys
 ## 📞 Migration Support Contact
 
 **Dedicated Migration Team:**
-- Email: migration@ezyify.com
+- Email: migration@ezyify.app
 - Slack: #seller-migration (invite-only)
 - Priority Support: Available during transition
 

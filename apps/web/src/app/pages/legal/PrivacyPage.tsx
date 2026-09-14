@@ -160,7 +160,7 @@ export default function PrivacyPage() {
 
             <h3>6.6 Data Portability</h3>
             <p>
-              Request a copy of your data by contacting us at privacy@ezyify.com.
+              Request a copy of your data by contacting us at privacy@ezyify.app.
             </p>
 
             <h2>7. Children's Privacy</h2>
@@ -202,8 +202,8 @@ export default function PrivacyPage() {
               If you have questions about this Privacy Policy or your data, contact us at:
             </p>
             <ul>
-              <li><strong>Email:</strong> privacy@ezyify.com</li>
-              <li><strong>Data Protection Officer:</strong> dpo@ezyify.com</li>
+              <li><strong>Email:</strong> privacy@ezyify.app</li>
+              <li><strong>Data Protection Officer:</strong> dpo@ezyify.app</li>
               <li><strong>Address:</strong> San Francisco, CA, USA</li>
               <li><strong>Phone:</strong> +1 (555) 123-4567</li>
             </ul>

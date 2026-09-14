@@ -167,10 +167,15 @@ describe('social + policy', () => {
     const rep = json(await inject('POST', '/reports', { token: buyer, body: { targetType: 'post', targetId: 'post-002', reason: 'spam' } }));
     expect(rep.data.ok).toBe(true);
   });
-  it('admin queue is role-gated', async () => {
+  it('admin queue is role-gated and child-safety reports are served first', async () => {
     expect((await inject('GET', '/admin/reports', { token: buyer })).statusCode).toBe(403);
+    const csae = json(await inject('POST', '/reports', { token: buyer, body: { targetType: 'post', targetId: 'post-003', reason: 'child_safety' } }));
+    expect(csae.data.ok).toBe(true);
     const admin = (await login('admin@ezyify.test')).accessToken;
-    expect((await inject('GET', '/admin/reports', { token: admin })).statusCode).toBe(200);
+    const queue = await inject('GET', '/admin/reports', { token: admin });
+    expect(queue.statusCode).toBe(200);
+    const items = json(queue).data.items as { id: string; reason: string; priority: number }[];
+    expect(items[0]).toMatchObject({ id: csae.data.id, reason: 'child_safety', priority: 2 });
   });
   it('device registration + notifications work', async () => {
     expect(json(await inject('POST', '/devices', { token: buyer, body: { token: 'fcm-test', platform: 'android', provider: 'fcm', appVersion: '0.1.0' } })).data.ok).toBe(true);

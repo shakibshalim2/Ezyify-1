@@ -183,7 +183,7 @@ export default function TermsPage() {
               If you have questions about these Terms, please contact us at:
             </p>
             <ul>
-              <li>Email: legal@ezyify.com</li>
+              <li>Email: legal@ezyify.app</li>
               <li>Address: San Francisco, CA, USA</li>
               <li>Phone: +1 (555) 123-4567</li>
             </ul>

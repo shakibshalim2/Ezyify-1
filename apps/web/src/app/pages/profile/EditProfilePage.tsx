@@ -140,7 +140,7 @@ export default function EditProfilePage() {
               name="username"
               value={form.username}
               onChange={change}
-              hint={`ezyify.com/@${form.username}`}
+              hint={`ezyify.app/@${form.username}`}
             />
             <label className="flex flex-col gap-1.5 text-sm font-medium">
               Bio

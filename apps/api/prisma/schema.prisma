@@ -646,10 +646,12 @@ model Report {
   reason     String
   details    String?          @db.VarChar(1000)
   status     ReportStatus     @default(open)
+  /// 2 = child safety (CSAE), 1 = self-harm / violence, 0 = everything else. Queue is ordered priority desc, createdAt asc.
+  priority   Int              @default(0)
   createdAt  DateTime         @default(now())
   resolvedAt DateTime?
 
-  @@index([status, createdAt])
+  @@index([status, priority(sort: Desc), createdAt])
   @@index([targetType, targetId])
 }
 

@@ -264,7 +264,7 @@ export default function LaunchDayCommandCenter() {
       role: 'Launch Commander',
       status: 'online',
       currentTask: 'Monitoring overall launch status',
-      contact: { phone: '+880 1XXX-XXXXXX', email: 'sarah@ezyify.com', slack: '@sarah' }
+      contact: { phone: '+880 1XXX-XXXXXX', email: 'sarah@ezyify.app', slack: '@sarah' }
     },
     {
       id: 'team-2',
@@ -272,7 +272,7 @@ export default function LaunchDayCommandCenter() {
       role: 'DevOps Lead',
       status: 'online',
       currentTask: 'Infrastructure verification',
-      contact: { phone: '+880 1XXX-XXXXXX', email: 'rajesh@ezyify.com', slack: '@rajesh' }
+      contact: { phone: '+880 1XXX-XXXXXX', email: 'rajesh@ezyify.app', slack: '@rajesh' }
     },
     {
       id: 'team-3',
@@ -280,7 +280,7 @@ export default function LaunchDayCommandCenter() {
       role: 'Backend Lead',
       status: 'busy',
       currentTask: 'Payment gateway testing',
-      contact: { phone: '+880 1XXX-XXXXXX', email: 'emily@ezyify.com', slack: '@emily' }
+      contact: { phone: '+880 1XXX-XXXXXX', email: 'emily@ezyify.app', slack: '@emily' }
     },
     {
       id: 'team-4',
@@ -288,7 +288,7 @@ export default function LaunchDayCommandCenter() {
       role: 'Frontend Lead',
       status: 'online',
       currentTask: 'UI final checks',
-      contact: { phone: '+880 1XXX-XXXXXX', email: 'michael@ezyify.com', slack: '@michael' }
+      contact: { phone: '+880 1XXX-XXXXXX', email: 'michael@ezyify.app', slack: '@michael' }
     },
     {
       id: 'team-5',
@@ -296,7 +296,7 @@ export default function LaunchDayCommandCenter() {
       role: 'Security Lead',
       status: 'online',
       currentTask: 'Security audit complete',
-      contact: { phone: '+880 1XXX-XXXXXX', email: 'priya@ezyify.com', slack: '@priya' }
+      contact: { phone: '+880 1XXX-XXXXXX', email: 'priya@ezyify.app', slack: '@priya' }
     },
     {
       id: 'team-6',
@@ -304,7 +304,7 @@ export default function LaunchDayCommandCenter() {
       role: 'Support Lead',
       status: 'online',
       currentTask: 'Team briefing',
-      contact: { phone: '+880 1XXX-XXXXXX', email: 'david@ezyify.com', slack: '@david' }
+      contact: { phone: '+880 1XXX-XXXXXX', email: 'david@ezyify.app', slack: '@david' }
     },
     {
       id: 'team-7',
@@ -312,7 +312,7 @@ export default function LaunchDayCommandCenter() {
       role: 'Marketing Lead',
       status: 'online',
       currentTask: 'Campaign preparation',
-      contact: { phone: '+880 1XXX-XXXXXX', email: 'lisa@ezyify.com', slack: '@lisa' }
+      contact: { phone: '+880 1XXX-XXXXXX', email: 'lisa@ezyify.app', slack: '@lisa' }
     },
     {
       id: 'team-8',
@@ -320,7 +320,7 @@ export default function LaunchDayCommandCenter() {
       role: 'SRE Lead',
       status: 'online',
       currentTask: 'Monitoring setup',
-      contact: { phone: '+880 1XXX-XXXXXX', email: 'ahmed@ezyify.com', slack: '@ahmed' }
+      contact: { phone: '+880 1XXX-XXXXXX', email: 'ahmed@ezyify.app', slack: '@ahmed' }
     }
   ]);
 

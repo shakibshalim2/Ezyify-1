@@ -32,6 +32,18 @@ test.describe('SEO', () => {
     const robots = await request.get('/robots.txt');
     expect(await robots.text()).toMatch(/Disallow: \/checkout/);
   });
+
+  test('child safety standards page is public, prerendered and indexed (Play CSAE policy)', async ({ page, request }) => {
+    const shell = await request.get('/child-safety/index.html');
+    expect(shell.ok()).toBe(true);
+    expect(await shell.text()).toContain('<title>Child Safety Standards');
+    expect(await (await request.get('/sitemap.xml')).text()).toContain('<loc>https://ezyify.app/child-safety</loc>');
+
+    await page.goto('/legal/child-safety');
+    await expect(page.getByRole('heading', { name: /child safety standards/i, level: 1 })).toBeVisible();
+    await expect(page.getByRole('link', { name: /childsafety@ezyify\.app/i }).first()).toBeVisible();
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /index/);
+  });
 });
 
 test.describe('PWA', () => {

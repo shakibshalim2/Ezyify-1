@@ -96,8 +96,8 @@ export default function PressPage() {
           <CardContent className="grid md:grid-cols-3 gap-6">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Email</p>
-              <a href="mailto:press@ezyify.com" className="text-primary hover:underline font-medium">
-                press@ezyify.com
+              <a href="mailto:press@ezyify.app" className="text-primary hover:underline font-medium">
+                press@ezyify.app
               </a>
             </div>
             <div>

@@ -43,6 +43,7 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
   { path: '/help', title: 'Help Center', description: 'Answers about orders, escrow, refunds, wallet and your account.', changefreq: 'weekly', priority: 0.5 },
   { path: '/faq', title: 'FAQ', description: 'Frequently asked questions about shopping, selling and creating on Ezyify.', changefreq: 'monthly', priority: 0.4 },
   { path: '/safety', title: 'Safety & Trust', description: 'How escrow, verification and moderation keep Ezyify safe.', changefreq: 'monthly', priority: 0.4 },
+  { path: '/child-safety', title: 'Child Safety Standards', description: 'Ezyify’s standards against child sexual abuse and exploitation (CSAE), how to report, and our designated safety contact.', changefreq: 'monthly', priority: 0.4, prerender: true },
   { path: '/terms', title: 'Terms of Service', description: 'Ezyify terms of service.', changefreq: 'monthly', priority: 0.3 },
   { path: '/privacy', title: 'Privacy Policy', description: 'How Ezyify collects, uses and protects your data.', changefreq: 'monthly', priority: 0.3 },
   { path: '/community-guidelines', title: 'Community Guidelines', description: 'What is and is not allowed on Ezyify.', changefreq: 'monthly', priority: 0.3 },

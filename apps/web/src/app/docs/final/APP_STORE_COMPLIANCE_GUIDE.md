@@ -380,9 +380,9 @@ Download EZYIFY today and experience the future of social commerce!
 ---
 
 Age Requirement: 13+
-Support: support@ezyify.com
-Privacy Policy: https://ezyify.com/privacy
-Terms of Service: https://ezyify.com/terms
+Support: support@ezyify.app
+Privacy Policy: https://ezyify.app/privacy
+Terms of Service: https://ezyify.app/terms
 ```
 
 ---
@@ -634,7 +634,7 @@ Users can:
 - Right to object (opt-out options)
 
 ✅ **Data Protection Officer (DPO):**
-- Contact: dpo@ezyify.com
+- Contact: dpo@ezyify.app
 
 ✅ **Cookie Consent:**
 - Cookie banner on first app launch

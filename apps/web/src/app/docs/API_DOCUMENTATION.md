@@ -1,7 +1,7 @@
 # EZYIFY Escrow System - API Documentation
 
 **Version:** 1.0.0  
-**Base URL:** `https://api.ezyify.com`  
+**Base URL:** `https://api.ezyify.app`  
 **Authentication:** Bearer Token (JWT)  
 **Last Updated:** January 19, 2026
 
@@ -37,7 +37,7 @@ Content-Type: application/json
 ```bash
 curl -H "Authorization: Bearer eyJhbGc..." \
      -H "Content-Type: application/json" \
-     https://api.ezyify.com/api/seller/balance
+     https://api.ezyify.app/api/seller/balance
 ```
 
 ---
@@ -735,7 +735,7 @@ Initiate KYC verification process.
   "success": true,
   "data": {
     "sessionId": "kyc_session_abc123",
-    "verificationUrl": "https://verify.ezyify.com/kyc/abc123",
+    "verificationUrl": "https://verify.ezyify.app/kyc/abc123",
     "expiresAt": "2026-01-19T15:30:00Z",
     "requiredDocuments": [
       "government-id",
@@ -971,9 +971,9 @@ X-RateLimit-Reset: 1642607200
 ## 📞 Support
 
 **API Issues:**
-- Email: api-support@ezyify.com
-- Documentation: https://docs.ezyify.com
-- Status Page: https://status.ezyify.com
+- Email: api-support@ezyify.app
+- Documentation: https://docs.ezyify.app
+- Status Page: https://status.ezyify.app
 
 **Response Times:**
 - Critical API issues: < 1 hour

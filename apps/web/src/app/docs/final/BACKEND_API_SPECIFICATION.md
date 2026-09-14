@@ -13,8 +13,8 @@
 | **API Version** | v1.0 |
 | **Status** | ✅ Production-Ready Specification |
 | **Last Updated** | January 7, 2026 |
-| **Base URL** | `https://api.ezyify.com/v1` (Production) |
-| **Dev URL** | `https://dev-api.ezyify.com/v1` (Development) |
+| **Base URL** | `https://api.ezyify.app/v1` (Production) |
+| **Dev URL** | `https://dev-api.ezyify.app/v1` (Development) |
 
 ---
 
@@ -827,8 +827,8 @@ Start a live stream
   "data": {
     "streamId": "uuid",
     "streamKey": "string (RTMP key)",
-    "rtmpUrl": "rtmp://live.ezyify.com/live",
-    "playbackUrl": "hls://live.ezyify.com/stream/{streamId}.m3u8",
+    "rtmpUrl": "rtmp://live.ezyify.app/live",
+    "playbackUrl": "hls://live.ezyify.app/stream/{streamId}.m3u8",
     "startedAt": "ISO 8601"
   }
 }
@@ -1253,7 +1253,7 @@ Create order from cart
     "orderNumber": "EZY1234567890",
     "status": "pending_payment",
     "total": 6099.93,
-    "paymentUrl": "https://payment.ezyify.com/pay/xyz (if redirect needed)",
+    "paymentUrl": "https://payment.ezyify.app/pay/xyz (if redirect needed)",
     "estimatedDelivery": "ISO 8601 date"
   }
 }
@@ -1829,17 +1829,17 @@ X-RateLimit-Reset: 1234567890
 ### **Test Credentials**
 
 ```
-Email: test@ezyify.com
+Email: test@ezyify.app
 Password: TestUser123!
 
-Creator Email: creator@ezyify.com
-Seller Email: seller@ezyify.com
-Admin Email: admin@ezyify.com
+Creator Email: creator@ezyify.app
+Seller Email: seller@ezyify.app
+Admin Email: admin@ezyify.app
 ```
 
 ### **API Testing Tools**
 - Postman Collection: Available at `/api/postman-collection.json`
-- Swagger UI: `https://api.ezyify.com/docs`
+- Swagger UI: `https://api.ezyify.app/docs`
 
 ---
 
@@ -1866,9 +1866,9 @@ Admin Email: admin@ezyify.com
 
 ## 📞 API SUPPORT
 
-**Documentation:** https://docs.ezyify.com/api  
-**Status Page:** https://status.ezyify.com  
-**Support Email:** api-support@ezyify.com
+**Documentation:** https://docs.ezyify.app/api  
+**Status Page:** https://status.ezyify.app  
+**Support Email:** api-support@ezyify.app
 
 ---
 

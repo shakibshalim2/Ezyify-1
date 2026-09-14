@@ -258,7 +258,7 @@ export default function SellOnEzyifyPage() {
             </Button>
           </div>
           <p className="text-sm mt-6 opacity-80">
-            Questions? Email <a href="mailto:sellers@ezyify.com" className="underline font-medium">sellers@ezyify.com</a>
+            Questions? Email <a href="mailto:sellers@ezyify.app" className="underline font-medium">sellers@ezyify.app</a>
           </p>
         </div>
       </div>

@@ -28,7 +28,7 @@ export const preloadCriticalAssets = (assets: string[]) => {
 
 export const addResourceHints = () => {
   // DNS Prefetch for external domains
-  const dnsPrefetch = ['https://images.unsplash.com', 'https://api.ezyify.com'];
+  const dnsPrefetch = ['https://images.unsplash.com', 'https://api.ezyify.app'];
   dnsPrefetch.forEach(domain => {
     const link = document.createElement('link');
     link.rel = 'dns-prefetch';
@@ -37,7 +37,7 @@ export const addResourceHints = () => {
   });
 
   // Preconnect to critical domains
-  const preconnect = ['https://api.ezyify.com', 'https://cdn.ezyify.com'];
+  const preconnect = ['https://api.ezyify.app', 'https://cdn.ezyify.app'];
   preconnect.forEach(domain => {
     const link = document.createElement('link');
     link.rel = 'preconnect';

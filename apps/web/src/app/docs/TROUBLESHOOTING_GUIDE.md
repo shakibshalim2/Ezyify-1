@@ -637,17 +637,17 @@ console.log('Withdrawal attempt:', {
 ## 📞 Support Contacts
 
 **Technical Issues:**
-- Email: engineering@ezyify.com
+- Email: engineering@ezyify.app
 - Slack: #escrow-system-support
 - On-Call: [Phone Number]
 
 **Security Issues:**
-- Email: security@ezyify.com
+- Email: security@ezyify.app
 - Emergency: [Phone Number]
 - Response: < 30 minutes
 
 **Compliance Issues:**
-- Email: compliance@ezyify.com
+- Email: compliance@ezyify.app
 - Response: < 4 hours
 
 ---

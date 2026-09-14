@@ -153,6 +153,7 @@ const SafetyPage = createLazyComponent(() => import('./pages/legal/SafetyPage'))
 
 // Batch 7
 const SafetyTrustPage = createLazyComponent(() => import('./pages/legal/SafetyTrustPage'));
+const ChildSafetyPage = createLazyComponent(() => import('./pages/legal/ChildSafetyPage'));
 const AccessibilityPage = createLazyComponent(() => import('./pages/legal/AccessibilityPage'));
 const TransparencyPage = createLazyComponent(() => import('./pages/legal/TransparencyPage'));
 const CommissionPolicyPage = createLazyComponent(() => import('./pages/legal/CommissionPolicyPage'));
@@ -373,6 +374,8 @@ export default function App() {
                 <Route path="/copyright" element={<CopyrightPage />} />
                 <Route path="/safety" element={<SafetyPage />} />
                 <Route path="/safety-trust" element={<SafetyTrustPage />} />
+                <Route path="/child-safety" element={<ChildSafetyPage />} />
+                <Route path="/legal/child-safety" element={<ChildSafetyPage />} />
                 <Route path="/accessibility" element={<AccessibilityPage />} />
                 <Route path="/settings/privacy" element={<PrivacySettingsPage />} />
                 <Route path="/settings/security" element={<SecuritySettingsPage />} />

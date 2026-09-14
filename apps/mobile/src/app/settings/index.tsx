@@ -67,6 +67,7 @@ export default function SettingsScreen() {
       { icon: 'help-circle-outline', label: 'Help center', onPress: () => WebBrowser.openBrowserAsync('https://ezyify.app/help') },
       { icon: 'document-text-outline', label: 'Terms of service', onPress: () => WebBrowser.openBrowserAsync('https://ezyify.app/legal/terms') },
       { icon: 'shield-outline', label: 'Privacy policy', onPress: () => WebBrowser.openBrowserAsync('https://ezyify.app/legal/privacy') },
+      { icon: 'heart-outline', label: 'Child safety standards', onPress: () => WebBrowser.openBrowserAsync('https://ezyify.app/legal/child-safety') },
       { icon: 'flag-outline', label: 'Report a problem', onPress: () => router.push({ pathname: '/report', params: { type: 'user', id: 'app' } }) },
       { icon: 'trash-outline', label: 'Delete account', danger: true, onPress: () => router.push('/settings/delete-account') },
     ]},

@@ -13,10 +13,10 @@
 **1. System Health Check (15 minutes)**
 ```bash
 # Check system uptime
-curl -I https://api.ezyify.com/health
+curl -I https://api.ezyify.app/health
 
 # Check escrow service status
-curl https://api.ezyify.com/api/escrow/health
+curl https://api.ezyify.app/api/escrow/health
 
 # Review overnight error logs
 tail -n 1000 /var/log/ezyify/errors.log | grep "ERROR"
@@ -108,7 +108,7 @@ AND status = 'under-review';
 **1. Performance Metrics (10 minutes)**
 ```bash
 # Check API response times
-curl https://api.ezyify.com/api/metrics/performance
+curl https://api.ezyify.app/api/metrics/performance
 
 # Check database query performance
 psql -c "SELECT query, mean_exec_time 
@@ -641,7 +641,7 @@ ORDER BY pg_total_relation_size(tablename::regclass) DESC;
 terraform apply -var="instance_count=3"
 
 # Verify health
-curl https://new-instance.ezyify.com/health
+curl https://new-instance.ezyify.app/health
 
 # Add to load balancer
 aws elb register-instances-with-load-balancer

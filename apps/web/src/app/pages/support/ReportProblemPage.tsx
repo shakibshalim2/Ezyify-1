@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import { Link } from 'react-router';
 import { SEO } from '../../components/SEO';
 import { Flag, AlertTriangle, ShoppingBag, Users, Shield, Bug, Mail } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -43,8 +44,10 @@ export default function ReportProblemPage() {
       <Alert className="mb-6 border-warning/30 bg-warning/10">
         <AlertTriangle className="w-5 h-5 text-warning" />
         <AlertDescription>
-          <strong>Urgent safety issues?</strong> If you're reporting harassment, threats, or immediate danger, 
-          email <a href="mailto:safety@ezyify.com" className="underline font-medium">safety@ezyify.com</a> for fastest response.
+          <strong>Urgent safety issues?</strong> If you're reporting harassment, threats, or immediate danger,
+          email <a href="mailto:safety@ezyify.app" className="underline font-medium">safety@ezyify.app</a> for fastest response.
+          Concerns involving a minor go to <a href="mailto:childsafety@ezyify.app" className="underline font-medium">childsafety@ezyify.app</a> — see our{' '}
+          <Link to="/child-safety" className="underline font-medium">Child Safety Standards</Link>.
         </AlertDescription>
       </Alert>
 
@@ -134,6 +137,7 @@ export default function ReportProblemPage() {
                   <SelectItem value="bug">Technical Bug/Error</SelectItem>
                   <SelectItem value="copyright">Copyright Infringement</SelectItem>
                   <SelectItem value="safety">Safety/Trust Issue</SelectItem>
+                  <SelectItem value="child_safety">Child Safety (CSAE) — reviewed first</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
@@ -196,7 +200,7 @@ export default function ReportProblemPage() {
               <Input
                 id="url"
                 type="url"
-                placeholder="https://ezyify.com/post/12345 or profile/username"
+                placeholder="https://ezyify.app/post/12345 or profile/username"
                 value={formData.url}
                 onChange={(e) => setFormData({ ...formData, url: e.target.value })}
               />
