@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Inject, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post, Req, Res } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -19,7 +19,7 @@ import { CurrentUser } from './current-user.decorator.js';
 import type { AccessClaims } from './auth.guard.js';
 import { zod } from '../../common/zod.pipe.js';
 import { ENV, type Env } from '../../config.js';
-import { unauthorized } from '../../common/errors.js';
+import { forbidden, unauthorized } from '../../common/errors.js';
 
 export const REFRESH_COOKIE = 'ezyify_rt';
 const RefreshBody = z.object({ refreshToken: z.string().min(1).optional() });
@@ -58,6 +58,7 @@ export class AuthController {
   async refresh(@Body(zod(RefreshBody)) body: z.infer<typeof RefreshBody>, @Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
     const token = body.refreshToken ?? req.cookies?.[REFRESH_COOKIE];
     if (!token) throw unauthorized('No session');
+    if (!body.refreshToken) this.assertSameOrigin(req); // cookie flow → CSRF check
     const result = await this.auth.refresh(token, meta(req));
     if (isNative(req)) return result;
     this.setCookie(reply, result.refreshToken);
@@ -69,6 +70,27 @@ export class AuthController {
   async logout(@Body(zod(RefreshBody)) body: z.infer<typeof RefreshBody>, @Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply, @CurrentUser() user?: AccessClaims) {
     const token = body.refreshToken ?? req.cookies?.[REFRESH_COOKIE];
     if (user) await this.auth.logout(token, user.sub);
+    reply.clearCookie(REFRESH_COOKIE, { path: '/' });
+    return { ok: true };
+  }
+
+  @Get('sessions')
+  @Public(false)
+  sessions(@CurrentUser() user: AccessClaims, @Req() req: FastifyRequest) {
+    return this.auth.sessions(user.sub, req.cookies?.[REFRESH_COOKIE]);
+  }
+
+  @Delete('sessions/:id')
+  @Public(false)
+  revoke(@CurrentUser() user: AccessClaims, @Param('id') id: string, @Req() req: FastifyRequest) {
+    return this.auth.revokeSession(user.sub, id, meta(req));
+  }
+
+  @Post('logout-all')
+  @Public(false)
+  @HttpCode(200)
+  async logoutAll(@CurrentUser() user: AccessClaims, @Res({ passthrough: true }) reply: FastifyReply) {
+    await this.auth.logoutAll(user.sub);
     reply.clearCookie(REFRESH_COOKIE, { path: '/' });
     return { ok: true };
   }
@@ -85,6 +107,16 @@ export class AuthController {
   async reset(@Body(zod(ResetPasswordRequestSchema)) body: { token: string; password: string }) {
     await this.auth.resetPassword(body.token, body.password);
     return { ok: true };
+  }
+
+  /**
+   * CSRF defence for the cookie-based refresh (ASVS 4.2.2): SameSite=Lax blocks cross-site POSTs in modern browsers,
+   * and as defence-in-depth the Origin/Referer must be one of our configured web origins.
+   */
+  private assertSameOrigin(req: FastifyRequest) {
+    const allowed = this.env.CORS_ORIGINS.split(',').map(s => s.trim());
+    const origin = req.headers.origin ?? (req.headers.referer ? new URL(req.headers.referer).origin : undefined);
+    if (!origin || !allowed.includes(origin)) throw forbidden('Cross-site request blocked');
   }
 
   private emit(session: SessionResult, req: FastifyRequest, reply: FastifyReply) {

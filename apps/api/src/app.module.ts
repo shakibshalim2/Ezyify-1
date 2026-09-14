@@ -19,6 +19,8 @@ import { MessagingModule } from './modules/messaging/messaging.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { AccountModule } from './modules/account/account.module.js';
 import { ModerationModule } from './modules/moderation/moderation.module.js';
+import { PaymentsModule } from './modules/payments/payments.module.js';
+import { UploadsModule } from './modules/uploads/uploads.module.js';
 import { HealthController } from './modules/health/health.controller.js';
 
 export function buildAppModule(env: Env = loadEnv()) {
@@ -47,6 +49,8 @@ export function buildAppModule(env: Env = loadEnv()) {
       NotificationsModule,
       AccountModule,
       ModerationModule,
+      PaymentsModule,
+      UploadsModule,
     ],
     controllers: [HealthController],
     providers: [

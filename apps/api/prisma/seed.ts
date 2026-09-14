@@ -11,6 +11,12 @@ const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: proc
 const img = (id: string, w = 800) => `https://images.unsplash.com/${id}?w=${w}&q=80`;
 
 export async function seed() {
+  // Transactional state is wiped so repeated seeds (tests, dev resets) start from the same balances and empty carts.
+  await prisma.$transaction([
+    prisma.cartItem.deleteMany(), prisma.order.deleteMany(), prisma.transaction.deleteMany(), prisma.refreshSession.deleteMany(),
+    prisma.otpCode.deleteMany(), prisma.report.deleteMany(), prisma.block.deleteMany(), prisma.device.deleteMany(), prisma.webhookEvent.deleteMany(),
+    prisma.auditLog.deleteMany(), prisma.notification.deleteMany(), prisma.like.deleteMany(), prisma.save.deleteMany(),
+  ]);
   const passwordHash = await argon2.hash('Password1', { type: argon2.argon2id });
 
   const users = [
@@ -25,7 +31,7 @@ export async function seed() {
     { id: 'u_admin', email: 'admin@ezyify.test', username: 'admin', name: 'Ezyify Admin', avatarUrl: null, verified: true, role: 'admin' as const },
   ];
   for (const u of users) {
-    await prisma.user.upsert({ where: { id: u.id }, create: { ...u, passwordHash, emailVerified: true, wallet: { create: { balance: u.id === 'u_buyer' ? 50_000 : 0 } }, cart: { create: {} } }, update: { ...u } });
+    await prisma.user.upsert({ where: { id: u.id }, create: { ...u, passwordHash, emailVerified: true, wallet: { create: { balance: u.id === 'u_buyer' ? 50_000 : 0 } }, cart: { create: {} } }, update: { ...u, failedLogins: 0, lockedUntil: null, wallet: { upsert: { create: { balance: u.id === 'u_buyer' ? 50_000 : 0 }, update: { balance: u.id === 'u_buyer' ? 50_000 : 0, pending: 0 } } } } });
   }
   await prisma.address.upsert({ where: { id: 'addr_buyer_home' }, create: { id: 'addr_buyer_home', userId: 'u_buyer', label: 'Home', recipient: 'Test Buyer', phone: '+6281234567890', line1: 'Jl. Sudirman No. 21', city: 'Jakarta', postal: '10220', country: 'ID', isDefault: true }, update: {} });
 
@@ -49,6 +55,8 @@ export async function seed() {
     { id: 'prod-008', slug: 'led-table-lamp', name: 'LED Table Lamp', description: 'Warm-to-cool dimmable, USB-C, touch controls.', sellerId: 'u_jules', categoryId: 'cat_home', price: 5499, compareAtPrice: 8999, images: [img('photo-1507473885765-e6ed057f782c')], tags: ['lighting'], badge: 'limited', stock: 25, soldCount: 210, ratingSum: 2880, ratingCount: 640 },
   ];
   for (const p of products) await prisma.product.upsert({ where: { id: p.id }, create: p, update: p });
+  // Throw-away accounts created by the e2e suite.
+  await prisma.user.deleteMany({ where: { email: { startsWith: 'new', endsWith: '@ezyify.test' }, id: { notIn: users.map(u => u.id) } } });
   await prisma.productVariant.upsert({ where: { id: 'var_backpack_midnight' }, create: { id: 'var_backpack_midnight', productId: 'prod-004', name: 'Midnight / M', options: { Color: 'Midnight', Size: 'M' }, price: 8999, stock: 20 }, update: {} });
   await prisma.productVariant.upsert({ where: { id: 'var_backpack_sand' }, create: { id: 'var_backpack_sand', productId: 'prod-004', name: 'Sand / M', options: { Color: 'Sand', Size: 'M' }, price: 8999, stock: 15 }, update: {} });
 

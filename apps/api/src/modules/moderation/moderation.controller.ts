@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import { ReportRequestSchema, type ReportRequest } from '@ezyify/core';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
+import { AuditService } from '../../common/audit.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles, type AccessClaims } from '../auth/auth.guard.js';
 import { zod } from '../../common/zod.pipe.js';
@@ -17,7 +18,7 @@ const QueueQuery = PageQuerySchema.extend({ status: z.enum(['open', 'reviewing',
 @ApiTags('moderation')
 @Controller()
 export class ModerationController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
   @Post('reports')
   async report(@CurrentUser() user: AccessClaims, @Body(zod(ReportRequestSchema)) body: ReportRequest) {
@@ -63,8 +64,9 @@ export class ModerationController {
 
   @Patch('admin/reports/:id')
   @Roles('admin')
-  async review(@Param('id') id: string, @Body(zod(ReviewSchema)) body: z.infer<typeof ReviewSchema>) {
+  async review(@CurrentUser() admin: AccessClaims, @Param('id') id: string, @Body(zod(ReviewSchema)) body: z.infer<typeof ReviewSchema>) {
     await this.prisma.report.update({ where: { id }, data: { status: body.status, resolvedAt: body.status === 'reviewing' ? null : new Date() } });
+    await this.audit.log('admin.report_reviewed', { userId: admin.sub, meta: { reportId: id, status: body.status } });
     return { ok: true as const };
   }
 }

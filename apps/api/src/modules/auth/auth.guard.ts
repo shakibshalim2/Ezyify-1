@@ -17,7 +17,7 @@ export type AuthedRequest = FastifyRequest & { user: AccessClaims };
 export const IS_PUBLIC = 'isPublic';
 export const ROLES = 'roles';
 /** Endpoint usable without a session (guest browsing, auth itself). Still parses a token when present. */
-export const Public = () => SetMetadata(IS_PUBLIC, true);
+export const Public = (isPublic = true) => SetMetadata(IS_PUBLIC, isPublic);
 export const Roles = (...roles: Role[]) => SetMetadata(ROLES, roles);
 
 const LEVEL: Record<Role, number> = { user: 1, creator: 2, seller: 3, admin: 4, superadmin: 5 };

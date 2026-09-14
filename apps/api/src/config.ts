@@ -17,6 +17,20 @@ const EnvSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  S3_BUCKET: z.string().optional(),
+  S3_REGION: z.string().optional(),
+  S3_ENDPOINT: z.string().url().optional(),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+  S3_PUBLIC_BASE_URL: z.string().url().optional(),
+}).superRefine((env, ctx) => {
+  // Production must never run with placeholder secrets or a permissive CORS list.
+  if (env.NODE_ENV !== 'production') return;
+  for (const k of ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'] as const) {
+    if (/change-me|dev-|test-|secret-please/i.test(env[k])) ctx.addIssue({ code: 'custom', path: [k], message: 'placeholder secret in production' });
+  }
+  if (env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) ctx.addIssue({ code: 'custom', path: ['JWT_REFRESH_SECRET'], message: 'must differ from JWT_ACCESS_SECRET' });
+  if (env.CORS_ORIGINS.split(',').some(o => o.trim() === '*' || o.includes('localhost'))) ctx.addIssue({ code: 'custom', path: ['CORS_ORIGINS'], message: 'wildcard/localhost origins not allowed in production' });
 });
 
 export type Env = z.infer<typeof EnvSchema>;

@@ -1,5 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Req } from '@nestjs/common';
+import type { FastifyRequest } from 'fastify';
+import { AuditService } from '../../common/audit.service.js';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import * as argon2 from 'argon2';
 import { z } from 'zod';
 import { DeleteAccountRequestSchema, type DeleteAccountRequest } from '@ezyify/core';
@@ -27,11 +30,11 @@ export const AddressSchema = z.object({
 @ApiTags('account')
 @Controller()
 export class AccountController {
-  constructor(private readonly prisma: PrismaService, private readonly auth: AuthService) {}
+  constructor(private readonly prisma: PrismaService, private readonly auth: AuthService, private readonly audit: AuditService) {}
 
   /** Soft-delete with 30-day purge (housekeeping cron); all sessions revoked immediately; re-auth when a password is supplied. */
   @Post('account/delete')
-  async requestDeletion(@CurrentUser() user: AccessClaims, @Body(zod(DeleteAccountRequestSchema)) body: DeleteAccountRequest) {
+  async requestDeletion(@CurrentUser() user: AccessClaims, @Body(zod(DeleteAccountRequestSchema)) body: DeleteAccountRequest, @Req() req: FastifyRequest) {
     const row = await this.prisma.user.findUnique({ where: { id: user.sub } });
     if (!row) throw notFound('User');
     if (body.password && !(await argon2.verify(row.passwordHash, body.password))) throw unauthorized('Incorrect password');
@@ -40,6 +43,7 @@ export class AccountController {
       this.prisma.device.deleteMany({ where: { userId: user.sub } }),
     ]);
     await this.auth.logoutAll(user.sub);
+    await this.audit.log('account.deleted', { userId: user.sub, ip: req.ip, userAgent: req.headers['user-agent'], meta: { reason: body.reason } });
     return { ok: true as const, purgeAfterDays: 30, cancelWithinDays: 14 };
   }
 
@@ -52,7 +56,9 @@ export class AccountController {
 
   /** Data export (GDPR / Play Data safety): the user's own records as JSON; media stays as URLs. */
   @Post('account/export')
-  async exportData(@CurrentUser() user: AccessClaims) {
+  @Throttle({ default: { limit: 3, ttl: 3_600_000 } })
+  async exportData(@CurrentUser() user: AccessClaims, @Req() req: FastifyRequest) {
+    await this.audit.log('account.exported', { userId: user.sub, ip: req.ip });
     const [profile, posts, orders, transactions, messages] = await this.prisma.$transaction([
       this.prisma.user.findUnique({ where: { id: user.sub }, select: { id: true, email: true, phone: true, username: true, name: true, bio: true, website: true, location: true, interests: true, createdAt: true } }),
       this.prisma.post.findMany({ where: { authorId: user.sub }, include: { media: true } }),

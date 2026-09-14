@@ -142,6 +142,9 @@ model User {
   interests     String[]  @default([])
   deletedAt     DateTime? // soft delete → hard purge job after 30 days
   deletionReason String?
+  failedLogins  Int       @default(0)
+  lockedUntil   DateTime?
+  passwordChangedAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -356,6 +359,7 @@ model Order {
   trackingCarrier String?
   trackingNumber  String?
   trackingUrl     String?
+  paymentIntentId String?     @unique
   note          String?
   idempotencyKey String?      @unique
   placedAt      DateTime      @default(now())
@@ -641,4 +645,26 @@ model IdempotencyKey {
   createdAt  DateTime @default(now())
 
   @@index([createdAt])
+}
+
+/// Security audit trail (ASVS V7): auth events, lockouts, token reuse, role/permission changes, admin actions.
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  event     String
+  ip        String?
+  userAgent String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([event, createdAt])
+}
+
+/// Processed payment-provider webhook events; the unique id makes delivery retries idempotent.
+model WebhookEvent {
+  id          String   @id
+  provider    String
+  type        String
+  processedAt DateTime @default(now())
 }

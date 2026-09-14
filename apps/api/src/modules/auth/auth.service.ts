@@ -8,10 +8,14 @@ import { ENV, type Env } from '../../config.js';
 import { ApiException, conflict, unauthorized, validation } from '../../common/errors.js';
 import type { AccessClaims } from './auth.guard.js';
 import { toUserSummary } from '../users/users.mapper.js';
+import { AuditService } from '../../common/audit.service.js';
 
 const ARGON = { type: argon2.argon2id, memoryCost: 19_456, timeCost: 2, parallelism: 1 } as const; // OWASP 2025 minimums
 const OTP_TTL_MS = 10 * 60_000;
 const OTP_MAX_ATTEMPTS = 5;
+// ASVS 2.2.1: lock after repeated failures, with a short cooling-off window rather than a permanent lock.
+const LOCKOUT_THRESHOLD = 5;
+const LOCKOUT_MS = 15 * 60_000;
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
 export interface SessionResult {
@@ -24,7 +28,7 @@ export interface SessionResult {
 @Injectable()
 export class AuthService {
   private readonly log = new Logger(AuthService.name);
-  constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService, @Inject(ENV) private readonly env: Env) {}
+  constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService, private readonly audit: AuditService, @Inject(ENV) private readonly env: Env) {}
 
   async signup(body: SignupRequest) {
     const email = body.email.toLowerCase();
@@ -57,9 +61,22 @@ export class AuthService {
   async login(body: LoginRequest, meta: SessionMeta): Promise<SessionResult> {
     const id = body.identifier.trim().toLowerCase();
     const user = await this.prisma.user.findFirst({ where: { OR: [{ email: id }, { phone: body.identifier.trim() }, { username: id }], deletedAt: null } });
+    if (user?.lockedUntil && user.lockedUntil > new Date()) {
+      throw new ApiException('RATE_LIMIT_EXCEEDED', `Too many failed attempts. Try again in ${Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000)} min.`);
+    }
     // Constant-time-ish: always run a hash verify so timing doesn't reveal account existence.
     const ok = user ? await argon2.verify(user.passwordHash, body.password) : await argon2.verify(DUMMY_HASH, body.password).catch(() => false);
-    if (!user || !ok) throw unauthorized('Incorrect email/phone or password');
+    if (!user || !ok) {
+      if (user) {
+        const failed = user.failedLogins + 1;
+        const lock = failed >= LOCKOUT_THRESHOLD;
+        await this.prisma.user.update({ where: { id: user.id }, data: { failedLogins: lock ? 0 : failed, lockedUntil: lock ? new Date(Date.now() + LOCKOUT_MS) : null } });
+        await this.audit.log(lock ? 'auth.locked' : 'auth.login_failed', { userId: user.id, ...meta, meta: { failed } });
+      }
+      throw unauthorized('Incorrect email/phone or password');
+    }
+    if (user.failedLogins) await this.prisma.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null } });
+    await this.audit.log('auth.login', { userId: user.id, ...meta });
     return this.createSession(user, meta);
   }
 
@@ -67,9 +84,13 @@ export class AuthService {
   async refresh(refreshToken: string, meta: SessionMeta) {
     const session = await this.prisma.refreshSession.findUnique({ where: { tokenHash: sha256(refreshToken) }, include: { user: true } });
     if (!session || session.expiresAt < new Date()) throw unauthorized('Session expired');
-    if (session.revokedAt || session.replacedById) {
+    // A token the user explicitly revoked (logout / device revoke) is simply dead; only a *rotated* token being
+    // presented again signals theft and revokes the whole chain.
+    if (session.revokedAt && !session.replacedById) throw unauthorized('Session revoked');
+    if (session.replacedById) {
       await this.prisma.refreshSession.updateMany({ where: { userId: session.userId, revokedAt: null }, data: { revokedAt: new Date() } });
       this.log.warn(`Refresh token reuse detected for user ${session.userId}; all sessions revoked`);
+      await this.audit.log('auth.refresh_reuse', { userId: session.userId, ...meta, meta: { sessionId: session.id } });
       throw unauthorized('Session invalidated — please sign in again');
     }
     const next = await this.newRefreshSession(session.userId, meta);
@@ -83,6 +104,19 @@ export class AuthService {
 
   async logoutAll(userId: string) {
     await this.prisma.refreshSession.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
+  }
+
+  /** ASVS 3.3: users can see and end their own device sessions. */
+  async sessions(userId: string, currentRefreshToken?: string) {
+    const currentHash = currentRefreshToken ? sha256(currentRefreshToken) : null;
+    const rows = await this.prisma.refreshSession.findMany({ where: { userId, revokedAt: null, expiresAt: { gt: new Date() } }, orderBy: { createdAt: 'desc' } });
+    return rows.map(r => ({ id: r.id, userAgent: r.userAgent, ip: r.ip, createdAt: r.createdAt.toISOString(), expiresAt: r.expiresAt.toISOString(), current: r.tokenHash === currentHash }));
+  }
+
+  async revokeSession(userId: string, sessionId: string, meta: SessionMeta) {
+    const r = await this.prisma.refreshSession.updateMany({ where: { id: sessionId, userId, revokedAt: null }, data: { revokedAt: new Date() } });
+    if (r.count) await this.audit.log('auth.session_revoked', { userId, ...meta, meta: { sessionId } });
+    return { ok: true as const };
   }
 
   async forgotPassword(email: string) {
@@ -99,9 +133,10 @@ export class AuthService {
     if (!record) throw validation({ token: 'Reset link is invalid or expired' });
     await this.prisma.$transaction([
       this.prisma.otpCode.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
-      this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash: await argon2.hash(password, ARGON) } }),
+      this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash: await argon2.hash(password, ARGON), passwordChangedAt: new Date(), failedLogins: 0, lockedUntil: null } }),
       this.prisma.refreshSession.updateMany({ where: { userId: record.userId, revokedAt: null }, data: { revokedAt: new Date() } }),
     ]);
+    await this.audit.log('auth.password_reset', { userId: record.userId });
   }
 
   // ---- internals

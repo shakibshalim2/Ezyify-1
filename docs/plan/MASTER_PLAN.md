@@ -122,16 +122,20 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 - ☑ Modules: auth (argon2id, JWT 15 min + rotating 7-day refresh with reuse detection, OTP verify/reset, cookie for web / body for `X-Client: native`), users (profiles, follow, block-aware), catalog (list/sort/filter/search, detail, categories), cart (server cart, coupons, shared pricing), orders (per-seller fan-out, wallet debit, `Idempotency-Key`, escrow state machine `held → released | refunded | disputed`, hourly auto-release cron, 5 % platform fee on release), wallet (balances, top-up, withdraw, double-entry style ledger), feed (posts/loops/stories, like/save/comment, blocked-author filtering), messaging (REST + Socket.IO `/realtime` gateway with JWT handshake, typing), notifications (list/read, `POST/DELETE /devices` for FCM), account (Play-policy soft deletion + 30-day purge, restore, data export, addresses), moderation (reports, block/unblock, admin review queue), health (`/health`, `/health/ready`)
 - ☑ Cross-cutting: zod-validated env (fails fast), request validation with the **same `@ezyify/core` schemas the clients use**, spec error envelope + codes, rate limiting (100/min, tighter on auth), Helmet, strict CORS, pino logging with secret redaction, Swagger UI at `/v1/docs` + `openapi.json`
 - ☑ Seed fixtures mirroring the mobile mock data; vitest unit + e2e (25 tests through the real Fastify stack: auth rotation/reuse, contract-validated responses, checkout → escrow → release with fee, RBAC, blocking, reports); CI runs against a Postgres 16 service
-- ☐ Stripe adapter + webhooks for card/bank top-ups & checkout (wallet path is live; other methods stay `pending_payment`), LiveKit tokens, FCM v1 send, Meilisearch — Phase 6/8
+- ☑ Stripe adapter + webhooks (Phase 6) · ☐ LiveKit tokens, FCM v1 send, Meilisearch — Phase 8
 - ☐ Migrate web + mobile screens from mock data to `useApi()` (Phase 7 alongside testing)
 
-### Phase 6 — Security
-- ☐ OWASP ASVS L2 checklist in `docs/plan/SECURITY.md`
-- ☐ Argon2id passwords, OTP rate‑limit + lockout, refresh token rotation & reuse detection, device sessions list/revoke
-- ☐ Helmet, strict CORS, CSRF for cookie flows, input validation (zod/class‑validator), output encoding, file‑upload scanning + MIME sniffing, signed URLs
-- ☐ RBAC guards (user/creator/seller/admin/superadmin), row‑level ownership checks, idempotency keys on payment endpoints, webhook signature verification
-- ☐ Secrets via env/CI only, dependency audit (`pnpm audit`, Renovate), SAST (CodeQL), Android: certificate pinning option, no cleartext traffic, SecureStore for tokens, ProGuard
-- ☐ Privacy: account deletion + data export, consent/cookie preferences, data‑safety mapping
+### Phase 6 — Security — ✅ delivered (PR #2)
+- ☑ OWASP ASVS L2 checklist with control → code → verification mapping in `docs/plan/SECURITY.md` (+ threat model, ops runbook)
+- ☑ Argon2id (already), **account lockout** (5 failures → 15 min), OTP attempt cap, refresh rotation + reuse detection (already), **device sessions list / revoke / logout-all**, `AuditLog` table + `AuditService` (login, failures, lockout, reuse, revoke, reset, delete/export, admin review, webhooks)
+- ☑ Helmet hardened (CSP `default-src 'none'` + HSTS preload in prod, `Referrer-Policy: no-referrer`, CORP), strict CORS, **CSRF Origin check** on the cookie refresh flow, zod validation everywhere, 2 MiB body limit, Swagger off in production
+- ☑ RBAC hierarchy + row-level ownership (already) · **Stripe adapter**: top-up & order PaymentIntents with idempotency keys, **webhook signature verification over raw body + event-id de-duplication** (`WebhookEvent`), card orders `pending_payment → paid/cancelled` via webhook
+- ☑ **Uploads**: allow-listed MIME + size, server-generated keys, 5-min signed PUT to S3/R2/MinIO, **magic-byte sniffing** at finalize (`file-type`), mismatches deleted
+- ☑ Production env guardrails (placeholder/identical secrets, wildcard/localhost CORS rejected at boot) · `pnpm audit --prod` clean via `pnpm.overrides` + CI gate (high/critical) · **Renovate** (grouped weekly, security PRs immediate, Expo SDK excluded) · **CodeQL** security-extended · **gitleaks** secret scan
+- ☑ Android: `usesCleartextTraffic=false`, R8 + resource shrinking (already), extra ProGuard rules, `allowBackup=false` (already), SecureStore tokens (already); certificate pinning documented as opt-in
+- ☑ Privacy: account deletion + export (already, now audited + export throttled 3/h); Data-safety mapping in Play checklist
+- ☐ MFA (TOTP/passkeys) for sellers/admins, web CSP + cookie consent — Phase 8
+- Tests: api 36 (unit 12 + e2e 24) incl. lockout, session revoke, CSRF, headers, 413, webhook idempotency, upload allow-list
 
 ### Phase 7 — Testing
 - ☐ Unit: Vitest (web/core), Jest (api), coverage gate 70 % on `packages/core` + `apps/api`
@@ -194,4 +198,5 @@ Ordered by audit score: Home hero + feed cards → Loops viewer transitions & ac
 | 2026‑09‑13 | Phase 4.5a: entry gate, onboarding carousel, interests/follow, auth screens, RN primitives | 9588322 |
 | 2026‑09‑13 | Phase 4.5b: Home feed, Explore, Shop, Profile, Loops, Stories, Post, Cart/Checkout/Success, Orders, Wallet, Messages, Notifications, Deals, Create, Settings | d082e6f |
 | 2026‑09‑13 | Phase 4.6–4.7: App Links + assetlinks, FCM push (contextual opt-in), Photo Picker/camera, biometrics, account deletion, report/block, Play checklist, store assets, 16 KB CI gate | 5b3dafe |
-| 2026‑09‑13 | Phase 5: `apps/api` NestJS 12 / Fastify 5 / Prisma 7 backend — auth, users, catalog, cart, orders + escrow, wallet, feed, messaging + WS, notifications, account deletion/export, moderation; seed; 25 e2e tests; CI Postgres | (this commit) |
+| 2026‑09‑13 | Phase 5: `apps/api` NestJS 12 / Fastify 5 / Prisma 7 backend — auth, users, catalog, cart, orders + escrow, wallet, feed, messaging + WS, notifications, account deletion/export, moderation; seed; 25 e2e tests; CI Postgres | 4a63969 |
+| 2026‑09‑14 | Phase 6: ASVS L2 `SECURITY.md`, lockout + audit log + device sessions, CSRF origin check, hardened Helmet, Stripe webhooks (signed + idempotent), signed uploads with MIME sniffing, prod env guardrails, audit/CodeQL/gitleaks CI, Renovate, Android cleartext off | (this commit) |

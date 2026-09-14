@@ -9,7 +9,7 @@ import { loadEnv, type Env } from './config.js';
 
 /** Shared by main.ts and e2e tests so both run the exact production middleware stack. */
 export async function createApp(env: Env = loadEnv()) {
-  const app = await NestFactory.create<NestFastifyApplication>(buildAppModule(env), new FastifyAdapter({ trustProxy: true, bodyLimit: 2 * 1024 * 1024 }), { bufferLogs: true });
+  const app = await NestFactory.create<NestFastifyApplication>(buildAppModule(env), new FastifyAdapter({ trustProxy: true, bodyLimit: 2 * 1024 * 1024 }), { bufferLogs: true, rawBody: true });
   app.useLogger(app.get(Logger));
   app.setGlobalPrefix(env.API_PREFIX);
   app.enableCors({
@@ -17,7 +17,13 @@ export async function createApp(env: Env = loadEnv()) {
     credentials: true,
     allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Client'],
   });
-  await app.register(helmet, { contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false });
+  // Strict headers (ASVS V14.4). CSP is API-only ('none') except for the Swagger UI, which is disabled in production.
+  await app.register(helmet, {
+    contentSecurityPolicy: env.NODE_ENV === 'production' ? { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } } : false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    hsts: env.NODE_ENV === 'production' ? { maxAge: 63_072_000, includeSubDomains: true, preload: true } : false,
+    referrerPolicy: { policy: 'no-referrer' },
+  });
   await app.register(cookie);
   app.enableShutdownHooks();
 

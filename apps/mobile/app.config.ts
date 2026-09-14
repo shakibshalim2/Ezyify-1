@@ -80,6 +80,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           enableProguardInReleaseBuilds: true,
           enableShrinkResourcesInReleaseBuilds: true,
           useLegacyPackaging: false,
+          // ASVS V9: release builds never talk cleartext. Debug builds keep the Metro/localhost exception via
+          // expo-build-properties' default network security config.
+          usesCleartextTraffic: false,
+          // Play "Data safety": release builds are not debuggable and strip extra native debug symbols.
+          extraProguardRules: `
+# Ezyify — keep model classes deserialised by Expo modules; everything else is obfuscated by default.
+-keepattributes *Annotation*
+-dontwarn org.bouncycastle.**
+-dontwarn org.conscrypt.**
+-dontwarn org.openjsse.**
+`,
           // 16 KB page-size compliance (Play requirement for API 35+ targets since Nov 2025): AGP 8.5.1+ aligns
           // uncompressed native libs; Expo SDK 57 ships AGP 8.13 + NDK r27 so all bundled .so files are 16 KB aligned.
           buildToolsVersion: '36.0.0',

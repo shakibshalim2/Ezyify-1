@@ -42,3 +42,17 @@ src/modules/moderation    reports, block/unblock, admin review queue
 - Native clients send `X-Client: native` and receive the refresh token in the body; web gets an httpOnly cookie.
 - Payment/checkout endpoints accept `Idempotency-Key`.
 - Tests: `pnpm test` (vitest; migrates + seeds `ezyify_test`, then unit + e2e through the real Fastify stack).
+
+## Security
+
+See `docs/plan/SECURITY.md` for the full OWASP ASVS L2 checklist. Quick facts:
+
+- Login lockout: 5 failures → 15 min (`RATE_LIMIT_EXCEEDED`); per-IP throttles on every auth endpoint.
+- Refresh rotation with reuse detection; `GET /auth/sessions`, `DELETE /auth/sessions/:id`, `POST /auth/logout-all`.
+- Cookie refresh (web) requires `Origin` in `CORS_ORIGINS`; native clients send `X-Client: native` and a body token.
+- `AuditLog` table records auth/security events — query it when investigating an account.
+- Stripe: `POST /payments/topup-intent`, `POST /payments/order-intent`, webhook `POST /payments/webhooks/stripe`
+  (signature over raw body, de-duplicated by event id). Unset `STRIPE_*` → card flows return "Payments unavailable".
+- Uploads: `POST /uploads/sign` → signed PUT to S3-compatible storage → `POST /uploads/finalize` sniffs magic bytes.
+- Rotating `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` invalidates every session (intended). Production boot refuses
+  placeholder secrets, identical secrets, and wildcard/localhost CORS origins.
