@@ -28,6 +28,9 @@ export interface SeedUser extends UserSummary {
   email: string;
   bio: string | null;
   location: string | null;
+  /** Set by `PATCH /users/me` in demo mode; unset users fall back to the role-based fixture value. */
+  coverUrl?: string | null;
+  website?: string | null;
 }
 
 export const users: SeedUser[] = [

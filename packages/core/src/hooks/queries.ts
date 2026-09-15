@@ -354,7 +354,12 @@ export function useToggleFollow() {
       qc.invalidateQueries({ queryKey: queryKeys.profile(username) });
       qc.invalidateQueries({ queryKey: queryKeys.me });
       qc.invalidateQueries({ queryKey: queryKeys.stories });
-      if (me) qc.invalidateQueries({ queryKey: queryKeys.following(me.username) });
+      if (me) {
+        qc.invalidateQueries({ queryKey: queryKeys.following(me.username) });
+        // The viewer's own `following` count changed too.
+        qc.invalidateQueries({ queryKey: queryKeys.profile(me.username) });
+      }
+      qc.invalidateQueries({ queryKey: queryKeys.followers(username) });
     },
   });
 }

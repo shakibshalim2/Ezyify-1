@@ -1,5 +1,5 @@
 import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, PayoutMethod, Post, ProductDetail, Review, SellerCustomer, SellerProduct, SellerProductDetail, SellerReview, UserProfile } from '../schemas/index.js';
-import { UpsertProductRequestSchema, UpdateProductRequestSchema } from '../schemas/index.js';
+import { UpdateProfileRequestSchema, UpsertProductRequestSchema, UpdateProductRequestSchema } from '../schemas/index.js';
 import { sellerProductStatus } from '../schemas/index.js';
 import * as fx from './fixtures.js';
 
@@ -183,7 +183,7 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
   const profileOf = (target: fx.SeedUser, viewer: fx.SeedUser | null): UserProfile => {
     const base = fx.profile(target);
     const followers = base.followers + [...state.follows.values()].filter(s => s.has(target.id)).length - (fx.buyerFollows.includes(target.id) ? 1 : 0);
-    return { ...base, name: target.name, username: target.username, bio: target.bio, location: target.location, avatarUrl: target.avatarUrl, followers: Math.max(0, followers), following: set(state.follows, target.id).size || base.following, isFollowing: !!viewer && set(state.follows, viewer.id).has(target.id) };
+    return { ...base, name: target.name, username: target.username, bio: target.bio, location: target.location, avatarUrl: target.avatarUrl, coverUrl: target.coverUrl === undefined ? base.coverUrl : target.coverUrl, website: target.website === undefined ? base.website : target.website, followers: Math.max(0, followers), following: set(state.follows, target.id).size || base.following, isFollowing: !!viewer && set(state.follows, viewer.id).has(target.id) };
   };
   const cartOf = (userId: string): Cart => {
     const c = state.carts.get(userId) ?? { lines: [], coupon: null };
@@ -358,7 +358,9 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
     ['PATCH', '/users/me', c => {
       const u = requireUser(c);
       if (typeof c.body.username === 'string' && state.users.some(x => x.username === c.body.username && x.id !== u.id)) throw new MockApiError(409, 'CONFLICT', 'That username is taken');
-      for (const k of ['name', 'username', 'bio', 'location', 'avatarUrl', 'coverUrl'] as const) if (k in c.body) (u as unknown as Record<string, unknown>)[k] = c.body[k];
+      const parsed = UpdateProfileRequestSchema.safeParse(c.body);
+      if (!parsed.success) throw validation(Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.') || '_', i.message])));
+      for (const k of ['name', 'username', 'bio', 'location', 'avatarUrl', 'coverUrl', 'website'] as const) if (k in parsed.data) (u as unknown as Record<string, unknown>)[k] = parsed.data[k];
       return profileOf(u, u);
     }],
     ['GET', '/users/me/blocked', c => [...set(state.blocks, requireUser(c).id)].map(id => fx.byId(id)).filter(Boolean).map(u => ({ id: u!.id, username: u!.username, name: u!.name, avatarUrl: u!.avatarUrl }))],
