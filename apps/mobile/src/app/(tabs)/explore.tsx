@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { formatCompactNumber, useCategories, useFeed, useLoops, useSearch, type Post } from '@ezyify/core';
+import { formatCompactNumber, useCategories, useFeed, useLiveSessions, useLoops, useSearch, type Post } from '@ezyify/core';
 import { Text } from '@/components/Text';
 import { SearchBar } from '@/components/SearchBar';
 import { Chip } from '@/components/Chip';
@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ProductCard } from '@/components/ProductCard';
 import { Skeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/QueryState';
+import { LiveSessionCard } from '@/components/LiveSessionCard';
 import { useInfiniteList, useRefresh } from '@/lib/data';
 import { useTheme } from '@/theme';
 import { useDebounced } from '@/lib/useDebounced';
@@ -48,9 +49,10 @@ export default function ExploreScreen() {
   const posts = useFeed(hashtag ? { hashtag } : {});
   const loops = useLoops(hashtag ? { hashtag } : {});
   const search = useSearch(query);
+  const live = useLiveSessions({ status: 'live', pageSize: 20 });
   const postList = useInfiniteList<Post>(posts);
   const loopList = useInfiniteList<Post>(loops);
-  const { refreshing, onRefresh } = useRefresh(async () => Promise.all([posts.refetch(), loops.refetch()]));
+  const { refreshing, onRefresh } = useRefresh(async () => Promise.all([posts.refetch(), loops.refetch(), live.refetch()]));
 
   const grid = useMemo<Item[]>(() => {
     const items: Item[] = [...loopList.items.map(l => ({ kind: 'loop' as const, post: l })), ...postList.items.map(p => ({ kind: 'post' as const, post: p }))];
@@ -99,7 +101,16 @@ export default function ExploreScreen() {
           )}
         />
       ) : filter === 'Live' ? (
-        <EmptyState icon="videocam-outline" title="No one is live right now" body="Follow creators to get notified when they go live with new drops." actionLabel="Browse creators" onAction={() => setFilter('Creators')} />
+        <FlatList
+          key="live"
+          data={live.data?.items ?? []}
+          keyExtractor={session => session.id}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 24 }}
+          ListEmptyComponent={live.isLoading ? <GridSkeleton /> : live.error ? <ErrorState error={live.error} onRetry={() => live.refetch()} /> : <EmptyState icon="videocam-outline" title="No one is live right now" body="Follow creators to get notified when they go live with new drops." actionLabel="See upcoming streams" onAction={() => router.push('/live')} />}
+          renderItem={({ item }) => <LiveSessionCard session={item} />}
+        />
       ) : (
         <FlatList
           key="grid"
