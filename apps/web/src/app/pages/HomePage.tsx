@@ -10,7 +10,6 @@ import { SEO } from '../components/SEO';
 import { PostCard } from '../components/PostCard';
 import { HeroBanner } from '../components/home/HeroBanner';
 import { QueryError } from '../components/QueryError';
-import { useMemoryOptimization } from '../hooks/useMemoryOptimization';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from '../components/PullToRefreshIndicator';
 import { useAddLine, useAuthed, useInCart, useInfiniteList } from '../lib/data';
@@ -156,7 +155,6 @@ const SectionHeader = ({ icon: Icon, title, subtitle, to, cta }: { icon: typeof 
 );
 
 export default function HomePage() {
-  useMemoryOptimization('HomePage');
   const authed = useAuthed();
   const me = useAuth(s => s.user);
   const [filter, setFilter] = useState<FeedFilter>('foryou');
