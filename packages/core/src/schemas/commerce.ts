@@ -59,6 +59,11 @@ export const OrderSchema = z.object({
     autoReleaseAt: IsoDateSchema.nullable(),
   }),
   seller: UserSummarySchema,
+  buyer: UserSummarySchema,
+  /** Snapshot of where the parcel goes — only what a seller needs to ship; no full address book exposure. */
+  shippingTo: z.object({ recipient: z.string(), city: z.string(), region: z.string().nullable(), country: z.string() }),
+  paymentMethod: z.enum(['wallet', 'card', 'bank_transfer', 'cod']),
+  note: z.string().nullable(),
   items: z.array(OrderItemSchema).min(1),
   subtotal: MoneySchema,
   shipping: MoneySchema,
@@ -70,6 +75,24 @@ export const OrderSchema = z.object({
   deliveredAt: IsoDateSchema.nullable(),
 });
 export type Order = z.infer<typeof OrderSchema>;
+
+export const ShipOrderRequestSchema = z.object({
+  carrier: z.string().min(1).max(60),
+  number: z.string().min(1).max(80),
+  url: z.string().url().optional(),
+});
+export type ShipOrderRequest = z.infer<typeof ShipOrderRequestSchema>;
+
+/** Seller‑side order counts for hub tabs; `needsAction` = paid (accept) + processing (ship) + refund_requested (decide). */
+export const SellerOrdersSummarySchema = z.object({
+  total: z.number().int().min(0),
+  needsAction: z.number().int().min(0),
+  toShip: z.number().int().min(0),
+  inTransit: z.number().int().min(0),
+  completed: z.number().int().min(0),
+  refunds: z.number().int().min(0),
+});
+export type SellerOrdersSummary = z.infer<typeof SellerOrdersSummarySchema>;
 
 export const OrderEventSchema = z.object({
   status: OrderStatusSchema,

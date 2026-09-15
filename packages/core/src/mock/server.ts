@@ -608,6 +608,10 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
           status: paidNow ? 'paid' : 'pending_payment',
           escrow: { status: 'held', autoReleaseAt: new Date(now() + 7 * 86_400_000).toISOString() },
           seller: fx.summary(fx.byUsername(sellerName)!),
+          buyer: fx.summary(u),
+          shippingTo: { recipient: address.recipient, city: address.city, region: address.region ?? null, country: address.country },
+          paymentMethod: c.body.paymentMethod as Order['paymentMethod'],
+          note: typeof c.body.note === 'string' ? c.body.note : null,
           items: items.map(i => ({ id: nextId('oi'), productId: i.productId, name: i.product.name, imageUrl: i.product.imageUrl, variant: i.variantId ? (fx.findProduct(i.productId)?.variants.find(v => v.id === i.variantId)?.name ?? null) : null, quantity: i.quantity, unitPrice: i.product.price })),
           subtotal: money(subtotal),
           shipping: money(shipping),
@@ -635,9 +639,46 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       return created;
     }],
     ['GET', '/orders', c => {
-      requireUser(c);
+      const u = requireUser(c);
       const status = c.query.get('status');
-      return paginate(status ? state.orders.filter(o => o.status === status) : state.orders, c.query);
+      const mine = c.query.get('role') === 'seller' ? state.orders.filter(o => o.seller.id === u.id) : state.orders.filter(o => o.buyer.id === u.id);
+      return paginate(status ? mine.filter(o => o.status === status) : mine, c.query);
+    }],
+    // ---- seller side (mirrors OrdersController seller routes + escrow state machine)
+    ['GET', '/seller/orders/summary', c => {
+      const u = requireUser(c);
+      if (u.role !== 'seller') throw forbidden('Seller account required');
+      const mine = state.orders.filter(o => o.seller.id === u.id);
+      const n = (...st: Order['status'][]) => mine.filter(o => st.includes(o.status)).length;
+      return { total: mine.length, needsAction: n('paid', 'processing', 'refund_requested'), toShip: n('paid', 'processing'), inTransit: n('shipped', 'out_for_delivery', 'delivered'), completed: n('completed'), refunds: n('refund_requested', 'refunded', 'disputed', 'cancelled') };
+    }],
+    ['POST', '/seller/orders/:id/:action', c => {
+      const u = requireUser(c);
+      if (u.role !== 'seller') throw forbidden('Seller account required');
+      const o = state.orders.find(x => x.id === c.params.id);
+      if (!o) throw notFound('Order');
+      if (o.seller.id !== u.id) throw forbidden();
+      const step = (from: Order['status'][], to: Order['status']) => {
+        if (!from.includes(o.status)) throw new MockApiError(409, 'CONFLICT', `Cannot go from ${o.status} to ${to}`);
+        o.status = to;
+      };
+      switch (c.params.action) {
+        case 'accept': step(['paid', 'refund_requested'], 'processing'); break;
+        case 'ship': {
+          if (!c.body?.carrier || !c.body?.number) throw validation({ carrier: 'Carrier and tracking number are required' });
+          step(['processing', 'refund_requested'], 'shipped');
+          o.tracking = { carrier: String(c.body.carrier), number: String(c.body.number), url: c.body.url ? String(c.body.url) : null };
+          break;
+        }
+        case 'deliver': step(['shipped', 'out_for_delivery', 'refund_requested'], 'delivered'); o.deliveredAt = iso(); break;
+        case 'refund': step(['refund_requested', 'disputed'], 'refunded'); o.escrow = { status: 'refunded', autoReleaseAt: null }; break;
+        case 'cancel': step(['pending_payment', 'paid', 'processing'], 'cancelled'); o.escrow = { status: 'refunded', autoReleaseAt: null }; break;
+        default: throw notFound('Action');
+      }
+      const notes = state.notifications.get(o.buyer.id) ?? [];
+      notes.unshift({ id: nextId('n'), type: 'order', actor: fx.summary(u), message: `${o.orderNumber} · ${o.status.replace(/_/g, ' ')}`, href: `/orders/${o.id}`, thumbnailUrl: o.items[0].imageUrl, read: false, createdAt: iso() });
+      state.notifications.set(o.buyer.id, notes);
+      return o;
     }],
     ['GET', '/orders/:id', c => {
       requireUser(c);

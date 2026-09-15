@@ -100,6 +100,30 @@ describe('mock API server', () => {
     expect(q.items.map(p => p.id)).toEqual(['prod-002']);
   });
 
+  it('seller order routes are scoped and follow the escrow state machine in mock mode', async () => {
+    const { api, login } = harness();
+    await login('techstore@ezyify.test');
+    const mine = await api.sellerOrders.list();
+    expect(mine.items.length).toBeGreaterThan(0);
+    expect(mine.items.every(o => o.seller.username === 'techstore')).toBe(true);
+    const o2 = mine.items.find(o => o.id === 'o2')!;
+    expect(o2.status).toBe('processing');
+    expect(o2.buyer.username).toBe('buyer');
+    const before = await api.sellerOrders.summary();
+    expect(before.toShip).toBeGreaterThanOrEqual(1);
+    await expect(api.sellerOrders.accept('o2')).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(() => api.sellerOrders.ship('o2', { carrier: '', number: '' })).toThrow();
+    const shipped = await api.sellerOrders.ship('o2', { carrier: 'JNE', number: 'JNE123' });
+    expect(shipped.status).toBe('shipped');
+    expect(shipped.tracking).toMatchObject({ carrier: 'JNE', number: 'JNE123' });
+    expect((await api.sellerOrders.deliver('o2')).status).toBe('delivered');
+    const after = await api.sellerOrders.summary();
+    expect(after.toShip).toBe(before.toShip - 1);
+    expect(after.inTransit).toBe(before.inTransit + 1);
+    // Another seller's order is off-limits.
+    await expect(api.sellerOrders.accept('o1')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
   it('login → native refresh rotation → protected route; rejects bad credentials', async () => {
     const { api, login, tokens, setAccess } = harness();
     await expect(api.auth.login({ identifier: 'buyer@ezyify.test', password: 'nope' })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });

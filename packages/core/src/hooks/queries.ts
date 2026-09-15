@@ -1,6 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type { z } from 'zod';
 import type { FeedQuery, ProductQuery, SellerProductQuery } from '../api/endpoints.js';
+import type { ShipOrderRequest } from '../schemas/index.js';
 import type { SearchType } from '../schemas/index.js';
 import type { paginated } from '../schemas/common.js';
 import type { Cart, CheckoutRequest, CreateAddressRequest, CreatePostRequest, Post, UpdateProfileRequest, UserProfile } from '../schemas/index.js';
@@ -22,6 +23,8 @@ export const queryKeys = {
   unifiedSearch: (q: string, type: SearchType = 'all') => ['search', 'all', q, type] as const,
   cart: ['cart'] as const,
   orders: (params: Record<string, unknown> = {}) => ['orders', params] as const,
+  sellerOrders: (params: Record<string, unknown> = {}) => ['orders', 'seller', params] as const,
+  sellerOrdersSummary: ['orders', 'seller', 'summary'] as const,
   order: (id: string) => ['order', id] as const,
   orderTimeline: (id: string) => ['order', id, 'timeline'] as const,
   addresses: ['addresses'] as const,
@@ -349,6 +352,51 @@ export function useOrderAction() {
     mutationFn: (v: { id: string; action: 'confirm' | 'cancel' } | { id: string; action: 'refund'; reason: string; itemIds: string[] }) => {
       if (v.action === 'refund') return api.orders.requestRefund(v.id, v.reason, v.itemIds);
       return v.action === 'confirm' ? api.orders.confirmDelivery(v.id) : api.orders.cancel(v.id);
+    },
+    onSuccess: order => {
+      qc.setQueryData(queryKeys.order(order.id), order);
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: queryKeys.orderTimeline(order.id) });
+      qc.invalidateQueries({ queryKey: queryKeys.wallet });
+    },
+  });
+}
+
+/** Seller hub orders (role seller); the buyer list uses `useOrders`. */
+export function useSellerOrders(query: PageQuery & { status?: string } = {}) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useInfiniteQuery({
+    queryKey: queryKeys.sellerOrders(query),
+    queryFn: ({ pageParam }) => api.sellerOrders.list({ ...query, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
+    enabled: authed,
+  });
+}
+
+export function useSellerOrdersSummary() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sellerOrdersSummary, queryFn: () => api.sellerOrders.summary(), enabled: authed, placeholderData: keepPreviousData });
+}
+
+export type SellerOrderAction =
+  | { id: string; action: 'accept' | 'deliver' | 'approveRefund' | 'cancel' }
+  | { id: string; action: 'ship'; body: ShipOrderRequest };
+
+export function useSellerOrderAction() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: SellerOrderAction) => {
+      switch (v.action) {
+        case 'accept': return api.sellerOrders.accept(v.id);
+        case 'ship': return api.sellerOrders.ship(v.id, v.body);
+        case 'deliver': return api.sellerOrders.deliver(v.id);
+        case 'approveRefund': return api.sellerOrders.approveRefund(v.id);
+        case 'cancel': return api.sellerOrders.cancel(v.id);
+      }
     },
     onSuccess: order => {
       qc.setQueryData(queryKeys.order(order.id), order);
