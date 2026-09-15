@@ -281,6 +281,41 @@ describe('orders: refund, cancel, seller list, errors', () => {
   });
 });
 
+describe('kyc', () => {
+  it('submit → pending (no full id number back) → admin reject → resubmit → approve flips User.verified', async () => {
+    const sara = await login('sara@ezyify.test');
+    const admin = await login('admin@ezyify.test');
+    const doc = { documentType: 'national_id', fullName: 'Sara Kim', idNumber: 'ID-1234567890', dateOfBirth: '1990-04-12', country: 'id', documentFrontUrl: 'https://cdn.example/kyc/front.jpg', documentBackUrl: 'https://cdn.example/kyc/back.jpg', selfieUrl: 'https://cdn.example/kyc/selfie.jpg' };
+    expect((await inject('GET', '/kyc')).statusCode).toBe(401);
+    expect(json(await inject('GET', '/kyc', { token: sara })).data).toEqual({ verified: false, submission: null, canSubmit: true });
+    // Validation: minors and missing back-of-card are 422.
+    expect((await inject('POST', '/kyc', { token: sara, body: { ...doc, dateOfBirth: '2015-01-01' } })).statusCode).toBe(422);
+    expect((await inject('POST', '/kyc', { token: sara, body: { ...doc, documentBackUrl: null } })).statusCode).toBe(422);
+    const sub = json(await inject('POST', '/kyc', { token: sara, body: doc })).data;
+    expect(sub).toMatchObject({ status: 'pending', idNumberLast4: '7890', country: 'ID' });
+    expect(JSON.stringify(sub)).not.toContain('ID-1234567890');
+    expect((await inject('POST', '/kyc', { token: sara, body: doc })).statusCode).toBe(409);
+    expect(json(await inject('GET', '/kyc', { token: sara })).data.canSubmit).toBe(false);
+    // Admin queue is admin-only and shows the submitter's email for the reviewer.
+    expect((await inject('GET', '/admin/kyc', { token: sara })).statusCode).toBe(403);
+    const queue = json(await inject('GET', '/admin/kyc', { token: admin })).data;
+    expect(queue.items.some((k: { id: string; email: string }) => k.id === sub.id && k.email === 'sara@ezyify.test')).toBe(true);
+    expect((await inject('PATCH', `/admin/kyc/${sub.id}`, { token: admin, body: { decision: 'reject' } })).statusCode).toBe(422);
+    const rejected = json(await inject('PATCH', `/admin/kyc/${sub.id}`, { token: admin, body: { decision: 'reject', reason: 'Selfie is blurry' } })).data;
+    expect(rejected).toMatchObject({ status: 'rejected', rejectionReason: 'Selfie is blurry' });
+    expect((await inject('PATCH', `/admin/kyc/${sub.id}`, { token: admin, body: { decision: 'approve' } })).statusCode).toBe(409);
+    const state = json(await inject('GET', '/kyc', { token: sara })).data;
+    expect(state).toMatchObject({ verified: false, canSubmit: true, submission: { status: 'rejected' } });
+    const again = json(await inject('POST', '/kyc', { token: sara, body: doc })).data;
+    expect(json(await inject('PATCH', `/admin/kyc/${again.id}`, { token: admin, body: { decision: 'approve' } })).data.status).toBe('approved');
+    expect(json(await inject('GET', '/kyc', { token: sara })).data).toMatchObject({ verified: true, canSubmit: false });
+    expect(json(await inject('GET', '/users/glow.with.sara')).data.verified).toBe(true);
+    expect((await inject('POST', '/kyc', { token: sara, body: doc })).statusCode).toBe(409);
+    const notes = json(await inject('GET', '/notifications', { token: sara })).data;
+    expect(notes.items.some((n: { message: string }) => /identity is verified/.test(n.message))).toBe(true);
+  });
+});
+
 describe('account', () => {
   it('addresses CRUD, export, deletion with wrong/right password, restore', async () => {
     const sara = await login('sara@ezyify.test');

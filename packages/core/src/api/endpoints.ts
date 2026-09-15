@@ -66,6 +66,11 @@ import {
   TransactionSchema,
   UpdateProfileRequestSchema,
   NotificationPreferencesSchema,
+  KycStateSchema,
+  KycSubmissionSchema,
+  SubmitKycRequestSchema,
+  AdminKycSubmissionSchema,
+  ReviewKycRequestSchema,
   UpdateNotificationPreferencesRequestSchema,
   UserProfileSchema,
   UserSummarySchema,
@@ -101,6 +106,8 @@ import {
   type SignupRequest,
   type UpdateProfileRequest,
   type UpdateNotificationPreferencesRequest,
+  type SubmitKycRequest,
+  type ReviewKycRequest,
   type VerifyOtpRequest,
 } from '../schemas/index.js';
 
@@ -271,6 +278,14 @@ export function createEndpoints(api: ApiClient) {
       unregisterDevice: (token: string) => api.delete(`/devices/${enc(token)}`, Ok),
       preferences: () => api.get('/users/me/notification-preferences', NotificationPreferencesSchema),
       updatePreferences: (body: UpdateNotificationPreferencesRequest) => api.patch('/users/me/notification-preferences', UpdateNotificationPreferencesRequestSchema.parse(body), NotificationPreferencesSchema),
+    },
+    kyc: {
+      /** Own verification state; `submission` is null before the first submit. */
+      state: () => api.get('/kyc', KycStateSchema),
+      submit: (body: SubmitKycRequest) => api.post('/kyc', SubmitKycRequestSchema.parse(body), KycSubmissionSchema),
+      /** Admin review queue (`status` defaults to pending on the server). */
+      adminQueue: (query: PageQuery & { status?: string } = {}) => api.get('/admin/kyc', paginated(AdminKycSubmissionSchema), { query }),
+      adminReview: (id: string, body: ReviewKycRequest) => api.patch(`/admin/kyc/${enc(id)}`, ReviewKycRequestSchema.parse(body), AdminKycSubmissionSchema),
     },
     uploads: {
       sign: (body: SignUploadRequest) => api.post('/uploads/sign', SignUploadRequestSchema.parse(body), SignedUploadSchema),

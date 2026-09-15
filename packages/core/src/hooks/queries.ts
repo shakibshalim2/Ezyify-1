@@ -1,7 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type { z } from 'zod';
 import type { FeedQuery, ProductQuery, SellerProductQuery } from '../api/endpoints.js';
-import type { CreatePayoutMethodRequest, CreateReviewRequest, DeleteProductResult, NotificationPreferences, PayoutMethod, SellerProductDetail, SellerReviewFilter, ShipOrderRequest, UpdateNotificationPreferencesRequest, UpdateProductRequest, UpsertProductRequest } from '../schemas/index.js';
+import type { CreatePayoutMethodRequest, CreateReviewRequest, DeleteProductResult, NotificationPreferences, PayoutMethod, ReviewKycRequest, SellerProductDetail, SellerReviewFilter, ShipOrderRequest, SubmitKycRequest, UpdateNotificationPreferencesRequest, UpdateProductRequest, UpsertProductRequest } from '../schemas/index.js';
 import type { SearchType } from '../schemas/index.js';
 import type { paginated } from '../schemas/common.js';
 import type { Cart, CheckoutRequest, CreateAddressRequest, CreatePostRequest, Post, UpdateProfileRequest, UserProfile } from '../schemas/index.js';
@@ -49,6 +49,8 @@ export const queryKeys = {
   notifications: ['notifications'] as const,
   unreadCount: ['notifications', 'unread'] as const,
   notificationPreferences: ['notifications', 'preferences'] as const,
+  kyc: ['kyc'] as const,
+  adminKyc: (q: object) => ['admin', 'kyc', q] as const,
   blocked: ['blocked'] as const,
   sessions: ['auth', 'sessions'] as const,
   mfa: ['auth', 'mfa'] as const,
@@ -647,6 +649,41 @@ export function useUpdateNotificationPreferences() {
     onError: (_e, _v, ctx) => { if (ctx?.previous) qc.setQueryData(queryKeys.notificationPreferences, ctx.previous); },
     // Rapid toggles overlap: only the last in-flight response may replace the optimistic document.
     onSuccess: data => { if (qc.isMutating({ mutationKey: key }) <= 1) qc.setQueryData(queryKeys.notificationPreferences, data); },
+  });
+}
+
+// ---------- KYC ----------
+
+export function useKycState() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.kyc, queryFn: () => api.kyc.state(), enabled: authed });
+}
+
+export function useSubmitKyc() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (body: SubmitKycRequest) => api.kyc.submit(body), onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.kyc }) });
+}
+
+export function useAdminKycQueue(query: PageQuery & { status?: string } = {}) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useInfiniteQuery({
+    queryKey: queryKeys.adminKyc(query),
+    queryFn: ({ pageParam }) => api.kyc.adminQueue({ ...query, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
+    enabled: authed,
+  });
+}
+
+export function useReviewKyc() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: ReviewKycRequest }) => api.kyc.adminReview(id, body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin', 'kyc'] }); qc.invalidateQueries({ queryKey: queryKeys.kyc }); },
   });
 }
 

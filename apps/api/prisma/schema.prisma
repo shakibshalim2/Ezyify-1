@@ -171,6 +171,7 @@ model User {
   devices       Device[]
   wallet        Wallet?
   payoutMethods PayoutMethod[]
+  kycSubmissions KycSubmission[]
   addresses     Address[]
   products      Product[]        @relation("SellerProducts")
   cart          Cart?
@@ -762,4 +763,40 @@ model WebhookEvent {
   provider    String
   type        String
   processedAt DateTime @default(now())
+}
+
+enum KycDocumentType {
+  passport
+  national_id
+  driving_license
+}
+
+enum KycStatus {
+  pending
+  approved
+  rejected
+}
+
+/// Identity verification. The ID number is AES-256-GCM encrypted at rest; only last4 is ever returned.
+model KycSubmission {
+  id                String          @id @default(cuid())
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status            KycStatus       @default(pending)
+  documentType      KycDocumentType
+  fullName          String
+  idNumberEncrypted String
+  idNumberLast4     String
+  dateOfBirth       String
+  country           String
+  documentFrontUrl  String
+  documentBackUrl   String?
+  selfieUrl         String
+  rejectionReason   String?
+  reviewedById      String?
+  submittedAt       DateTime        @default(now())
+  reviewedAt        DateTime?
+
+  @@index([userId, submittedAt])
+  @@index([status, submittedAt])
 }

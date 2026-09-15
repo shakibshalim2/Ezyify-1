@@ -45,6 +45,7 @@ export const users: SeedUser[] = [
   { id: 'u_glowcare', email: 'glowcare@ezyify.test', username: 'glowcare', name: 'GlowCare', avatarUrl: img('photo-1596462502278-27bfdc403348', 200), verified: true, role: 'seller', bio: 'Clean beauty, dermatologist tested', location: 'Seoul' },
   { id: 'u_workspace', email: 'workspace@ezyify.test', username: 'workspace', name: 'WorkSpace', avatarUrl: img('photo-1497366216548-37526070297c', 200), verified: false, role: 'seller', bio: 'Desk gear for makers', location: 'Berlin' },
   { id: 'u_fit', email: 'fit@ezyify.test', username: 'fit', name: 'FitLife', avatarUrl: img('photo-1517836357463-d25dfeac3438', 200), verified: false, role: 'seller', bio: 'Sustainable fitness gear', location: 'Denver' },
+  { id: 'u_admin', email: 'admin@ezyify.test', username: 'admin', name: 'Ezyify Admin', avatarUrl: null, verified: true, role: 'admin', bio: null, location: null },
   { id: 'u_buyer', email: 'buyer@ezyify.test', username: 'buyer', name: 'Test Buyer', avatarUrl: img('photo-1500648767791-00dcc994a43e', 200), verified: false, role: 'user', bio: null, location: null },
 ];
 

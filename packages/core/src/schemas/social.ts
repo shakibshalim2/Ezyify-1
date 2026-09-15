@@ -58,7 +58,7 @@ export type CreatePostRequest = z.input<typeof CreatePostRequestSchema>;
 
 /** Direct-to-bucket upload contract: sign → PUT bytes to `url` with `headers` → finalize. */
 export const UploadContentTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'video/mp4', 'video/quicktime']);
-export const UploadPurposeSchema = z.enum(['post', 'loop', 'story', 'avatar', 'cover', 'product', 'message']);
+export const UploadPurposeSchema = z.enum(['post', 'loop', 'story', 'avatar', 'cover', 'product', 'message', 'kyc']);
 export const SignUploadRequestSchema = z.object({
   contentType: UploadContentTypeSchema,
   sizeBytes: z.number().int().positive(),

@@ -13,7 +13,7 @@ const img = (id: string, w = 800) => `https://images.unsplash.com/${id}?w=${w}&q
 export async function seed() {
   // Transactional state is wiped so repeated seeds (tests, dev resets) start from the same balances and empty carts.
   await prisma.$transaction([
-    prisma.liveViewer.deleteMany(), prisma.liveSession.deleteMany(), prisma.review.deleteMany(), prisma.payoutMethod.deleteMany(),
+    prisma.liveViewer.deleteMany(), prisma.liveSession.deleteMany(), prisma.review.deleteMany(), prisma.payoutMethod.deleteMany(), prisma.kycSubmission.deleteMany(),
     prisma.cartItem.deleteMany(), prisma.order.deleteMany(), prisma.transaction.deleteMany(), prisma.refreshSession.deleteMany(),
     prisma.otpCode.deleteMany(), prisma.report.deleteMany(), prisma.block.deleteMany(), prisma.device.deleteMany(), prisma.webhookEvent.deleteMany(),
     prisma.auditLog.deleteMany(), prisma.notification.deleteMany(), prisma.like.deleteMany(), prisma.save.deleteMany(),

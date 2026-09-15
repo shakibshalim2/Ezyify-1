@@ -113,6 +113,28 @@ describe('mock API server', () => {
     expect(await api.notifications.preferences()).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
   });
 
+  it('kyc: submit is redacted and single-flight, admin reject → resubmit → approve verifies the user', async () => {
+    const { api, login } = harness();
+    await login('sara@ezyify.test');
+    const doc = { documentType: 'national_id' as const, fullName: 'Sara Kim', idNumber: 'KR-99887766', dateOfBirth: '1992-02-02', country: 'kr', documentFrontUrl: 'https://cdn.example/f.jpg', documentBackUrl: 'https://cdn.example/b.jpg', selfieUrl: 'https://cdn.example/s.jpg' };
+    expect(await api.kyc.state()).toEqual({ verified: false, submission: null, canSubmit: true });
+    const sub = await api.kyc.submit(doc);
+    expect(sub).toMatchObject({ status: 'pending', idNumberLast4: '7766', country: 'KR' });
+    await expect(api.kyc.submit(doc)).rejects.toMatchObject({ code: 'CONFLICT' });
+    await login('admin@ezyify.test');
+    const queue = await api.kyc.adminQueue();
+    expect(queue.items.find(k => k.id === sub.id)?.email).toBe('sara@ezyify.test');
+    expect((await api.kyc.adminReview(sub.id, { decision: 'reject', reason: 'Blurry selfie' })).status).toBe('rejected');
+    await login('sara@ezyify.test');
+    expect((await api.kyc.state()).canSubmit).toBe(true);
+    const again = await api.kyc.submit(doc);
+    await login('admin@ezyify.test');
+    expect((await api.kyc.adminReview(again.id, { decision: 'approve' })).status).toBe('approved');
+    await login('sara@ezyify.test');
+    expect(await api.kyc.state()).toMatchObject({ verified: true, canSubmit: false });
+    expect((await api.users.me()).verified).toBe(true);
+  });
+
   it('seller product CRUD: drafts stay out of the public catalog, ownership is enforced, sold products archive instead of deleting', async () => {
     const { api, login } = harness();
     await login('techstore@ezyify.test');

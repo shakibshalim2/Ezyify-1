@@ -1,5 +1,5 @@
 import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, PayoutMethod, Post, ProductDetail, Review, SellerCustomer, SellerProduct, SellerProductDetail, SellerReview, UserProfile } from '../schemas/index.js';
-import { UpdateNotificationPreferencesRequestSchema, UpdateProfileRequestSchema, UpsertProductRequestSchema, UpdateProductRequestSchema, resolveNotificationPreferences, type NotificationPreferences } from '../schemas/index.js';
+import { ReviewKycRequestSchema, SubmitKycRequestSchema, UpdateNotificationPreferencesRequestSchema, UpdateProfileRequestSchema, UpsertProductRequestSchema, UpdateProductRequestSchema, resolveNotificationPreferences, type KycSubmission, type NotificationPreferences } from '../schemas/index.js';
 import { sellerProductStatus } from '../schemas/index.js';
 import * as fx from './fixtures.js';
 
@@ -105,8 +105,9 @@ export function createMockState() {
   const comments = new Map<string, Comment[]>();
   const uploads = new Map<string, { contentType: string; sizeBytes: number }>();
   const notificationPrefs = new Map<string, NotificationPreferences>();
+  const kyc: KycSubmission[] = [];
   const liveSessions = fx.liveSessions.map(session => ({ ...session, host: { ...session.host }, productIds: [...session.productIds] }));
-  return { users, passwords, sessions, refreshTokens, revoked, pendingOtp, mfa, mfaChallenges, products, posts, likes, saves, follows, blocks, carts, orders, reviews, addresses, wallets, payoutMethods, transactions, conversations, messages, notifications, comments, uploads, notificationPrefs, liveSessions, counter: 1000 };
+  return { users, passwords, sessions, refreshTokens, revoked, pendingOtp, mfa, mfaChallenges, products, posts, likes, saves, follows, blocks, carts, orders, reviews, addresses, wallets, payoutMethods, transactions, conversations, messages, notifications, comments, uploads, notificationPrefs, kyc, liveSessions, counter: 1000 };
 }
 export type MockState = ReturnType<typeof createMockState>;
 
@@ -1329,6 +1330,47 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       const n = (state.notifications.get(requireUser(c).id) ?? []).find(x => x.id === c.params.id);
       if (n) n.read = true;
       return { ok: true };
+    }],
+    // ---- KYC: submission body validated by the shared schema; full id number is never stored/returned in the mock either.
+    ['GET', '/kyc', c => {
+      const u = requireUser(c);
+      const latest = [...state.kyc].reverse().find(k => k.id.startsWith(`kyc_${u.id}_`)) ?? null;
+      return { verified: u.verified, submission: latest, canSubmit: !u.verified && latest?.status !== 'pending' };
+    }],
+    ['POST', '/kyc', c => {
+      const u = requireUser(c);
+      if (u.verified) throw conflict('Your identity is already verified');
+      if (state.kyc.some(k => k.id.startsWith(`kyc_${u.id}_`) && k.status === 'pending')) throw conflict('A submission is already under review');
+      const parsed = SubmitKycRequestSchema.safeParse(c.body);
+      if (!parsed.success) throw validation(Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.') || '_', i.message])));
+      const b = parsed.data;
+      const sub: KycSubmission = { id: `kyc_${u.id}_${nextId('k')}`, status: 'pending', documentType: b.documentType, fullName: b.fullName, idNumberLast4: b.idNumber.slice(-4), dateOfBirth: b.dateOfBirth, country: b.country, documentFrontUrl: b.documentFrontUrl, documentBackUrl: b.documentBackUrl, selfieUrl: b.selfieUrl, rejectionReason: null, submittedAt: iso(), reviewedAt: null };
+      state.kyc.push(sub);
+      return sub;
+    }],
+    ['GET', '/admin/kyc', c => {
+      if (requireUser(c).role !== 'admin') throw forbidden();
+      const status = c.query.get('status') ?? 'pending';
+      const rows = state.kyc.filter(k => k.status === status).map(k => { const owner = state.users.find(x => k.id.startsWith(`kyc_${x.id}_`))!; return { ...k, user: fx.summary(owner), email: owner.email }; });
+      return paginate(status === 'pending' ? rows : rows.reverse(), c.query);
+    }],
+    ['PATCH', '/admin/kyc/:id', c => {
+      const admin = requireUser(c);
+      if (admin.role !== 'admin') throw forbidden();
+      const sub = state.kyc.find(k => k.id === c.params.id);
+      if (!sub) throw notFound('Submission');
+      if (sub.status !== 'pending') throw conflict('This submission was already reviewed');
+      const parsed = ReviewKycRequestSchema.safeParse(c.body);
+      if (!parsed.success) throw validation(Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.') || '_', i.message])));
+      const owner = state.users.find(x => sub.id.startsWith(`kyc_${x.id}_`))!;
+      sub.status = parsed.data.decision === 'approve' ? 'approved' : 'rejected';
+      sub.rejectionReason = parsed.data.decision === 'reject' ? parsed.data.reason : null;
+      sub.reviewedAt = iso();
+      if (parsed.data.decision === 'approve') owner.verified = true;
+      const inbox = state.notifications.get(owner.id) ?? [];
+      state.notifications.set(owner.id, inbox);
+      inbox.unshift({ id: nextId('n'), type: 'system', actor: null, message: parsed.data.decision === 'approve' ? 'Your identity is verified — the verified badge is now on your profile.' : `Identity verification needs another look: ${parsed.data.reason}`, href: '/seller/kyc-verification', thumbnailUrl: null, read: false, createdAt: iso() });
+      return { ...sub, user: fx.summary(owner), email: owner.email };
     }],
     ['GET', '/users/me/notification-preferences', c => resolveNotificationPreferences(state.notificationPrefs.get(requireUser(c).id))],
     ['PATCH', '/users/me/notification-preferences', c => {
