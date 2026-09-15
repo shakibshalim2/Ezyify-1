@@ -24,7 +24,9 @@ export class ModerationController {
   async report(@CurrentUser() user: AccessClaims, @Body(zod(ReportRequestSchema)) body: ReportRequest) {
     const recent = await this.prisma.report.findFirst({ where: { reporterId: user.sub, targetType: body.targetType, targetId: body.targetId, createdAt: { gt: new Date(Date.now() - 86_400_000) } } });
     if (recent) return { ok: true as const, id: recent.id };
-    const r = await this.prisma.report.create({ data: { reporterId: user.sub, ...body } });
+    const priority = body.reason === 'child_safety' ? 2 : body.reason === 'self_harm' || body.reason === 'violence' ? 1 : 0;
+    const r = await this.prisma.report.create({ data: { reporterId: user.sub, priority, ...body } });
+    if (priority === 2) await this.audit.log('moderation.child_safety_report', { userId: user.sub, meta: { reportId: r.id, targetType: body.targetType, targetId: body.targetId } });
     return { ok: true as const, id: r.id };
   }
 
@@ -56,7 +58,8 @@ export class ModerationController {
   async queue(@Query(zod(QueueQuery)) q: z.infer<typeof QueueQuery>) {
     const where = { status: q.status as ReportStatus };
     const [rows, total] = await this.prisma.$transaction([
-      this.prisma.report.findMany({ where, include: { reporter: { select: { id: true, username: true } } }, orderBy: { createdAt: 'asc' }, ...skipTake(q) }),
+      // CSAE reports jump the queue (Play Child Safety Standards: prioritised review), then oldest first.
+      this.prisma.report.findMany({ where, include: { reporter: { select: { id: true, username: true } } }, orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }], ...skipTake(q) }),
       this.prisma.report.count({ where }),
     ]);
     return page(rows, total, q);

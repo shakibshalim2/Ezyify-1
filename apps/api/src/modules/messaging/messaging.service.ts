@@ -85,7 +85,8 @@ export class MessagingService {
     return rows.map(r => r.userId);
   }
 
-  private async assertMember(userId: string, conversationId: string) {
+  /** Throws NOT_FOUND (not FORBIDDEN) so non-members cannot probe conversation ids. */
+  async assertMember(userId: string, conversationId: string) {
     const p = await this.prisma.participant.findUnique({ where: { conversationId_userId: { conversationId, userId } } });
     if (!p) throw notFound('Conversation');
   }

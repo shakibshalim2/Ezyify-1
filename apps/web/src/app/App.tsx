@@ -15,12 +15,10 @@ import InstallPrompt from './components/InstallPrompt';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { RouteAwareLoader } from './components/RouteAwareLoader';
-import { WorldClassPerformanceMonitor } from './components/WorldClassPerformanceMonitor';
-import { registerServiceWorker } from './utils/serviceWorkerRegistration';
+import { CookieConsent } from './components/CookieConsent';
+import { registerPwa } from './pwa';
 import { initializeOptimizations } from './utils/advancedPerformance';
-import { loadFontsOptimized } from './utils/fontLoader';
 import { initializeManualTriggers } from './utils/systemTriggers';
-import { APP_VERSION } from './version';
 import { logPlatformStatus } from './console-status';
 import { displayLaunchStatusBanner, showLaunchReminder } from './utils/launchStatusBanner';
 import { markInitializationComplete } from './utils/initializationGuard';
@@ -102,6 +100,7 @@ const UploadPage = createLazyComponent(() => import('./pages/UploadPage'));
 const ForgotPasswordPage = createLazyComponent(() => import('./pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = createLazyComponent(() => import('./pages/auth/ResetPasswordPage'));
 const OTPVerificationPage = createLazyComponent(() => import('./pages/auth/OTPVerificationPage'));
+const TwoFactorPage = createLazyComponent(() => import('./pages/auth/TwoFactorPage'));
 const UserDashboardPage = createLazyComponent(() => import('./pages/user/UserDashboard'));
 const CheckoutPage = createLazyComponent(() => import('./pages/user/index').then(m => ({ default: m.CheckoutPage })));
 const WalletPage = createLazyComponent(() => import('./pages/user/index').then(m => ({ default: m.WalletPage })));
@@ -154,6 +153,7 @@ const SafetyPage = createLazyComponent(() => import('./pages/legal/SafetyPage'))
 
 // Batch 7
 const SafetyTrustPage = createLazyComponent(() => import('./pages/legal/SafetyTrustPage'));
+const ChildSafetyPage = createLazyComponent(() => import('./pages/legal/ChildSafetyPage'));
 const AccessibilityPage = createLazyComponent(() => import('./pages/legal/AccessibilityPage'));
 const TransparencyPage = createLazyComponent(() => import('./pages/legal/TransparencyPage'));
 const CommissionPolicyPage = createLazyComponent(() => import('./pages/legal/CommissionPolicyPage'));
@@ -262,10 +262,7 @@ export default function App() {
     // All heavy services deferred — never block the render pipeline
     const init = () => {
       try { initializeManualTriggers(); } catch (e) {}
-      try { loadFontsOptimized(); } catch (e) {}
-      try {
-        if (typeof navigator !== 'undefined') registerServiceWorker();
-      } catch (e) {}
+      try { registerPwa(); } catch (e) {}
       try { initializeOptimizations(); } catch (e) {}
       if (import.meta.env.DEV) {
         try { logPlatformStatus(); } catch (e) {}
@@ -296,19 +293,18 @@ export default function App() {
           <Toaster />
           {/* Wrapped in error boundaries - never blocks UI */}
           <ErrorBoundary fallback={null}>
-            <Analytics />
-          </ErrorBoundary>
-          <ErrorBoundary fallback={null}>
             <InstallPrompt />
           </ErrorBoundary>
           <ErrorBoundary fallback={null}>
             <OfflineIndicator />
           </ErrorBoundary>
-          {/* Performance monitor wrapped in error boundary - never blocks UI */}
-          <ErrorBoundary fallback={null}>
-            <WorldClassPerformanceMonitor />
-          </ErrorBoundary>
           <AuthProvider>
+          <ErrorBoundary fallback={null}>
+            <Analytics />
+          </ErrorBoundary>
+          <ErrorBoundary fallback={null}>
+            <CookieConsent />
+          </ErrorBoundary>
           <Suspense fallback={<RouteAwareLoader />}>
             <Routes>
               <Route path="/welcome" element={<OnboardingPage />} />
@@ -321,6 +317,7 @@ export default function App() {
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/otp-verification" element={<OTPVerificationPage />} />
+              <Route path="/two-factor" element={<TwoFactorPage />} />
               <Route path="/landing" element={<LandingPage />} />
               <Route path="/stories/:username" element={<StoriesPage />} />
               <Route path="/loops" element={<LoopsPage />} />
@@ -377,6 +374,8 @@ export default function App() {
                 <Route path="/copyright" element={<CopyrightPage />} />
                 <Route path="/safety" element={<SafetyPage />} />
                 <Route path="/safety-trust" element={<SafetyTrustPage />} />
+                <Route path="/child-safety" element={<ChildSafetyPage />} />
+                <Route path="/legal/child-safety" element={<ChildSafetyPage />} />
                 <Route path="/accessibility" element={<AccessibilityPage />} />
                 <Route path="/settings/privacy" element={<PrivacySettingsPage />} />
                 <Route path="/settings/security" element={<SecuritySettingsPage />} />

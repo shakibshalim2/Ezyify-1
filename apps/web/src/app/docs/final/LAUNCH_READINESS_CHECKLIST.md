@@ -220,8 +220,8 @@ EZYIFY has completed comprehensive development and is ready for:
 
 | **Requirement** | **Implementation** | **Status** |
 |----------------|-------------------|-----------|
-| **Privacy Policy** | URL: `https://ezyify.com/privacy` | ✅ Ready |
-| **Terms of Service** | URL: `https://ezyify.com/terms` | ✅ Ready |
+| **Privacy Policy** | URL: `https://ezyify.app/privacy` | ✅ Ready |
+| **Terms of Service** | URL: `https://ezyify.app/terms` | ✅ Ready |
 | **App Privacy Details** | Data collection fully disclosed | ✅ Documented |
 | **Permission Strings** | All NSUsageDescription strings defined | ✅ Ready |
 | **Privacy Manifest** | PrivacyInfo.xcprivacy created | ✅ Ready |
@@ -509,7 +509,7 @@ EZYIFY has completed comprehensive development and is ready for:
 
 **For Web Launch:**
 1. Choose hosting provider (Vercel recommended)
-2. Set up domain (ezyify.com)
+2. Set up domain (ezyify.app)
 3. Configure environment variables
 4. Deploy frontend to production
 5. Launch with beta users

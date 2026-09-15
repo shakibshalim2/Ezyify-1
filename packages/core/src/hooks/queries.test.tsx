@@ -15,6 +15,7 @@ import {
   useServerCart,
   useToggleFollow,
   useToggleLike,
+  useUnifiedSearch,
   useUnreadCount,
 } from './queries.js';
 import { createAuthStore } from '../stores/auth.js';
@@ -52,6 +53,7 @@ function fakeApi() {
     users: { me: vi.fn(async () => profile), follow: vi.fn(async () => null), unfollow: vi.fn(async () => null) },
     cart: { get: vi.fn(async () => cart(0)), add: vi.fn(async () => cart(2)) },
     notifications: { unreadCount: vi.fn(async () => ({ count: 4 })) },
+    search: { all: vi.fn(async () => ({ products: { items: [], nextCursor: null, total: 0 }, users: { items: [user], nextCursor: null, total: 1 }, posts: { items: [], nextCursor: null, total: 0 } })) },
   };
   return api as unknown as Endpoints & typeof api;
 }
@@ -84,6 +86,18 @@ beforeEach(() => {
 });
 
 describe('query hooks', () => {
+  it('useUnifiedSearch calls the sectioned search endpoint only for a non-empty query', async () => {
+    const api = fakeApi();
+    function Probe() {
+      const search = useUnifiedSearch('sara', 'users');
+      return createElement('span', null, search.data?.users.items[0]?.username ?? '');
+    }
+    mount(createElement(Probe), api);
+    await flush();
+    expect(el.textContent).toBe('maya');
+    expect(api.search.all).toHaveBeenCalledWith('sara', { type: 'users' });
+  });
+
   it('useProducts pages through the API and flattens items', async () => {
     const api = fakeApi();
     let hook: ReturnType<typeof useProducts> | undefined;

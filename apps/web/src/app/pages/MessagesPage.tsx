@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
-import { formatRelativeTime, useAuth, useConversations, useMessages, useProduct, useSendMessage, useStartConversation, type Conversation, type Message } from '@ezyify/core';
+import { avatarDataUri, formatRelativeTime, useAuth, useConversations, useMessages, useProduct, useSendMessage, useStartConversation, type Conversation, type Message } from '@ezyify/core';
 import { SEO, SEOConfigs } from '../components/SEO';
 import { ConversationList } from '../components/messages/ConversationList';
 import { ChatHeader } from '../components/messages/ChatHeader';
@@ -15,7 +15,7 @@ import { useAuthed, useInfiniteList } from '../lib/data';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { formErrors } from '../lib/apiErrors';
 
-const AVATAR_FALLBACK = (name: string) => `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
+const AVATAR_FALLBACK = (name: string) => avatarDataUri(name, 96);
 
 const toListItem = (c: Conversation) => {
   const other = c.participants[0];

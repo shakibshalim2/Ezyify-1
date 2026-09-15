@@ -1,13 +1,9 @@
-<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-  <rect width="32" height="32" fill="#0095f6" />
-  <text
-    x="50%"
-    y="50%"
-    dominant-baseline="central"
-    text-anchor="middle"
-    font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-    font-weight="700"
-    font-size="20"
-    fill="#ffffff"
-  >E</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2F7FE0"/><stop offset="1" stop-color="#0B4FA0"/></linearGradient></defs>
+  <rect width="32" height="32" rx="7.04" fill="url(#g)"/>
+  <g transform="translate(4.16 4.16) scale(0.2368)">
+  <path fill="#FFFFFF" d="M35.5 14H64.5A6.5 6.5 0 0 1 64.5 27H29V20.5A6.5 6.5 0 0 1 35.5 14Z"/>
+  <path fill="#FF6F22" d="M29 33H59.5A6.5 6.5 0 0 1 59.5 46H29Z"/>
+  <path fill="#FFFFFF" d="M29 52H64.5A6.5 6.5 0 0 1 64.5 65H35.5A6.5 6.5 0 0 1 29 58.5Z"/>
+  <circle cx="50" cy="78" r="8" fill="#FF6F22"/></g>
 </svg>

@@ -433,8 +433,8 @@ export default function TransparencyPage() {
           <CardContent className="p-6 text-center">
             <p className="text-sm text-muted-foreground">
               Questions about this report? Email us at{' '}
-              <a href="mailto:transparency@ezyify.com" className="text-primary hover:underline">
-                transparency@ezyify.com
+              <a href="mailto:transparency@ezyify.app" className="text-primary hover:underline">
+                transparency@ezyify.app
               </a>
             </p>
           </CardContent>

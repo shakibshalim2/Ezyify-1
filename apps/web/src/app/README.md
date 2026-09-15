@@ -425,7 +425,6 @@ ezyify/
 ├── utils/                       # Utility functions
 │   ├── apiClient.ts             # API client (22 endpoints)
 │   ├── advancedPerformance.ts   # Performance optimizations
-│   ├── memoryManager.ts         # Memory monitoring
 │   └── ...
 │
 ├── mocks/                       # MSW mock handlers
@@ -433,9 +432,6 @@ ezyify/
 │   └── browser.ts               # MSW setup
 │
 ├── data/                        # Mock data
-│   ├── posts.ts
-│   ├── products.ts
-│   ├── users.ts
 │   └── ...
 │
 ├── contexts/                    # React contexts
@@ -443,7 +439,6 @@ ezyify/
 │   └── ...
 │
 ├── hooks/                       # Custom React hooks
-│   ├── useMemoryOptimization.ts
 │   └── ...
 │
 ├── styles/                      # CSS styles

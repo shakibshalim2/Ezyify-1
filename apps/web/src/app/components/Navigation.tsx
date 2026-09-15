@@ -10,6 +10,7 @@ import { BottomNav } from './BottomNav';
 import { useAuth } from '../contexts/AuthContext';
 import { useBadgeCount } from '../lib/data';
 import { useUnreadCount } from '@ezyify/core';
+import { Img } from './primitives/Img';
 
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -195,7 +196,7 @@ export default function Navigation() {
                   aria-label="User menu"
                 >
                   {user?.avatar ? (
-                    <img src={user.avatar} alt="" className="w-7 h-7 rounded-full object-cover ring-2 ring-primary/20" />
+                    <Img src={user.avatar} alt="" className="w-7 h-7 rounded-full object-cover ring-2 ring-primary/20" />
                   ) : (
                     <div className="w-7 h-7 rounded-full bg-brand-gradient flex items-center justify-center ring-2 ring-primary/20">
                       <User className="w-4 h-4 text-white" />

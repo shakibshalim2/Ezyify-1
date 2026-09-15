@@ -372,7 +372,7 @@ export default function MarketingAcquisitionHub() {
   };
 
   const handleGenerateReferralLink = () => {
-    const link = 'https://ezyify.com/ref/USER123';
+    const link = 'https://ezyify.app/ref/USER123';
     navigator.clipboard.writeText(link);
     toast.success('Referral link copied to clipboard!', {
       description: link
@@ -997,7 +997,7 @@ export default function MarketingAcquisitionHub() {
                 <div>
                   <h3 className="font-semibold mb-3">Your Referral Link</h3>
                   <div className="flex gap-2">
-                    <Input value="https://ezyify.com/ref/USER123" readOnly />
+                    <Input value="https://ezyify.app/ref/USER123" readOnly />
                     <Button onClick={handleGenerateReferralLink}>
                       <Copy className="w-4 h-4" />
                     </Button>

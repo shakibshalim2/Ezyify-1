@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApp } from '../src/bootstrap.js';
 import { loadEnv } from '../src/config.js';
-import { OrderSchema, ProductSummarySchema, SessionSchema, paginated } from '@ezyify/core';
+import { OrderSchema, ProductReviewsResponseSchema, ProductSummarySchema, SellerReviewsResponseSchema, SellerAnalyticsSchema, SellerCustomersResponseSchema, SellerDashboardSchema, SellerEarningsSchema, SellerProductsResponseSchema, SessionSchema, paginated } from '@ezyify/core';
 
 let app: NestFastifyApplication;
 const inject = (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, opts: { token?: string; body?: unknown; headers?: Record<string, string> } = {}) =>
@@ -120,6 +120,24 @@ describe('commerce: cart → checkout → escrow → release', () => {
     expect((await inject('POST', `/orders/${orderId}/confirm-delivery`, { token: seller })).statusCode).toBe(403);
   });
 
+  it('seller list/summary are seller-scoped and the order exposes buyer + destination', async () => {
+    expect((await inject('GET', '/seller/orders/summary', { token: buyer })).statusCode).toBe(403);
+    const list = json(await inject('GET', '/orders?role=seller', { token: seller })).data;
+    expect(list.items.map((o: { id: string }) => o.id)).toContain(orderId);
+    const o = list.items.find((x: { id: string }) => x.id === orderId);
+    expect(o.buyer.username).toBe('buyer');
+    expect(o.shippingTo).toMatchObject({ recipient: expect.any(String), city: expect.any(String), country: expect.any(String) });
+    expect(o.paymentMethod).toBe('wallet');
+    const summary = json(await inject('GET', '/seller/orders/summary', { token: seller })).data;
+    expect(summary.total).toBe(list.pagination.total);
+    expect(summary.toShip).toBeGreaterThanOrEqual(1);
+    expect(summary.needsAction).toBeGreaterThanOrEqual(summary.toShip);
+    // Other sellers never see this order.
+    const other = (await login('fashion@ezyify.test')).accessToken;
+    expect(json(await inject('GET', '/orders?role=seller', { token: other })).data.items.map((x: { id: string }) => x.id)).not.toContain(orderId);
+    expect((await inject('POST', `/seller/orders/${orderId}/accept`, { token: other })).statusCode).toBe(403);
+  });
+
   it('walks the state machine and releases escrow minus platform fee', async () => {
     const sellerBefore = json(await inject('GET', '/wallet', { token: seller })).data.balance.amount;
     expect(json(await inject('POST', `/seller/orders/${orderId}/accept`, { token: seller })).data.status).toBe('processing');
@@ -133,9 +151,157 @@ describe('commerce: cart → checkout → escrow → release', () => {
     expect(json(again).error.code).toBe('CONFLICT');
   });
 
+  it('seller cancel refunds the buyer and restores stock; summary reflects it', async () => {
+    json(await inject('POST', '/cart/items', { token: buyer, body: { productId: 'prod-002', quantity: 1 } }));
+    const [created] = json(await inject('POST', '/checkout', { token: buyer, body: { addressId: 'addr_buyer_home', paymentMethod: 'wallet' } })).data;
+    const stockOf = async () => json(await inject('GET', '/seller/products?q=watch', { token: seller })).data.items[0].stock as number;
+    const stockBefore = await stockOf();
+    const summaryBefore = json(await inject('GET', '/seller/orders/summary', { token: seller })).data;
+    const buyerBefore = json(await inject('GET', '/wallet', { token: buyer })).data.balance.amount;
+    const cancelled = json(await inject('POST', `/seller/orders/${created.id}/cancel`, { token: seller })).data;
+    expect(cancelled).toMatchObject({ status: 'cancelled', escrow: { status: 'refunded' } });
+    expect(json(await inject('GET', '/wallet', { token: buyer })).data.balance.amount - buyerBefore).toBe(created.total.amount);
+    expect(await stockOf()).toBe(stockBefore + 1);
+    const summary = json(await inject('GET', '/seller/orders/summary', { token: seller })).data;
+    expect(summary.refunds).toBe(summaryBefore.refunds + 1);
+    expect(summary.toShip).toBe(summaryBefore.toShip - 1);
+    expect(summary.completed).toBeGreaterThanOrEqual(1);
+  });
+
+  it('seller dashboard aggregates real sales, escrow, payouts and attention counts', async () => {
+    expect((await inject('GET', '/seller/dashboard', { token: buyer })).statusCode).toBe(403);
+    const d = json(await inject('GET', '/seller/dashboard?days=30', { token: seller })).data;
+    expect(SellerDashboardSchema.safeParse(d).success).toBe(true);
+    expect(d.window.days).toBe(30);
+    // The completed headphones order (7999) counts as gross; the cancelled watch order does not.
+    expect(d.gross.current.amount).toBe(7999);
+    expect(d.orders.current).toBe(1);
+    expect(d.averageOrder.current.amount).toBe(7999);
+    expect(d.paidOut.amount).toBe(7999 - Math.round(7999 * 0.05));
+    expect(d.escrowHeld.amount).toBe(0);
+    expect(d.series).toHaveLength(14);
+    expect(d.series.reduce((n: number, p: { gross: number }) => n + p.gross, 0)).toBe(7999);
+    expect(d.attention).toMatchObject({ toShip: 0, refundRequests: 0 });
+    expect(d.rating.count).toBeGreaterThan(0);
+    expect((await inject('GET', '/seller/dashboard?days=3', { token: seller })).statusCode).toBe(422);
+  });
+
+  it('seller analytics reconciles top products, categories, customers and fulfilment with real orders', async () => {
+    expect((await inject('GET', '/seller/analytics', { token: buyer })).statusCode).toBe(403);
+    const a = json(await inject('GET', '/seller/analytics?days=30', { token: seller })).data;
+    expect(SellerAnalyticsSchema.safeParse(a).success).toBe(true);
+    expect(a.series).toHaveLength(30);
+    expect(a.totals).toMatchObject({ gross: { amount: 7999 }, orders: 1, units: 1, averageOrder: { amount: 7999 } });
+    expect(a.series.reduce((n: number, p: { gross: number }) => n + p.gross, 0)).toBe(a.totals.gross.amount);
+    expect(a.topProducts).toHaveLength(1);
+    expect(a.topProducts[0]).toMatchObject({ id: 'prod-001', units: 1, share: 1 });
+    expect(a.categories).toEqual([expect.objectContaining({ name: 'Tech', share: 1 })]);
+    expect(a.customers).toEqual({ unique: 1, repeat: 0, firstTime: 1 });
+    // One completed + one cancelled order in the window → 50% each; shipped 1 order so latency is a number.
+    expect(a.fulfillment.completionRate).toBe(0.5);
+    expect(a.fulfillment.cancelRate).toBe(0.5);
+    expect(typeof a.fulfillment.avgHoursToShip).toBe('number');
+    expect(a.paymentMix).toEqual([{ method: 'wallet', orders: 1, share: 1 }]);
+  });
+
+  it('seller customers aggregate buyers from paid orders with public profile data only', async () => {
+    expect((await inject('GET', '/seller/customers', { token: buyer })).statusCode).toBe(403);
+    const r = json(await inject('GET', '/seller/customers?sort=spent', { token: seller })).data;
+    expect(SellerCustomersResponseSchema.safeParse(r).success).toBe(true);
+    expect(r.items).toHaveLength(1);
+    const c = r.items[0];
+    expect(c.user.username).toBe('buyer');
+    expect(c.user).not.toHaveProperty('email');
+    // Only the completed 7999 order counts; the cancelled one is excluded from orders/spend.
+    expect(c).toMatchObject({ orders: 1, spent: { amount: 7999 }, openOrders: 0 });
+    expect(c.lastShippedTo).toMatchObject({ city: expect.any(String), country: expect.any(String) });
+    expect(r.summary).toMatchObject({ total: 1, repeat: 0, averageOrder: { amount: 7999 }, averageLifetime: { amount: 7999 } });
+    expect(json(await inject('GET', '/seller/customers?q=nobody', { token: seller })).data.items).toHaveLength(0);
+  });
+
+  it('reviews: one per buyer, verified from a completed order, seller replies are scoped and public', async () => {
+    const before = json(await inject('GET', '/products/prod-001/reviews')).data;
+    expect(ProductReviewsResponseSchema.safeParse(before).success).toBe(true);
+    expect(before.stats.total).toBe(2);
+    const countBefore = json(await inject('GET', '/products/prod-001')).data.reviewCount as number;
+    // Seller cannot review own product; buyer with the completed headphones order gets "verified purchase".
+    expect((await inject('POST', '/products/prod-001/reviews', { token: seller, body: { rating: 5 } })).statusCode).toBe(403);
+    const created = json(await inject('POST', '/products/prod-001/reviews', { token: buyer, body: { rating: 4, text: 'Solid ANC, comfy for hours.' } })).data;
+    expect(created).toMatchObject({ rating: 4, verifiedPurchase: true, reply: null, user: { username: 'buyer' } });
+    expect(json(await inject('POST', '/products/prod-001/reviews', { token: buyer, body: { rating: 5 } })).error.code).toBe('CONFLICT');
+    const after = json(await inject('GET', '/products/prod-001/reviews')).data;
+    expect(after.stats.total).toBe(3);
+    expect(after.stats.distribution['4']).toBe(2);
+    // Product aggregate (seeded marketing count + real reviews) moves with the new review.
+    expect(json(await inject('GET', '/products/prod-001')).data.reviewCount).toBe(countBefore + 1);
+
+    // Seller hub: scoped to own products, filter works, reply notifies + shows publicly.
+    expect((await inject('GET', '/seller/reviews', { token: buyer })).statusCode).toBe(403);
+    const mine = json(await inject('GET', '/seller/reviews?filter=unreplied', { token: seller })).data;
+    expect(SellerReviewsResponseSchema.safeParse(mine).success).toBe(true);
+    expect(mine.items.every((r: { product: { id: string } }) => ['prod-001', 'prod-002'].includes(r.product.id))).toBe(true);
+    expect(mine.items.every((r: { reply: unknown }) => r.reply === null)).toBe(true);
+    const other = (await login('fashion@ezyify.test')).accessToken;
+    expect((await inject('POST', `/seller/reviews/${created.id}/reply`, { token: other, body: { text: 'Not my product' } })).statusCode).toBe(403);
+    const replied = json(await inject('POST', `/seller/reviews/${created.id}/reply`, { token: seller, body: { text: 'Thanks! Enjoy the music.' } })).data;
+    expect(replied.reply).toMatchObject({ text: 'Thanks! Enjoy the music.' });
+    const stats = json(await inject('GET', '/seller/reviews', { token: seller })).data.stats;
+    expect(stats.awaitingReply).toBe(mine.stats.awaitingReply - 1);
+    const notes = json(await inject('GET', '/notifications', { token: buyer })).data;
+    expect(JSON.stringify(notes)).toMatch(/replied to your review/);
+  });
+
+  it('seller earnings reconcile escrow, releases, fees and payouts; payout methods are encrypted and scoped', async () => {
+    expect((await inject('GET', '/seller/earnings', { token: buyer })).statusCode).toBe(403);
+    const e = json(await inject('GET', '/seller/earnings', { token: seller })).data;
+    expect(SellerEarningsSchema.safeParse(e).success).toBe(true);
+    const fee = Math.round(7999 * 0.05);
+    expect(e.paidOutAllTime.amount).toBe(7999 - fee);
+    expect(e.platformFeeAllTime.amount).toBe(fee);
+    expect(e.paidOutThisMonth.amount).toBe(7999 - fee);
+    expect(e.escrowHeld.amount).toBe(0);
+    expect(e.series).toHaveLength(30);
+    expect(e.series.reduce((n: number, d: { released: number }) => n + d.released, 0)).toBe(7999 - fee);
+    expect(e.available.amount).toBeGreaterThanOrEqual(7999 - fee);
+
+    expect(json(await inject('GET', '/seller/payout-methods', { token: seller })).data).toEqual([]);
+    expect((await inject('POST', '/seller/payout-methods', { token: seller, body: { label: 'Main', holderName: 'T', institution: 'X', accountNumber: '12' } })).statusCode).toBe(422);
+    const a = json(await inject('POST', '/seller/payout-methods', { token: seller, body: { label: 'Mandiri', holderName: 'TechStore Pte', institution: 'Bank Mandiri', accountNumber: '9988-7766-5544' } })).data;
+    const b = json(await inject('POST', '/seller/payout-methods', { token: seller, body: { label: 'GoPay', type: 'ewallet', holderName: 'TechStore Pte', institution: 'GoPay', accountNumber: '081234567890', isDefault: true } })).data;
+    expect(a).toMatchObject({ accountLast4: '5544', isDefault: true });
+    expect(b).toMatchObject({ accountLast4: '7890', isDefault: true, type: 'ewallet' });
+    const list = json(await inject('GET', '/seller/payout-methods', { token: seller })).data;
+    expect(list.map((m: { id: string; isDefault: boolean }) => [m.id, m.isDefault])).toEqual([[b.id, true], [a.id, false]]);
+    expect(JSON.stringify(list)).not.toMatch(/9988|081234567890|accountEncrypted/);
+    // Another seller can neither see nor use these methods.
+    const other = (await login('fashion@ezyify.test')).accessToken;
+    expect(json(await inject('GET', '/seller/payout-methods', { token: other })).data).toEqual([]);
+    expect((await inject('POST', '/wallet/withdraw', { token: other, body: { amount: 500, payoutMethodId: a.id } })).statusCode).toBe(422);
+    const w = json(await inject('POST', '/wallet/withdraw', { token: seller, body: { amount: 1000, payoutMethodId: a.id } })).data;
+    expect(w.description).toContain('••••5544');
+    const after = json(await inject('GET', '/seller/earnings', { token: seller })).data;
+    expect(after.pendingWithdrawal.amount).toBe(e.pendingWithdrawal.amount + 1000);
+    expect(after.available.amount).toBe(e.available.amount - 1000);
+    expect(after.recentPayouts[0]).toMatchObject({ type: 'withdrawal', status: 'pending' });
+    expect(json(await inject('POST', `/seller/payout-methods/${a.id}/default`, { token: seller })).data.isDefault).toBe(true);
+    expect((await inject('DELETE', `/seller/payout-methods/${b.id}`, { token: seller })).statusCode).toBe(200);
+  });
+
   it('timeline records every transition', async () => {
     const t = json(await inject('GET', `/orders/${orderId}/timeline`, { token: buyer })).data.map((e: { status: string }) => e.status);
     expect(t).toEqual(['pending_payment', 'paid', 'processing', 'shipped', 'delivered', 'completed']);
+  });
+
+  it('seller hub inventory is seller-scoped, role-gated and reflects real order revenue', async () => {
+    expect((await inject('GET', '/seller/products', { token: buyer })).statusCode).toBe(403);
+    const r = json(await inject('GET', '/seller/products', { token: seller })).data;
+    expect(SellerProductsResponseSchema.safeParse(r).success).toBe(true);
+    expect(r.items.every((p: { seller: { username: string } }) => p.seller.username === 'techstore')).toBe(true);
+    expect(r.summary.total).toBe(r.summary.active + r.summary.lowStock + r.summary.outOfStock + r.summary.draft);
+    const sold = r.items.find((p: { id: string }) => p.id === 'prod-001');
+    expect(sold.revenue.amount).toBeGreaterThanOrEqual(7999);
+    const filtered = json(await inject('GET', '/seller/products?q=headphones&status=active', { token: seller })).data;
+    expect(filtered.items.map((p: { id: string }) => p.id)).toEqual(['prod-001']);
   });
 });
 
@@ -167,10 +333,15 @@ describe('social + policy', () => {
     const rep = json(await inject('POST', '/reports', { token: buyer, body: { targetType: 'post', targetId: 'post-002', reason: 'spam' } }));
     expect(rep.data.ok).toBe(true);
   });
-  it('admin queue is role-gated', async () => {
+  it('admin queue is role-gated and child-safety reports are served first', async () => {
     expect((await inject('GET', '/admin/reports', { token: buyer })).statusCode).toBe(403);
+    const csae = json(await inject('POST', '/reports', { token: buyer, body: { targetType: 'post', targetId: 'post-003', reason: 'child_safety' } }));
+    expect(csae.data.ok).toBe(true);
     const admin = (await login('admin@ezyify.test')).accessToken;
-    expect((await inject('GET', '/admin/reports', { token: admin })).statusCode).toBe(200);
+    const queue = await inject('GET', '/admin/reports', { token: admin });
+    expect(queue.statusCode).toBe(200);
+    const items = json(queue).data.items as { id: string; reason: string; priority: number }[];
+    expect(items[0]).toMatchObject({ id: csae.data.id, reason: 'child_safety', priority: 2 });
   });
   it('device registration + notifications work', async () => {
     expect(json(await inject('POST', '/devices', { token: buyer, body: { token: 'fcm-test', platform: 'android', provider: 'fcm', appVersion: '0.1.0' } })).data.ok).toBe(true);

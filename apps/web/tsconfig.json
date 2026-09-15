@@ -5,6 +5,7 @@
     "noUnusedParameters": false,
     "types": [
       "vite/client",
+      "vite-plugin-pwa/client",
       "vitest/globals",
       "@testing-library/jest-dom"
     ],
@@ -29,6 +30,8 @@
   },
   "include": [
     "src",
+    "vite",
+    "scripts",
     "e2e",
     "vite.config.ts",
     "vitest.config.ts",

@@ -185,7 +185,7 @@ export default function ContactPage() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Send us a detailed message and we'll respond within 24-48 hours.
                 </p>
-                <a href="mailto:support@ezyify.com" className="block"><Button variant="outline" className="w-full">Send Email</Button></a>
+                <a href="mailto:support@ezyify.app" className="block"><Button variant="outline" className="w-full">Send Email</Button></a>
               </CardContent>
             </Card>
           </div>
@@ -292,8 +292,8 @@ export default function ContactPage() {
                     <Mail className="w-5 h-5 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="font-medium text-sm">Email</p>
-                      <a href="mailto:support@ezyify.com" className="text-sm text-info hover:underline">
-                        support@ezyify.com
+                      <a href="mailto:support@ezyify.app" className="text-sm text-info hover:underline">
+                        support@ezyify.app
                       </a>
                     </div>
                   </div>
@@ -340,32 +340,32 @@ export default function ContactPage() {
                 <CardContent className="space-y-2 text-sm">
                   <div>
                     <p className="font-medium">Press & Media:</p>
-                    <a href="mailto:press@ezyify.com" className="text-info hover:underline">
-                      press@ezyify.com
+                    <a href="mailto:press@ezyify.app" className="text-info hover:underline">
+                      press@ezyify.app
                     </a>
                   </div>
                   <div>
                     <p className="font-medium">Partnerships:</p>
-                    <a href="mailto:partnerships@ezyify.com" className="text-info hover:underline">
-                      partnerships@ezyify.com
+                    <a href="mailto:partnerships@ezyify.app" className="text-info hover:underline">
+                      partnerships@ezyify.app
                     </a>
                   </div>
                   <div>
                     <p className="font-medium">Legal:</p>
-                    <a href="mailto:legal@ezyify.com" className="text-info hover:underline">
-                      legal@ezyify.com
+                    <a href="mailto:legal@ezyify.app" className="text-info hover:underline">
+                      legal@ezyify.app
                     </a>
                   </div>
                   <div>
                     <p className="font-medium">Safety & Trust:</p>
-                    <a href="mailto:safety@ezyify.com" className="text-info hover:underline">
-                      safety@ezyify.com
+                    <a href="mailto:safety@ezyify.app" className="text-info hover:underline">
+                      safety@ezyify.app
                     </a>
                   </div>
                   <div>
                     <p className="font-medium">Careers:</p>
-                    <a href="mailto:careers@ezyify.com" className="text-info hover:underline">
-                      careers@ezyify.com
+                    <a href="mailto:careers@ezyify.app" className="text-info hover:underline">
+                      careers@ezyify.app
                     </a>
                   </div>
                 </CardContent>

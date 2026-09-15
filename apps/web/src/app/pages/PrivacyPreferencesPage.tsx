@@ -6,14 +6,11 @@ import { Button } from '../components/ui/button';
 import { Switch } from '../components/ui/switch';
 import { Card, CardContent } from '../components/ui/card';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { saveCookiePreferences, getCookiePreferences, CookiePreferences } from '../utils/cookiePreferences';
+import { toast } from 'sonner';
+import { saveCookiePreferences, getCookiePreferences, type CookiePreferences } from '../utils/cookiePreferences';
+import { ALL_CONSENT, DEFAULT_CONSENT } from '../lib/consent';
 
-const defaultPreferences: CookiePreferences = {
-  necessary: true,
-  analytics: false,
-  marketing: false,
-  functional: false,
-};
+const defaultPreferences: CookiePreferences = DEFAULT_CONSENT;
 
 export default function PrivacyPreferencesPage() {
   const navigate = useNavigate();
@@ -32,23 +29,16 @@ export default function PrivacyPreferencesPage() {
     setHasChanges(true);
   };
 
-  const handleSave = () => {
-    saveCookiePreferences(preferences);
+  const apply = (next: CookiePreferences) => {
+    saveCookiePreferences(next);
+    setPreferences(next);
+    setHasChanges(false);
+    toast.success('Privacy preferences saved');
   };
 
-  const handleAcceptAll = () => {
-    const allAccepted: CookiePreferences = {
-      necessary: true,
-      analytics: true,
-      marketing: true,
-      functional: true,
-    };
-    saveCookiePreferences(allAccepted);
-  };
-
-  const handleRejectAll = () => {
-    saveCookiePreferences(defaultPreferences);
-  };
+  const handleSave = () => apply(preferences);
+  const handleAcceptAll = () => apply(ALL_CONSENT);
+  const handleRejectAll = () => apply(DEFAULT_CONSENT);
 
   return (<div className="min-h-screen bg-background pb-20">
       <SEO title="Privacy Preferences — Ezyify" description="Manage your data and privacy preferences on Ezyify." />

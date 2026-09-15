@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { z } from 'zod';
-import type { CheckoutRequest } from '@ezyify/core';
+import { ShipOrderRequestSchema, type CheckoutRequest, type SellerOrdersSummary } from '@ezyify/core';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
 import { ENV, type Env } from '../../config.js';
 import { ApiException, forbidden, notFound, validation } from '../../common/errors.js';
@@ -16,7 +16,7 @@ import { orderInclude, toOrder } from './orders.mapper.js';
 
 export const OrderQuerySchema = PageQuerySchema.extend({ status: z.string().optional(), role: z.enum(['buyer', 'seller']).default('buyer') });
 export const RefundSchema = z.object({ reason: z.string().min(3).max(500), itemIds: z.array(z.string()).default([]) });
-export const ShipSchema = z.object({ carrier: z.string().min(1), number: z.string().min(1), url: z.string().url().optional() });
+export const ShipSchema = ShipOrderRequestSchema;
 
 const orderNumber = () => `EZ-${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 900 + 100)}`;
 
@@ -111,6 +111,19 @@ export class OrdersService {
       this.prisma.order.count({ where }),
     ]);
     return page(rows.map(toOrder), total, q);
+  }
+
+  async sellerSummary(sellerId: string): Promise<SellerOrdersSummary> {
+    const rows = await this.prisma.order.groupBy({ by: ['status'], where: { sellerId }, _count: { _all: true } });
+    const n = (...st: OrderStatus[]) => rows.filter(r => st.includes(r.status)).reduce((a, r) => a + r._count._all, 0);
+    return {
+      total: rows.reduce((a, r) => a + r._count._all, 0),
+      needsAction: n('paid', 'processing', 'refund_requested'),
+      toShip: n('paid', 'processing'),
+      inTransit: n('shipped', 'out_for_delivery', 'delivered'),
+      completed: n('completed'),
+      refunds: n('refund_requested', 'refunded', 'disputed', 'cancelled'),
+    };
   }
 
   async get(userId: string, id: string, role: string) {

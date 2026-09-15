@@ -66,6 +66,7 @@ export function Footer() {
         { label: 'We value your privacy', path: '/privacy-preferences' },
         { label: 'Cookie Policy', path: '/privacy-preferences' },
         { label: 'Safety & Trust', path: '/safety-trust' },
+        { label: 'Child Safety', path: '/child-safety' },
         { label: 'Copyright', path: '/copyright' },
         { label: 'Transparency', path: '/transparency' },
       ],
@@ -133,7 +134,7 @@ export function Footer() {
             <h4 className="text-xs font-semibold uppercase tracking-widest mb-3.5" style={{ color: 'rgba(255,255,255,0.35)' }}>Contact</h4>
             <div className="space-y-2.5">
               {[
-                { icon: Mail, text: 'support@ezyify.com' },
+                { icon: Mail, text: 'support@ezyify.app' },
                 { icon: Phone, text: '+1 (888) 234-5678' },
                 { icon: MapPin, text: 'Global HQ, USA' },
                 { icon: Globe, text: 'Available in 50+ Countries' },

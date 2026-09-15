@@ -1,7 +1,7 @@
-import { FlatList, RefreshControl, View } from 'react-native';
+import { FlatList, RefreshControl, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useConversations, useFeed, useUnreadCount, type Post } from '@ezyify/core';
+import { useConversations, useFeed, useLiveSessions, useUnreadCount, type Post } from '@ezyify/core';
 import { Text } from '@/components/Text';
 import { IconButton } from '@/components/IconButton';
 import { BrandMark, BrandWordmark } from '@/components/BrandMark';
@@ -10,6 +10,8 @@ import { PostCard } from '@/components/PostCard';
 import { Skeleton } from '@/components/Skeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/QueryState';
+import { LiveSessionCard } from '@/components/LiveSessionCard';
+import { SectionHeader } from '@/components/SectionHeader';
 import { useBadgeCount, useInfiniteList, useRefresh } from '@/lib/data';
 import { useTheme } from '@/theme';
 
@@ -46,6 +48,7 @@ export default function HomeScreen() {
   const convos = useConversations();
   const unreadMessages = convos.data?.reduce((n, c) => n + c.unreadCount, 0) ?? 0;
   const feed = useFeed();
+  const live = useLiveSessions({ status: 'live', pageSize: 6 });
   const { items, loadMore, loadingMore } = useInfiniteList<Post>(feed);
   const { refreshing, onRefresh } = useRefresh(feed.refetch);
 
@@ -72,7 +75,19 @@ export default function HomeScreen() {
         data={items}
         keyExtractor={p => p.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        ListHeaderComponent={<View style={{ paddingVertical: 8 }}><StoriesRail /></View>}
+        ListHeaderComponent={
+          <View style={{ paddingVertical: 8, gap: 16 }}>
+            <StoriesRail />
+            {(live.data?.items.length ?? 0) > 0 ? (
+              <View style={{ gap: 10 }}>
+                <SectionHeader title="Live now" actionLabel="See all" onAction={() => router.push('/live')} />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+                  {live.data!.items.map(session => <LiveSessionCard key={session.id} session={session} width={228} />)}
+                </ScrollView>
+              </View>
+            ) : null}
+          </View>
+        }
         ListEmptyComponent={
           feed.isLoading ? (
             <View style={{ gap: 12 }}><PostSkeleton /><PostSkeleton /></View>

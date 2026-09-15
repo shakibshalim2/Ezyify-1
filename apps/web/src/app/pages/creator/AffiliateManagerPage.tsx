@@ -11,9 +11,9 @@ export default function AffiliateManagerPage() {
   const reduce = useReducedMotion();
 
   const affiliateLinks = [
-    { id: 1, product: 'Premium Headphones', link: 'https://ezyify.com/aff/xyz123', clicks: 245, conversions: 18, earnings: '$180' },
-    { id: 2, product: 'Smart Watch', link: 'https://ezyify.com/aff/abc456', clicks: 189, conversions: 12, earnings: '$240' },
-    { id: 3, product: 'Wireless Earbuds', link: 'https://ezyify.com/aff/def789', clicks: 456, conversions: 34, earnings: '$340' },
+    { id: 1, product: 'Premium Headphones', link: 'https://ezyify.app/aff/xyz123', clicks: 245, conversions: 18, earnings: '$180' },
+    { id: 2, product: 'Smart Watch', link: 'https://ezyify.app/aff/abc456', clicks: 189, conversions: 12, earnings: '$240' },
+    { id: 3, product: 'Wireless Earbuds', link: 'https://ezyify.app/aff/def789', clicks: 456, conversions: 34, earnings: '$340' },
   ];
 
   const copyToClipboard = (text: string) => {

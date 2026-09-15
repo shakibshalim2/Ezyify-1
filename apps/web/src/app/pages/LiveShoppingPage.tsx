@@ -1,401 +1,320 @@
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router';
+import { Bell, ChevronRight, CirclePlay, Clock3, Eye, Radio, TrendingUp } from 'lucide-react';
+import { avatarUrlFor, formatCompactNumber, formatTimeUntil, useLiveSessions } from '@ezyify/core';
+import { toast } from 'sonner';
 import { SEO } from '../components/SEO';
 import { VerifiedBadge } from '../components/VerifiedBadge';
-import { Card, CardContent } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
-import { Skeleton } from '../components/ui/skeleton';
-import { 
-  Heart, Share2, Users, Eye, ChevronRight, Bell, Clock, TrendingUp,
-  Filter
-} from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { toast } from 'sonner';
-import { motion } from 'motion/react';
-
-interface LiveStream {
-  id: string;
-  title: string;
-  host: {
-    name: string;
-    username: string;
-    avatar: string;
-    verified: boolean;
-  };
-  thumbnail: string;
-  viewers: number;
-  likes: number;
-  isLive: boolean;
-  category: string;
-  startedAt: string;
-}
-
-interface UpcomingStream {
-  id: string;
-  title: string;
-  host: string;
-  avatar: string;
-  scheduledFor: string;
-  category: string;
-}
-
-interface TopHost {
-  id: string;
-  name: string;
-  username: string;
-  avatar: string;
-  verified: boolean;
-  followers: number;
-  avgViewers: number;
-}
+import { Button } from '../components/primitives/Button';
+import { Card } from '../components/primitives/Card';
+import { EmptyState } from '../components/primitives/EmptyState';
+import { Img } from '../components/primitives/Img';
+import { Skeleton } from '../components/primitives/Skeleton';
+import { useLiveReminders } from '../lib/reminders';
 
 function LiveShoppingSkeleton() {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-        <div className="mb-8 pt-6">
-          <Skeleton className="h-8 w-40 mb-2" />
-          <Skeleton className="h-4 w-64" />
-        </div>
-        
-        {[1, 2].map(section => (
-          <div key={section} className="mb-8">
-            <Skeleton className="h-6 w-48 mb-4" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[1, 2, 3, 4].map(i => (
-                <Skeleton key={i} className="aspect-video rounded-lg" />
-              ))}
-            </div>
-          </div>
+    <main className="mx-auto max-w-7xl space-y-8 px-4 py-6 lg:px-6 lg:py-8" aria-busy>
+      <div className="space-y-2">
+        <Skeleton className="h-9 w-44" />
+        <Skeleton className="h-5 w-72" />
+      </div>
+      <div className="flex gap-2">
+        <Skeleton className="h-10 w-20" />
+        <Skeleton className="h-10 w-24" />
+        <Skeleton className="h-10 w-20" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <Skeleton key={index} className="aspect-video rounded-card" />
         ))}
       </div>
-    </div>
+    </main>
   );
 }
 
 export default function LiveShoppingPage() {
-  const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-
-  useEffect(() => {
-    if ('requestIdleCallback' in window) {
-      const handle = requestIdleCallback(() => setIsLoading(false), { timeout: 200 });
-      return () => cancelIdleCallback(handle);
-    } else {
-      const t = setTimeout(() => setIsLoading(false), 50);
-      return () => clearTimeout(t);
-    }
-  }, []);
-
-  if (isLoading) return <LiveShoppingSkeleton />;
-
-  // Mock data
-  const liveStreams: LiveStream[] = [
-    {
-      id: '1',
-      title: 'Premium Leather Bags Collection 👜',
-      host: { name: 'Fashion Hub', username: 'fashionhub', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', verified: true },
-      thumbnail: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=500&h=400&fit=crop',
-      viewers: 2847,
-      likes: 1205,
-      isLive: true,
-      category: 'Fashion',
-      startedAt: '45 min ago'
-    },
-    {
-      id: '2',
-      title: 'Tech Gadgets Flash Sale ⚡',
-      host: { name: 'TechStore', username: 'techstore', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', verified: true },
-      thumbnail: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&h=400&fit=crop',
-      viewers: 3421,
-      likes: 2105,
-      isLive: true,
-      category: 'Electronics',
-      startedAt: '22 min ago'
-    },
-    {
-      id: '3',
-      title: 'Skincare Routine Masterclass 💆',
-      host: { name: 'Beauty Pro', username: 'beautypro', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', verified: true },
-      thumbnail: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=500&h=400&fit=crop',
-      viewers: 1923,
-      likes: 945,
-      isLive: true,
-      category: 'Beauty',
-      startedAt: '18 min ago'
-    },
-  ];
-
-  const upcomingStreams: UpcomingStream[] = [
-    {
-      id: '1',
-      title: 'Accessories Bundle Launch',
-      host: 'StyleMaven',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-      scheduledFor: 'Today at 6:00 PM',
-      category: 'Fashion'
-    },
-    {
-      id: '2',
-      title: 'Weekend Deals Preview',
-      host: 'ShopHub',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
-      scheduledFor: 'Tomorrow at 3:00 PM',
-      category: 'Multi-Category'
-    },
-    {
-      id: '3',
-      title: 'Designer Collaboration Special',
-      host: 'LuxuryBrand',
-      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
-      scheduledFor: 'Friday at 8:00 PM',
-      category: 'Fashion'
-    },
-  ];
-
-  const topHosts: TopHost[] = [
-    { id: '1', name: 'Fashion Hub', username: 'fashionhub', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', verified: true, followers: 245000, avgViewers: 3500 },
-    { id: '2', name: 'TechStore', username: 'techstore', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', verified: true, followers: 189000, avgViewers: 2800 },
-    { id: '3', name: 'Beauty Pro', username: 'beautypro', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', verified: true, followers: 156000, avgViewers: 2100 },
-    { id: '4', name: 'StyleMaven', username: 'stylemaven', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', verified: true, followers: 98000, avgViewers: 1500 },
-  ];
-
-  const categories = ['Fashion', 'Beauty', 'Electronics', 'Home', 'Food'];
-
-  const StreamCard = ({ stream }: { stream: LiveStream }) => (
-    <motion.div
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={() => navigate(`/live/${stream.id}`)}
-      className="cursor-pointer group"
-    >
-      <Card className="overflow-hidden border-border hover:border-primary/50 transition-colors">
-        <CardContent className="p-0">
-          {/* Thumbnail */}
-          <div className="relative aspect-video bg-muted overflow-hidden">
-            <img 
-              src={stream.thumbnail} 
-              alt={stream.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            />
-            {/* Gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-            
-            {/* LIVE badge */}
-            {stream.isLive && (
-              <Badge className="absolute top-2 left-2 bg-error text-error-foreground animate-pulse">
-                <span className="inline-block w-2 h-2 rounded-full bg-white mr-1.5" />
-                LIVE
-              </Badge>
-            )}
-
-            {/* Viewers badge */}
-            <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 text-white px-2 py-1 rounded-full text-xs">
-              <Users className="w-3 h-3" />
-              {stream.viewers.toLocaleString()}
-            </div>
-
-            {/* Host avatar on video */}
-            <div className="absolute bottom-2 left-2 flex items-center gap-2">
-              <img 
-                src={stream.host.avatar} 
-                alt={stream.host.name}
-                className="w-8 h-8 rounded-full border-2 border-white"
-              />
-              <div className="text-white">
-                <p className="text-xs font-semibold leading-none">{stream.host.name}</p>
-                {stream.host.verified && <VerifiedBadge size="sm" />}
-              </div>
-            </div>
-          </div>
-
-          {/* Title & Info */}
-          <div className="p-3">
-            <h3 className="font-semibold text-foreground text-sm mb-2 line-clamp-2">{stream.title}</h3>
-            <div className="flex items-center justify-between gap-2">
-              <Badge variant="outline" className="text-xs">{stream.category}</Badge>
-              <div className="flex items-center gap-2 text-foreground-secondary text-xs">
-                <Heart className="w-3 h-3" />
-                {stream.likes.toLocaleString()}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+  const [category, setCategory] = useState<string | null>(null);
+  const live = useLiveSessions({ status: 'live' });
+  const upcoming = useLiveSessions({ status: 'scheduled' });
+  const reminders = useLiveReminders();
+  const liveSessions = live.data?.items ?? [];
+  const upcomingSessions = upcoming.data?.items ?? [];
+  const categories = useMemo(
+    () => [
+      ...new Set(
+        [...liveSessions, ...upcomingSessions].flatMap((session) =>
+          session.category ? [session.category] : [],
+        ),
+      ),
+    ],
+    [liveSessions, upcomingSessions],
   );
+  const visibleLive = category
+    ? liveSessions.filter((session) => session.category === category)
+    : liveSessions;
+  const hosts = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          [...liveSessions, ...upcomingSessions].map((session) => [
+            session.host.username,
+            session.host,
+          ]),
+        ).values(),
+      ),
+    [liveSessions, upcomingSessions],
+  );
+
+  const toggleReminder = async (id: string, title: string, at: string | null) => {
+    const added = await reminders.toggle({ id, title, at });
+    toast.success(added ? 'Reminder set' : 'Reminder removed', {
+      description: added ? title : undefined,
+    });
+  };
+
+  if (live.isLoading || upcoming.isLoading) return <LiveShoppingSkeleton />;
+  if (live.isError || upcoming.isError) {
+    return (
+      <main className="min-h-screen bg-background px-4 py-8">
+        <EmptyState
+          kind="error"
+          title="Couldn’t load live shopping"
+          description="Check your connection and try again."
+          action={
+            <Button
+              onClick={() => {
+                void live.refetch();
+                void upcoming.refetch();
+              }}
+            >
+              Retry
+            </Button>
+          }
+        />
+      </main>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
-      <SEO 
-        title="Live Shopping — Ezyify" 
-        description="Watch live shopping streams, discover products, and shop with creators in real-time."
+      <SEO
+        title="Live shopping"
+        description="Shop creator-led live product demos and upcoming drops on Ezyify."
       />
-      
-      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        {/* Header */}
-        <div className="mb-8 pt-6">
-          <h1 className="font-display text-2xl font-semibold text-foreground mb-1">Live Shopping</h1>
-          <p className="text-sm text-foreground-secondary">Watch live streams and shop in real-time</p>
-        </div>
-
-        {/* Live Now Section */}
-        <section className="mb-12">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-lg font-semibold text-foreground flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-error animate-pulse" />
-              Live Now
-            </h2>
-            <Link to="/live-shopping?filter=live" className="text-sm text-primary hover:underline flex items-center gap-1">
-              View All <ChevronRight className="w-4 h-4" />
-            </Link>
+      <main className="mx-auto max-w-7xl space-y-10 px-4 py-6 pb-12 lg:px-6 lg:py-8">
+        <header className="rounded-sheet bg-brand-gradient p-6 text-white sm:p-8">
+          <div className="max-w-2xl">
+            <span className="inline-flex items-center gap-2 rounded-full bg-background/15 px-3 py-1 text-xs font-semibold">
+              <Radio className="size-4" aria-hidden />
+              Live shopping
+            </span>
+            <h1 className="mt-3 font-display text-3xl font-bold sm:text-4xl">
+              See it live. Shop with confidence.
+            </h1>
+            <p className="mt-2 text-sm text-white/85 sm:text-base">
+              Creator demos, real-time product drops, and escrow-protected checkout.
+            </p>
           </div>
+        </header>
 
-          {liveStreams.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {liveStreams.map(stream => (
-                <StreamCard key={stream.id} stream={stream} />
+        <section className="space-y-4" aria-labelledby="live-now">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="live-now" className="font-display text-xl font-semibold">
+                Live now
+              </h2>
+              <p className="text-sm text-foreground-secondary">
+                Join a stream before the best drops are gone.
+              </p>
+            </div>
+            <span className="text-sm text-foreground-secondary">
+              {visibleLive.length} streaming
+            </span>
+          </div>
+          {categories.length > 0 && (
+            <div
+              className="flex gap-2 overflow-x-auto pb-1"
+              aria-label="Filter live streams by category"
+            >
+              <Button
+                variant={category === null ? 'primary' : 'outline'}
+                size="sm"
+                aria-pressed={category === null}
+                onClick={() => setCategory(null)}
+              >
+                All
+              </Button>
+              {categories.map((item) => (
+                <Button
+                  key={item}
+                  variant={category === item ? 'primary' : 'outline'}
+                  size="sm"
+                  aria-pressed={category === item}
+                  onClick={() => setCategory(item)}
+                >
+                  {item}
+                </Button>
+              ))}
+            </div>
+          )}
+          {visibleLive.length ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {visibleLive.map((session) => (
+                <Link
+                  key={session.id}
+                  to={`/live/${session.id}`}
+                  className="group block rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Card interactive padding="none" className="h-full overflow-hidden">
+                    <div className="relative aspect-video overflow-hidden bg-muted">
+                      <Img
+                        src={session.coverUrl ?? undefined}
+                        alt={`${session.title} live stream`}
+                        className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-foreground/75 via-transparent to-transparent" />
+                      <span className="absolute left-3 top-3 rounded-full bg-destructive px-2.5 py-1 text-xs font-bold text-destructive-foreground">
+                        LIVE
+                      </span>
+                      <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-background/85 px-2 py-1 text-xs font-semibold text-foreground">
+                        <Eye className="size-3.5" aria-hidden />
+                        {formatCompactNumber(session.viewers)}
+                      </span>
+                    </div>
+                    <div className="space-y-3 p-4">
+                      <div className="flex items-center gap-2">
+                        <Img
+                          src={avatarUrlFor(session.host)}
+                          alt=""
+                          className="size-8 rounded-full object-cover"
+                        />
+                        <span className="min-w-0 truncate text-sm font-medium">
+                          {session.host.name}
+                        </span>
+                        {session.host.verified && <VerifiedBadge size="sm" />}
+                      </div>
+                      <div>
+                        <h3 className="line-clamp-2 font-display font-semibold">{session.title}</h3>
+                        {session.category && (
+                          <span className="mt-2 inline-flex rounded-full bg-muted px-2 py-1 text-xs font-medium text-foreground-secondary">
+                            {session.category}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                </Link>
               ))}
             </div>
           ) : (
-            <Card className="border-border">
-              <CardContent className="py-12 text-center">
-                <Eye className="w-12 h-12 text-foreground-secondary mx-auto mb-3 opacity-50" />
-                <p className="text-foreground-secondary">No live streams right now. Check back soon!</p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              compact
+              kind="feed"
+              title="No one is live right now"
+              description="Check upcoming streams and set a reminder."
+            />
           )}
         </section>
 
-        {/* Category Filter */}
-        <div className="mb-8 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          <Button
-            variant={categoryFilter === null ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setCategoryFilter(null)}
-            className="flex-shrink-0"
-          >
-            <Filter className="w-3 h-3 mr-1.5" />
-            All
-          </Button>
-          {categories.map(cat => (
-            <Button
-              key={cat}
-              variant={categoryFilter === cat ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setCategoryFilter(cat)}
-              className="flex-shrink-0"
-            >
-              {cat}
-            </Button>
-          ))}
-        </div>
-
-        {/* Upcoming Section */}
-        <section className="mb-12">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-lg font-semibold text-foreground flex items-center gap-2">
-              <Clock className="w-5 h-5" />
+        <section className="space-y-4" aria-labelledby="upcoming">
+          <div>
+            <h2 id="upcoming" className="font-display text-xl font-semibold">
               Upcoming
             </h2>
-            <Link to="/live-shopping?filter=upcoming" className="text-sm text-primary hover:underline flex items-center gap-1">
-              View All <ChevronRight className="w-4 h-4" />
-            </Link>
+            <p className="text-sm text-foreground-secondary">Save a spot for the next drop.</p>
           </div>
-
-          <div className="space-y-3">
-            {upcomingStreams.map(stream => (
-              <motion.div
-                key={stream.id}
-                whileHover={{ x: 4 }}
-                className="group cursor-pointer"
-                onClick={() => toast.success('Reminder set for this stream!')}
-              >
-                <Card className="border-border hover:border-primary/50 transition-colors">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 flex gap-3">
-                        <img 
-                          src={stream.avatar} 
-                          alt={stream.host}
-                          className="w-12 h-12 rounded-full flex-shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-foreground text-sm mb-1">{stream.title}</p>
-                          <p className="text-xs text-foreground-secondary mb-1">by {stream.host}</p>
-                          <div className="flex items-center gap-2 text-xs text-foreground-secondary">
-                            <Clock className="w-3 h-3" />
-                            {stream.scheduledFor}
-                          </div>
-                        </div>
-                      </div>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="flex-shrink-0"
-                        onClick={e => {
-                          e.stopPropagation();
-                          toast.success('Reminder set!');
-                        }}
-                      >
-                        <Bell className="w-4 h-4 mr-1" />
-                        Remind
-                      </Button>
-                    </div>
-                  </CardContent>
+          {upcomingSessions.length ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {upcomingSessions.map((session) => (
+                <Card key={session.id} className="flex items-center gap-3 p-3">
+                  <Img
+                    src={session.coverUrl ?? undefined}
+                    alt=""
+                    className="size-16 shrink-0 rounded-xl object-cover"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      to={`/live/${session.id}`}
+                      className="font-display font-semibold hover:text-primary"
+                    >
+                      {session.title}
+                    </Link>
+                    <p className="mt-1 text-sm text-foreground-secondary">
+                      {session.host.name} ·{' '}
+                      {session.scheduledFor
+                        ? formatTimeUntil(session.scheduledFor)
+                        : 'Schedule pending'}
+                    </p>
+                  </div>
+                  <Button
+                    variant={reminders.has(session.id) ? 'primary' : 'outline'}
+                    size="sm"
+                    aria-pressed={reminders.has(session.id)}
+                    onClick={() =>
+                      void toggleReminder(session.id, session.title, session.scheduledFor)
+                    }
+                    leftIcon={
+                      <Bell
+                        className={reminders.has(session.id) ? 'size-4 fill-current' : 'size-4'}
+                        aria-hidden
+                      />
+                    }
+                  >
+                    {reminders.has(session.id) ? 'Reminding' : 'Remind'}
+                  </Button>
                 </Card>
-              </motion.div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              compact
+              kind="feed"
+              title="No streams scheduled yet"
+              description="Follow your favorite hosts to hear about their next stream."
+            />
+          )}
         </section>
 
-        {/* Top Hosts Section */}
-        <section className="mb-12">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-lg font-semibold text-foreground flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
-              Top Hosts
-            </h2>
-            <Link to="/live-shopping?view=hosts" className="text-sm text-primary hover:underline flex items-center gap-1">
-              View All <ChevronRight className="w-4 h-4" />
-            </Link>
+        <section className="space-y-4" aria-labelledby="top-hosts">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 id="top-hosts" className="font-display text-xl font-semibold">
+                Top hosts
+              </h2>
+              <p className="text-sm text-foreground-secondary">
+                Meet the people behind the streams.
+              </p>
+            </div>
+            <TrendingUp className="size-6 text-primary" aria-hidden />
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {topHosts.map(host => (
-              <motion.div
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {hosts.map((host) => (
+              <Link
                 key={host.id}
-                whileHover={{ scale: 1.02 }}
-                onClick={() => navigate(`/profile/${host.username}`)}
-                className="cursor-pointer"
+                to={`/profile/${host.username}`}
+                className="rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <Card className="border-border hover:border-primary/50 transition-colors overflow-hidden">
-                  <CardContent className="p-4 text-center">
-                    <img 
-                      src={host.avatar} 
-                      alt={host.name}
-                      className="w-16 h-16 rounded-full mx-auto mb-3"
-                    />
-                    <div className="mb-3">
-                      <p className="font-semibold text-foreground text-sm">{host.name}</p>
-                      <p className="text-xs text-foreground-secondary mb-1">@{host.username}</p>
+                <Card interactive className="flex items-center gap-3 p-4">
+                  <Img
+                    src={avatarUrlFor(host)}
+                    alt=""
+                    className="size-11 rounded-full object-cover"
+                  />
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1 truncate font-semibold">
+                      {host.name}
                       {host.verified && <VerifiedBadge size="sm" />}
-                    </div>
-                    <div className="space-y-1 text-xs text-foreground-secondary mb-3">
-                      <p>{host.followers.toLocaleString()} followers</p>
-                      <p>{host.avgViewers.toLocaleString()} avg viewers</p>
-                    </div>
-                    <Button size="sm" className="w-full" variant="outline">
-                      Follow
-                    </Button>
-                  </CardContent>
+                    </p>
+                    <p className="text-sm text-foreground-secondary">@{host.username}</p>
+                  </div>
+                  <ChevronRight className="ml-auto size-4 text-foreground-tertiary" aria-hidden />
                 </Card>
-              </motion.div>
+              </Link>
             ))}
           </div>
         </section>
-      </div>
+      </main>
     </div>
   );
 }

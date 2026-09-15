@@ -1,298 +1,227 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { Link } from 'react-router';
-import {
-  Package,
-  Search,
-  Eye,
-  Truck,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Download,
-  AlertCircle,
-  MessageSquare
-} from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Link, useNavigate } from 'react-router';
+import { Package, Search, Eye, Truck, CheckCircle, AlertCircle, ShieldCheck } from 'lucide-react';
+import { avatarUrlFor, formatMoney, formatTimeAgo, formatTimeUntil, useAuth, useSellerOrders, useSellerOrdersSummary, type Order, type OrderStatus } from '@ezyify/core';
 import { Button } from '../../components/primitives/Button';
 import { Card } from '../../components/primitives/Card';
 import { Field } from '../../components/primitives/Field';
 import { Skeleton } from '../../components/primitives/Skeleton';
-import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
+import { EmptyState } from '../../components/primitives/EmptyState';
+import { Img } from '../../components/primitives/Img';
+import { QueryError } from '../../components/QueryError';
 import { SellerLayout } from '../../components/SellerLayout';
 import { SEO, SEOConfigs } from '../../components/SEO';
+import { SellerOrderActions, SELLER_STATUS, PAYMENT_LABEL } from '../../components/seller/SellerOrderActions';
+import { useInfiniteList } from '../../lib/data';
 import { fadeUp, staggerContainer } from '../../lib/motion';
 import { cn } from '../../components/ui/utils';
 
-interface Order {
-  id: string;
-  orderNumber: string;
-  customer: {
-    name: string;
-    email: string;
-    avatar: string;
-  };
-  total: number;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  paymentStatus: 'paid' | 'pending' | 'failed';
-  createdAt: string;
-}
+const FILTERS = [
+  ['all', 'All'],
+  ['action', 'Needs action'],
+  ['transit', 'In transit'],
+  ['completed', 'Completed'],
+  ['refunds', 'Refunds & cancelled'],
+] as const;
+type Filter = (typeof FILTERS)[number][0];
+const ACTION: OrderStatus[] = ['paid', 'processing', 'refund_requested'];
+const TRANSIT: OrderStatus[] = ['shipped', 'out_for_delivery', 'delivered'];
+const REFUNDS: OrderStatus[] = ['refund_requested', 'refunded', 'disputed', 'cancelled'];
+const matches = (o: Order, f: Filter) =>
+  f === 'all' || (f === 'action' && ACTION.includes(o.status)) || (f === 'transit' && TRANSIT.includes(o.status)) || (f === 'completed' && o.status === 'completed') || (f === 'refunds' && REFUNDS.includes(o.status));
 
-const mockOrders: Order[] = [
-  {
-    id: '1',
-    orderNumber: 'ORD-2024-1001',
-    customer: { name: 'Ahmed Hassan', email: 'ahmed@email.com', avatar: 'https://i.pravatar.cc/150?img=1' },
-    total: 157.50,
-    status: 'pending',
-    paymentStatus: 'paid',
-    createdAt: '2024-01-15'
-  },
-  {
-    id: '2',
-    orderNumber: 'ORD-2024-1002',
-    customer: { name: 'Sarah Ahmed', email: 'sarah@email.com', avatar: 'https://i.pravatar.cc/150?img=2' },
-    total: 32.00,
-    status: 'processing',
-    paymentStatus: 'paid',
-    createdAt: '2024-01-14'
-  },
-  {
-    id: '3',
-    orderNumber: 'ORD-2024-1003',
-    customer: { name: 'Mike Johnson', email: 'mike@email.com', avatar: 'https://i.pravatar.cc/150?img=3' },
-    total: 89.00,
-    status: 'shipped',
-    paymentStatus: 'paid',
-    createdAt: '2024-01-13'
-  },
-  {
-    id: '4',
-    orderNumber: 'ORD-2024-1004',
-    customer: { name: 'Emma Williams', email: 'emma@email.com', avatar: 'https://i.pravatar.cc/150?img=4' },
-    total: 90.00,
-    status: 'delivered',
-    paymentStatus: 'paid',
-    createdAt: '2024-01-12'
-  },
-  {
-    id: '5',
-    orderNumber: 'ORD-2024-1005',
-    customer: { name: 'John Smith', email: 'john@email.com', avatar: 'https://i.pravatar.cc/150?img=5' },
-    total: 125.00,
-    status: 'processing',
-    paymentStatus: 'paid',
-    createdAt: '2024-01-11'
-  }
-];
-
-function OrderListSkeleton() {
+function OrdersSkeleton() {
   return (
-    <div className="space-y-3">
+    <div className="space-y-4" aria-busy>
       {[1, 2, 3].map(i => (
-        <Skeleton key={i} className="h-20 w-full" />
+        <Card key={i} className="p-4 space-y-4">
+          <Skeleton className="h-6 w-40" />
+          <div className="flex gap-4">
+            <Skeleton className="size-16 rounded-card flex-shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-2/3" />
+            </div>
+          </div>
+          <Skeleton className="h-10 w-48" />
+        </Card>
       ))}
     </div>
   );
 }
 
+function SellerOrderCard({ order }: { order: Order }) {
+  const cfg = SELLER_STATUS[order.status];
+  const Icon = cfg.icon;
+  const escrow = order.escrow;
+  return (
+    <Card variant="elevated" data-testid={`seller-order-${order.id}`}>
+      <div className="p-4 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <Link to={`/seller/order-detail/${order.id}`} className="font-display font-semibold text-foreground hover:underline">{order.orderNumber}</Link>
+              <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium', cfg.className)}>
+                <Icon className="size-3.5" aria-hidden />
+                {cfg.label}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-foreground-secondary">
+              <Img src={avatarUrlFor(order.buyer, 48)} alt="" className="size-5 rounded-full object-cover" />
+              <Link to={`/profile/${order.buyer.username}`} className="hover:underline font-medium text-foreground">{order.buyer.name}</Link>
+              <span aria-hidden>•</span>
+              <span>{order.shippingTo.city}, {order.shippingTo.country}</span>
+              <span aria-hidden>•</span>
+              <time dateTime={order.placedAt}>{formatTimeAgo(order.placedAt)}</time>
+            </div>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <p className="font-display font-bold text-lg tabular-nums text-foreground">{formatMoney(order.total)}</p>
+            <p className="text-xs text-foreground-secondary">{PAYMENT_LABEL[order.paymentMethod]}</p>
+          </div>
+        </div>
+
+        <ul className="space-y-2">
+          {order.items.slice(0, 2).map(item => (
+            <li key={item.id} className="flex gap-3">
+              <Img src={item.imageUrl} alt="" loading="lazy" className="size-14 rounded-lg object-cover flex-shrink-0 bg-card" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
+                <p className="text-xs text-foreground-secondary">{item.variant ? `${item.variant} • ` : ''}Qty {item.quantity} • {formatMoney(item.unitPrice)}</p>
+              </div>
+            </li>
+          ))}
+          {order.items.length > 2 && <li className="text-xs text-foreground-secondary">+{order.items.length - 2} more item{order.items.length - 2 > 1 ? 's' : ''}</li>}
+        </ul>
+
+        <div className="flex items-center gap-2 rounded-xl bg-background-elevated px-3 py-2 text-xs text-foreground-secondary">
+          <ShieldCheck className={cn('size-4 shrink-0', escrow.status === 'held' ? 'text-primary' : escrow.status === 'released' ? 'text-success' : 'text-foreground-tertiary')} aria-hidden />
+          {escrow.status === 'held' && (escrow.autoReleaseAt ? `Escrow held · auto-releases to you ${formatTimeUntil(escrow.autoReleaseAt)}` : 'Escrow held until the buyer confirms delivery')}
+          {escrow.status === 'released' && 'Escrow released to your wallet'}
+          {escrow.status === 'refunded' && 'Refunded to the buyer'}
+          {escrow.status === 'disputed' && 'Escrow frozen while the refund is decided'}
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <SellerOrderActions order={order} size="sm" />
+          <Button variant="ghost" size="sm" asChild>
+            <Link to={`/seller/order-detail/${order.id}`}><Eye className="size-4" aria-hidden />Details</Link>
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/** Seller hub orders on `GET /orders?role=seller` + the seller state-machine endpoints. */
 export default function OrderManagement() {
   const reduce = useReducedMotion();
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTab, setSelectedTab] = useState('all');
+  const navigate = useNavigate();
+  const status = useAuth(s => s.status);
+  const [filter, setFilter] = useState<Filter>('all');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
-  }, []);
+    if (status === 'anonymous') navigate('/login', { replace: true, state: { next: '/seller/orders' } });
+  }, [status, navigate]);
 
-  const stats = {
-    total: mockOrders.length,
-    pending: mockOrders.filter(o => o.status === 'pending').length,
-    processing: mockOrders.filter(o => o.status === 'processing').length,
-    shipped: mockOrders.filter(o => o.status === 'shipped').length,
-    delivered: mockOrders.filter(o => o.status === 'delivered').length,
-  };
+  const orders = useSellerOrders({ pageSize: 50 });
+  const summary = useSellerOrdersSummary();
+  const { items, loadMore, hasMore, loadingMore } = useInfiniteList<Order>(orders);
+  const list = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return items.filter(o => matches(o, filter)).filter(o => !q || o.orderNumber.toLowerCase().includes(q) || o.buyer.name.toLowerCase().includes(q) || o.buyer.username.toLowerCase().includes(q) || o.items.some(i => i.name.toLowerCase().includes(q)));
+  }, [items, filter, search]);
+  const held = useMemo(() => items.filter(o => o.escrow.status === 'held').reduce((n, o) => n + o.total.amount, 0), [items]);
 
-  const filteredOrders = mockOrders.filter(order => {
-    const matchesSearch =
-      order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customer.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTab = selectedTab === 'all' || order.status === selectedTab;
-    return matchesSearch && matchesTab;
-  });
+  const counts: Partial<Record<Filter, number>> = summary.data
+    ? { action: summary.data.needsAction, transit: summary.data.inTransit, completed: summary.data.completed, refunds: summary.data.refunds }
+    : {};
 
-  const getStatusConfig = (status: Order['status']) => {
-    const configs: Record<string, { icon: any; bg: string; text: string }> = {
-      pending: { icon: Clock, bg: 'bg-warning-subtle', text: 'text-warning' },
-      processing: { icon: Package, bg: 'bg-info-subtle', text: 'text-info' },
-      shipped: { icon: Truck, bg: 'bg-primary-subtle', text: 'text-primary' },
-      delivered: { icon: CheckCircle, bg: 'bg-success-subtle', text: 'text-success' },
-      cancelled: { icon: XCircle, bg: 'bg-error-subtle', text: 'text-error' },
-    };
-    return configs[status] || configs.pending;
-  };
-
-  if (isLoading) {
-    return (
-      <SellerLayout>
-        <div className="space-y-6">
-          <Skeleton className="h-10 w-64" />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-20" />)}
-          </div>
-          <OrderListSkeleton />
-        </div>
-      </SellerLayout>
-    );
-  }
+  const stats = [
+    { label: 'Needs action', value: summary.data?.needsAction, icon: AlertCircle, tone: 'text-warning' },
+    { label: 'To ship', value: summary.data?.toShip, icon: Package, tone: 'text-info' },
+    { label: 'In transit', value: summary.data?.inTransit, icon: Truck, tone: 'text-primary' },
+    { label: 'Completed', value: summary.data?.completed, icon: CheckCircle, tone: 'text-success' },
+  ];
 
   return (
     <SellerLayout>
       <SEO {...SEOConfigs.orders} />
-      <motion.div
-        variants={staggerContainer(reduce ? 0 : 0.05)}
-        initial="hidden"
-        animate="visible"
-        className="space-y-6"
-      >
-        {/* Header */}
+      <motion.div variants={staggerContainer(reduce ? 0 : 0.05)} initial="hidden" animate="visible" className="space-y-6">
         <motion.div variants={fadeUp} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="font-display text-2xl font-semibold text-foreground">Orders</h1>
-            <p className="text-sm text-foreground-secondary mt-1">{stats.total} orders total</p>
+            <p className="text-sm text-foreground-secondary mt-1">
+              {summary.data ? `${summary.data.total} ${summary.data.total === 1 ? 'order' : 'orders'} · ${formatMoney({ amount: held, currency: 'USD' })} held in escrow for you` : 'Accept, ship and settle orders'}
+            </p>
           </div>
         </motion.div>
 
-        {/* Stats Cards */}
         <motion.div variants={fadeUp} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <Card variant="default" padding="md">
-            <div className="flex items-center gap-3">
-              <Clock className="size-5 text-warning" />
-              <div>
-                <p className="text-xs font-medium text-foreground-secondary">Pending</p>
-                <p className="font-display font-bold text-2xl text-foreground">{stats.pending}</p>
+          {stats.map(({ label, value, icon: Icon, tone }) => (
+            <Card key={label} variant="default" padding="md">
+              <div className="flex items-center gap-3">
+                <Icon className={cn('size-5', tone)} aria-hidden />
+                <div>
+                  <p className="text-xs font-medium text-foreground-secondary">{label}</p>
+                  {value != null ? <p className="font-display font-bold text-2xl text-foreground tabular-nums">{value}</p> : <Skeleton className="h-8 w-10 mt-1" />}
+                </div>
               </div>
-            </div>
-          </Card>
-
-          <Card variant="default" padding="md">
-            <div className="flex items-center gap-3">
-              <Package className="size-5 text-info" />
-              <div>
-                <p className="text-xs font-medium text-foreground-secondary">Processing</p>
-                <p className="font-display font-bold text-2xl text-foreground">{stats.processing}</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card variant="default" padding="md">
-            <div className="flex items-center gap-3">
-              <Truck className="size-5 text-primary" />
-              <div>
-                <p className="text-xs font-medium text-foreground-secondary">Shipped</p>
-                <p className="font-display font-bold text-2xl text-foreground">{stats.shipped}</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card variant="default" padding="md">
-            <div className="flex items-center gap-3">
-              <CheckCircle className="size-5 text-success" />
-              <div>
-                <p className="text-xs font-medium text-foreground-secondary">Delivered</p>
-                <p className="font-display font-bold text-2xl text-foreground">{stats.delivered}</p>
-              </div>
-            </div>
-          </Card>
+            </Card>
+          ))}
         </motion.div>
 
-        {/* Search */}
-        <motion.div variants={fadeUp}>
-          <Field
-            label="Search orders"
-            type="text"
-            placeholder="Search by order number or customer name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            leftIcon={<Search className="size-5" />}
-          />
-        </motion.div>
+        <motion.div variants={fadeUp} className="space-y-4">
+          <Field label="Search orders" type="search" placeholder="Order number, buyer or product…" value={search} onChange={e => setSearch(e.target.value)} leftIcon={<Search className="size-5" aria-hidden />} />
 
-        {/* Orders Tabs */}
-        <motion.div variants={fadeUp}>
-          <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-            <TabsList className="w-full grid grid-cols-5">
-              <TabsTrigger value="all">All ({stats.total})</TabsTrigger>
-              <TabsTrigger value="pending">Pending ({stats.pending})</TabsTrigger>
-              <TabsTrigger value="processing">Processing ({stats.processing})</TabsTrigger>
-              <TabsTrigger value="shipped">Shipped ({stats.shipped})</TabsTrigger>
-              <TabsTrigger value="delivered">Delivered ({stats.delivered})</TabsTrigger>
-            </TabsList>
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" role="group" aria-label="Filter orders">
+            {FILTERS.map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setFilter(id)}
+                aria-pressed={filter === id}
+                className={cn(
+                  'px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-all',
+                  filter === id ? 'bg-primary text-primary-foreground' : 'bg-card border border-border text-foreground hover:bg-card-hover',
+                )}
+              >
+                {label}
+                {counts[id] ? <span className="ml-2 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full text-xs font-semibold bg-foreground/10 tabular-nums">{counts[id]}</span> : null}
+              </button>
+            ))}
+          </div>
 
-            <TabsContent value={selectedTab} className="mt-6">
-              {filteredOrders.length === 0 ? (
-                <div className="text-center py-12">
-                  <Package className="size-12 text-foreground-tertiary mx-auto mb-4" />
-                  <p className="text-foreground-secondary">No orders found</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredOrders.map(order => {
-                    const statusConfig = getStatusConfig(order.status);
-                    const StatusIcon = statusConfig.icon;
-
-                    return (
-                      <Link key={order.id} to={`/seller/orders/${order.id}`}>
-                        <Card variant="default" padding="md" interactive>
-                          <div className="flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
-                            {/* Order info */}
-                            <div className="flex items-center gap-4 flex-1 min-w-0 w-full sm:w-auto">
-                              <Avatar className="size-12 flex-shrink-0">
-                                <AvatarImage src={order.customer.avatar} alt={order.customer.name} />
-                                <AvatarFallback>{order.customer.name.charAt(0)}</AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-foreground truncate">{order.orderNumber}</p>
-                                <p className="text-xs text-foreground-secondary mt-0.5">{order.customer.name}</p>
-                                <p className="text-xs text-foreground-secondary">{order.createdAt}</p>
-                              </div>
-                            </div>
-
-                            {/* Status and amount */}
-                            <div className="flex items-center gap-4">
-                              <div className="flex items-center gap-2">
-                                <div className={cn('size-8 rounded-lg flex items-center justify-center', statusConfig.bg)}>
-                                  <StatusIcon className={cn('size-4', statusConfig.text)} />
-                                </div>
-                                <div>
-                                  <p className="text-xs text-foreground-secondary">Status</p>
-                                  <p className={cn('font-semibold text-sm', statusConfig.text)}>
-                                    {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="text-right">
-                                <p className="text-xs text-foreground-secondary">Amount</p>
-                                <p className="font-display font-bold text-lg text-foreground tabular-nums">
-                                  ${order.total.toFixed(2)}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Action */}
-                            <Eye className="size-5 text-foreground-tertiary flex-shrink-0 ml-auto sm:ml-0" />
-                          </div>
-                        </Card>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
+          <div role="region" aria-live="polite" aria-label="Order list">
+            {orders.isLoading ? (
+              <OrdersSkeleton />
+            ) : orders.error ? (
+              <QueryError error={orders.error} onRetry={() => void orders.refetch()} />
+            ) : list.length === 0 ? (
+              <EmptyState
+                kind="orders"
+                title={search || filter !== 'all' ? 'No orders match' : 'No orders yet'}
+                description={search || filter !== 'all' ? 'Try a different search or filter.' : 'When shoppers buy from your store, orders land here with escrow already held.'}
+                action={search || filter !== 'all' ? undefined : <Button asChild><Link to="/seller/products">Manage products</Link></Button>}
+                compact
+              />
+            ) : (
+              <motion.div variants={staggerContainer(reduce ? 0 : 0.04)} className="space-y-4">
+                {list.map(order => (
+                  <motion.div key={order.id} variants={fadeUp}>
+                    <SellerOrderCard order={order} />
+                  </motion.div>
+                ))}
+                {hasMore && (
+                  <div className="flex justify-center">
+                    <Button variant="secondary" size="md" loading={loadingMore} onClick={loadMore}>Load more</Button>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </div>
         </motion.div>
       </motion.div>
     </SellerLayout>

@@ -130,7 +130,7 @@ export default function ProfileScreen() {
             <View style={{ paddingHorizontal: 16, marginTop: -40, gap: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
                 <View style={{ borderWidth: 4, borderColor: colors.background, borderRadius: 48, backgroundColor: colors.background }}>
-                  <Avatar uri={user.avatarUrl} size={80} verified={user.verified} />
+                  <Avatar uri={user.avatarUrl} name={user.name} size={80} verified={user.verified} />
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
                   {isMe ? (

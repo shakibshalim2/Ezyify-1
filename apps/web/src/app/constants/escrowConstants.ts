@@ -388,10 +388,10 @@ export const FEATURE_FLAGS = {
 // ============================================================================
 
 export const SUPPORT = {
-  EMAIL: 'seller-support@ezyify.com',
+  EMAIL: 'seller-support@ezyify.app',
   PHONE: '1-800-EZYIFY-1',
   LIVE_CHAT_HOURS: '9 AM - 9 PM EST',
-  EMERGENCY_CONTACT: 'security@ezyify.com',
+  EMERGENCY_CONTACT: 'security@ezyify.app',
   RESPONSE_TIME_HOURS: 24,
 } as const;
 

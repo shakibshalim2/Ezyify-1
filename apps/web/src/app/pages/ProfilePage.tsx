@@ -1,406 +1,206 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { motion, useReducedMotion } from 'motion/react';
+import { Play, Share2, Edit, MessageCircle, MapPin, Calendar, Link as LinkIcon, Bookmark, Package, Settings, Ban, Flag, MoreHorizontal } from 'lucide-react';
+import { toast } from 'sonner';
 import {
-  Play, Share2, Edit, MessageCircle,
-  MapPin, Calendar, Link as LinkIcon, Bookmark, Package, Settings } from 'lucide-react';
-import { storage } from '../lib/storage';
+  avatarUrlFor, flattenPages, formatCompactNumber, useAuth, useBlockUser, useBlockedUsers, useFeed, useLoops, useMe, useProducts, useProfile, useSavedPosts, useToggleFollow,
+  type Post, type UserProfile,
+} from '@ezyify/core';
 import { SEO } from '../components/SEO';
 import { Button } from '../components/primitives/Button';
 import { Card } from '../components/primitives/Card';
 import { Skeleton } from '../components/primitives/Skeleton';
+import { EmptyState } from '../components/primitives/EmptyState';
+import { Img } from '../components/primitives/Img';
 import { VerifiedBadge } from '../components/VerifiedBadge';
-import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { ProductCard } from '../components/shop/ProductCard';
-import { toProductSummary } from '../data/products';
-import {
-  EmptyPosts, EmptyContent, EmptyProducts, EmptySearchResults,
-} from '../components/EmptyStates';
-import {
-  fadeUp, staggerContainer, DURATION, EASE_EMPHASIZED, springSnappy,
-} from '../lib/motion';
-import { posts } from '../data/posts';
-import { products } from '../data/products';
-
-// ─── Types & Constants ───────────────────────────────────────────────────────
+import { EmptyPosts, EmptyContent, EmptyProducts } from '../components/EmptyStates';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
+import { fadeUp, staggerContainer, DURATION } from '../lib/motion';
+import { formErrors } from '../lib/apiErrors';
 
 type Tab = 'posts' | 'loops' | 'products' | 'saved';
 
-interface ProfileState {
-  user: any | null;
-  userPosts: any[];
-  userLoops: any[];
-  userProducts: any[];
-  savedPosts: any[];
-  savedLoops: any[];
-  savedProducts: any[];
-  isFollowing: boolean;
-  likedPostIds: Set<string>;
-  cartItems: Set<string>;
-}
-
-// ─── Skeleton ────────────────────────────────────────────────────────────────
-
 function ProfileSkeleton() {
   return (
-    <div className="min-h-screen bg-background pb-20 lg:pb-0">
-      {/* Cover image */}
+    <div className="min-h-screen bg-background pb-20 lg:pb-0" aria-busy>
       <Skeleton className="h-48 lg:h-72 w-full" />
-
       <div className="mx-auto max-w-4xl px-4 lg:px-6">
-        {/* Profile header */}
-        <div className="relative -mt-16 lg:-mt-24 mb-6">
-          <div className="flex flex-col gap-4">
-            <div className="flex gap-4">
-              <Skeleton className="size-32 lg:size-40 rounded-full flex-shrink-0" />
-              <div className="flex-1 space-y-2 pt-4">
-                <Skeleton className="h-8 w-48" />
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-3 w-full max-w-sm" />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              {[1, 2, 3].map(i => (
-                <Skeleton key={i} className="h-10 w-20" />
-              ))}
+        <div className="relative -mt-16 lg:-mt-24 mb-6 flex flex-col gap-4">
+          <div className="flex gap-4">
+            <Skeleton className="size-32 lg:size-40 rounded-full flex-shrink-0" />
+            <div className="flex-1 space-y-2 pt-4">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-full max-w-sm" />
             </div>
           </div>
+          <div className="flex gap-2">{[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-20" />)}</div>
         </div>
-
-        {/* Highlights strip */}
-        <div className="flex gap-3 overflow-x-auto pb-6 mb-6 scrollbar-hide">
-          {[1, 2, 3, 4].map(i => (
-            <Skeleton key={i} className="size-20 rounded-full flex-shrink-0" />
-          ))}
-        </div>
-
-        {/* Tabs */}
         <Skeleton className="h-12 w-full mb-6" />
-
-        {/* Grid */}
-        <div className="grid grid-cols-3 gap-2 lg:gap-4">
-          {[1, 2, 3, 4, 5, 6].map(i => (
-            <Skeleton key={i} className="aspect-square rounded-card" />
-          ))}
-        </div>
+        <div className="grid grid-cols-3 gap-2 lg:gap-4">{[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="aspect-square rounded-card" />)}</div>
       </div>
     </div>
   );
 }
 
-// ─── Profile Page ───────────────────────────────────────────────────────────
+function MediaGrid({ posts, aspect, empty }: { posts: Post[]; aspect: 'square' | 'tall'; empty: React.ReactNode }) {
+  if (posts.length === 0) return <>{empty}</>;
+  return (
+    <div className="grid grid-cols-3 gap-2 lg:gap-4">
+      {posts.map(post => {
+        const m = post.media[0]!;
+        return (
+          <motion.div key={post.id} variants={fadeUp}>
+            <Link
+              to={post.kind === 'loop' ? `/loops?start=${post.id}` : `/post/${post.id}`}
+              className={`group relative block ${aspect === 'tall' ? 'aspect-[9/16]' : 'aspect-square'} rounded-card overflow-hidden bg-muted focus-visible:ring-2 focus-visible:ring-ring`}
+              aria-label={post.caption ? `${post.kind === 'loop' ? 'Loop' : 'Post'}: ${post.caption.slice(0, 80)}` : `Open ${post.kind}`}
+            >
+              <Img src={m.thumbnailUrl ?? m.url} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+              {post.kind === 'loop' && (
+                <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Play className="size-10 text-white drop-shadow-lg" aria-hidden />
+                </span>
+              )}
+            </Link>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
 
+/** Profile on the real API: `/users/me` or `/users/:username`, feed/loops/products filtered by author, saved for self. */
 export default function ProfilePage() {
-  const { username } = useParams();
+  const { username: param } = useParams();
   const navigate = useNavigate();
   const reduce = useReducedMotion();
-  const isOwnProfile = !username || username === 'me';
+  const authUser = useAuth(s => s.user);
+  const authed = useAuth(s => s.status === 'authenticated');
+  const isMe = !param || param === 'me' || (!!authUser && param === authUser.username);
+  const username = isMe ? authUser?.username : param;
 
-  const [state, setState] = useState<ProfileState>({
-    user: null,
-    userPosts: [],
-    userLoops: [],
-    userProducts: [],
-    savedPosts: [],
-    savedLoops: [],
-    savedProducts: [],
-    isFollowing: false,
-    likedPostIds: new Set(),
-    cartItems: new Set(),
-  });
+  const me = useMe();
+  const other = useProfile(isMe ? undefined : username);
+  const profile = isMe ? me : other;
+  const user: UserProfile | undefined = profile.data;
 
-  const [activeTab, setActiveTab] = useState<Tab>('posts');
-  const [isLoading, setIsLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>('posts');
+  const posts = useFeed(username ? { author: username, kind: 'post' } : {});
+  const loops = useLoops(username ? { author: username } : {});
+  const shop = useProducts(username ? { seller: username, pageSize: 24 } : {});
+  const saved = useSavedPosts();
+  const follow = useToggleFollow();
+  const block = useBlockUser();
+  const blocked = useBlockedUsers();
+  const isBlocked = !!user && (blocked.data ?? []).some(b => b.id === user.id);
 
-  // Load profile data
-  useEffect(() => {
-    const loadData = () => {
-      const user = {
-        username: username || 'fashionista_emma',
-        name: 'Emma Wilson',
-        avatar: 'https://images.unsplash.com/photo-1632163506775-db3341414ffb?w=300',
-        coverImage: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200&h=400&fit=crop',
-        verified: true,
-        bio: 'Fashion & Lifestyle Content Creator | Sharing daily outfit inspiration and style tips',
-        location: 'New York, USA',
-        website: 'emmastyle.com',
-        joinDate: 'January 2024',
-        followers: 156000,
-        following: 892,
-        posts: 342,
-        role: isOwnProfile ? 'creator' : 'user',
-      };
-
-      const userPosts = posts
-        .filter(p => p.type === 'post' && p.user.username === user.username)
-        .slice(0, 9);
-
-      const userLoops = posts
-        .filter(p => p.type === 'loop' && p.user.username === user.username)
-        .slice(0, 9);
-
-      const userProductIds = new Set(
-        posts
-          .filter(p => p.user.username === user.username && p.taggedProducts)
-          .flatMap(p => p.taggedProducts || [])
-      );
-      const userProducts = products
-        .filter(p => userProductIds.has(p.id))
-        .slice(0, 8);
-
-      const savedPosts = posts.filter(p => p.type === 'post' && p.isSaved).slice(0, 9);
-      const savedLoops = posts.filter(p => p.type === 'loop' && p.isSaved).slice(0, 6);
-      const wishlistIds: string[] = (() => {
-        try {
-          return storage.get<string[]>('ezyify_wishlist', []);
-        } catch {
-          return [];
-        }
-      })();
-      const savedProducts = wishlistIds.length > 0
-        ? products.filter(p => wishlistIds.includes(p.id)).slice(0, 8)
-        : products.slice(0, 8);
-
-      // Load from localStorage
-      const likedPostIds = new Set<string>(storage.get<string[]>('ezyify_liked_posts', []));
-      const cartItems = new Set<string>(
-        storage.get<{ id: string }[]>('ezyify_cart', []).map(item => item.id)
-      );
-
-      setState({
-        user,
-        userPosts,
-        userLoops,
-        userProducts,
-        savedPosts,
-        savedLoops,
-        savedProducts,
-        isFollowing: storage.get<string[]>('ezyify_following', []).includes(user.username),
-        likedPostIds,
-        cartItems,
-      });
-      setIsLoading(false);
-    };
-
-    if ('requestIdleCallback' in window) {
-      const handle = requestIdleCallback(loadData, { timeout: 100 });
-      return () => cancelIdleCallback(handle);
-    } else {
-      const timer = setTimeout(loadData, 16);
-      return () => clearTimeout(timer);
-    }
-  }, [username, isOwnProfile]);
-
-  const toggleFollow = () => {
-    if (!state.user) return;
-    const following = storage.get<string[]>('ezyify_following', []);
-    if (state.isFollowing) {
-      localStorage.setItem('ezyify_following', JSON.stringify(
-        following.filter((u: string) => u !== state.user.username)
-      ));
-    } else {
-      following.push(state.user.username);
-      localStorage.setItem('ezyify_following', JSON.stringify(following));
-    }
-    setState(prev => ({ ...prev, isFollowing: !prev.isFollowing }));
-  };
-
-  const toggleLike = (postId: string) => {
-    const liked = new Set(state.likedPostIds);
-    if (liked.has(postId)) {
-      liked.delete(postId);
-    } else {
-      liked.add(postId);
-    }
-    setState(prev => ({ ...prev, likedPostIds: liked }));
-    localStorage.setItem('ezyify_liked_posts', JSON.stringify(Array.from(liked)));
-  };
-
-  const toggleCart = (productId: string) => {
-    const cart = new Set(state.cartItems);
-    if (cart.has(productId)) {
-      cart.delete(productId);
-    } else {
-      cart.add(productId);
-    }
-    setState(prev => ({ ...prev, cartItems: cart }));
-    const cartData = Array.from(cart).map(id => ({ id, quantity: 1 }));
-    localStorage.setItem('ezyify_cart', JSON.stringify(cartData));
-  };
-
-  if (isLoading || !state.user) {
-    return <ProfileSkeleton />;
+  if (isMe && !authed) {
+    navigate('/login', { replace: true, state: { next: '/profile/me' } });
+    return null;
+  }
+  if (profile.isLoading || (!user && !profile.isError)) return <ProfileSkeleton />;
+  if (profile.isError || !user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <EmptyState kind="search" title="Profile not found" description="This account may have been removed or the link is wrong." action={<Button asChild><Link to="/explore">Explore creators</Link></Button>} />
+      </div>
+    );
   }
 
-  const { user } = state;
-  const tabsData = {
-    posts: { label: 'Posts', icon: null, count: state.userPosts.length, empty: EmptyPosts },
-    loops: { label: 'Loops', icon: Play, count: state.userLoops.length, empty: EmptyContent },
-    products: { label: 'Products', icon: Package, count: state.userProducts.length, empty: EmptyProducts },
-    saved: { label: 'Saved', icon: Bookmark, count: state.savedPosts.length, empty: EmptySearchResults },
+  const postItems = flattenPages(posts.data);
+  const loopItems = flattenPages(loops.data);
+  const productItems = flattenPages(shop.data);
+  const savedItems = isMe ? flattenPages(saved.data) : [];
+  const joined = new Date(user.createdAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+  const onFollow = () => {
+    if (!authed) return navigate('/login', { state: { next: `/profile/${user.username}` } });
+    follow.mutate({ username: user.username, following: !!user.isFollowing }, { onError: e => toast.error(formErrors(e).message ?? 'Couldn’t update follow') });
+  };
+  const onShare = async () => {
+    const url = `${window.location.origin}/profile/${user.username}`;
+    try {
+      if (navigator.share) await navigator.share({ title: `${user.name} on Ezyify`, url });
+      else {
+        await navigator.clipboard.writeText(url);
+        toast.success('Profile link copied');
+      }
+    } catch {
+      /* user dismissed the share sheet */
+    }
+  };
+  const onBlock = () => {
+    if (!authed) return navigate('/login');
+    block.mutate({ userId: user.id, blocked: isBlocked }, {
+      onSuccess: () => toast.success(isBlocked ? `Unblocked @${user.username}` : `Blocked @${user.username}`, { description: isBlocked ? undefined : 'They can no longer see your content or message you.' }),
+      onError: e => toast.error(formErrors(e).message ?? 'Couldn’t update block'),
+    });
   };
 
-  const getTabContent = () => {
-    switch (activeTab) {
+  const tabs: { id: Tab; label: string; icon: typeof Play | null; count: number }[] = [
+    { id: 'posts', label: 'Posts', icon: null, count: postItems.length },
+    { id: 'loops', label: 'Loops', icon: Play, count: loopItems.length },
+    { id: 'products', label: 'Products', icon: Package, count: productItems.length },
+    ...(isMe ? [{ id: 'saved' as Tab, label: 'Saved', icon: Bookmark, count: savedItems.length }] : []),
+  ];
+
+  const content = () => {
+    switch (tab) {
       case 'posts':
-        return state.userPosts.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2 lg:gap-4">
-            {state.userPosts.map(post => (
-              <motion.button
-                key={post.id}
-                variants={fadeUp}
-                className="group relative aspect-square rounded-card overflow-hidden bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                onClick={() => {}}
-              >
-                {post.image && (
-                  <ImageWithFallback
-                    src={post.image}
-                    alt={post.content?.text || 'Post'}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  />
-                )}
-              </motion.button>
-            ))}
-          </div>
-        ) : (
-          <EmptyPosts />
-        );
-
+        return posts.isLoading ? <Skeleton className="h-64 w-full rounded-card" /> : <MediaGrid posts={postItems} aspect="square" empty={<EmptyPosts />} />;
       case 'loops':
-        return state.userLoops.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2 lg:gap-4">
-            {state.userLoops.map(loop => (
-              <motion.button
-                key={loop.id}
-                variants={fadeUp}
-                className="group relative aspect-[9/16] rounded-card overflow-hidden bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {loop.image && (
-                  <ImageWithFallback
-                    src={loop.image}
-                    alt={loop.content?.text || 'Loop'}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  />
-                )}
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Play className="size-12 text-white drop-shadow-lg" />
-                </div>
-              </motion.button>
-            ))}
-          </div>
-        ) : (
-          <EmptyContent />
-        );
-
+        return loops.isLoading ? <Skeleton className="h-64 w-full rounded-card" /> : <MediaGrid posts={loopItems} aspect="tall" empty={<EmptyContent />} />;
       case 'products':
-        return state.userProducts.length > 0 ? (
+        if (shop.isLoading) return <Skeleton className="h-64 w-full rounded-card" />;
+        return productItems.length ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
-            {state.userProducts.map(product => (
-              <motion.div key={product.id} variants={fadeUp}>
-                <ProductCard product={toProductSummary(product)} />
-              </motion.div>
+            {productItems.map(p => (
+              <motion.div key={p.id} variants={fadeUp}><ProductCard product={p} /></motion.div>
             ))}
           </div>
-        ) : (
-          <EmptyProducts />
-        );
-
+        ) : <EmptyProducts />;
       case 'saved':
-        return state.savedPosts.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2 lg:gap-4">
-            {state.savedPosts.map(post => (
-              <motion.button
-                key={post.id}
-                variants={fadeUp}
-                className="group relative aspect-square rounded-card overflow-hidden bg-muted"
-              >
-                {post.image && (
-                  <ImageWithFallback
-                    src={post.image}
-                    alt="Saved post"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  />
-                )}
-              </motion.button>
-            ))}
-          </div>
-        ) : (
-          <EmptySearchResults />
-        );
-
-      default:
-        return null;
+        return saved.isLoading ? <Skeleton className="h-64 w-full rounded-card" /> : <MediaGrid posts={savedItems} aspect="square" empty={<EmptyState kind="wishlist" title="Nothing saved yet" description="Tap the bookmark on any post to keep it here." />} />;
     }
   };
 
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-0">
-      <SEO
-        title={`${user.name} (@${user.username}) - Ezyify`}
-        description={user.bio}
-      />
+      <SEO title={`${user.name} (@${user.username})`} description={user.bio ?? `${user.name} on Ezyify`} type="profile" noindex={isMe} />
 
-      {/* Cover Image with Gradient Scrim */}
-      <div className="relative h-48 lg:h-72 w-full overflow-hidden">
-        <ImageWithFallback
-          src={user.coverImage}
-          alt="Cover"
-          className="w-full h-full object-cover"
-        />
+      <div className="relative h-48 lg:h-72 w-full overflow-hidden bg-brand-gradient">
+        {user.coverUrl && <Img src={user.coverUrl} alt="" className="w-full h-full object-cover" />}
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
       </div>
 
       <div className="mx-auto max-w-4xl px-4 lg:px-6">
-        {/* Profile Header */}
-        <motion.div
-          variants={staggerContainer(reduce ? 0 : 0.05)}
-          initial="hidden"
-          animate="visible"
-          className="relative -mt-16 lg:-mt-24 mb-8"
-        >
+        <motion.div variants={staggerContainer(reduce ? 0 : 0.05)} initial="hidden" animate="visible" className="relative -mt-16 lg:-mt-24 mb-8">
           <div className="flex flex-col gap-6">
-            {/* Avatar + Name/Bio */}
             <div className="flex gap-4">
               <motion.div variants={fadeUp}>
                 <div className="size-32 lg:size-40 rounded-full ring-4 ring-card bg-card overflow-hidden flex-shrink-0">
-                  <ImageWithFallback
-                    src={user.avatar}
-                    alt={user.name}
-                    className="w-full h-full object-cover"
-                    width={160}
-                    height={160}
-                  />
+                  <Img src={avatarUrlFor(user, 320)} alt={user.name} className="w-full h-full object-cover" width={160} height={160} />
                 </div>
               </motion.div>
-
-              <motion.div variants={fadeUp} className="flex-1 pt-4 lg:pt-8">
+              <motion.div variants={fadeUp} className="flex-1 pt-4 lg:pt-8 min-w-0">
                 <div className="flex items-start gap-2 mb-1">
-                  <h1 className="font-display text-2xl lg:text-3xl font-bold text-foreground">
-                    {user.name}
-                  </h1>
+                  <h1 className="font-display text-2xl lg:text-3xl font-bold text-foreground truncate">{user.name}</h1>
                   {user.verified && <VerifiedBadge size="lg" />}
                 </div>
                 <p className="text-foreground-secondary mb-3">@{user.username}</p>
-                <p className="text-foreground text-sm lg:text-base mb-4 max-w-sm line-clamp-3">
-                  {user.bio}
-                </p>
+                {user.bio && <p className="text-foreground text-sm lg:text-base mb-4 max-w-sm line-clamp-3">{user.bio}</p>}
                 {(user.location || user.website) && (
                   <div className="flex flex-col gap-1 text-xs text-foreground-secondary">
-                    {user.location && (
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="size-4" />
-                        {user.location}
-                      </div>
-                    )}
+                    {user.location && <div className="flex items-center gap-1.5"><MapPin className="size-4" aria-hidden />{user.location}</div>}
                     {user.website && (
                       <div className="flex items-center gap-1.5">
-                        <LinkIcon className="size-4" />
-                        <Link
-                          to="#"
-                          className="text-primary hover:underline"
-                        >
-                          {user.website}
-                        </Link>
+                        <LinkIcon className="size-4" aria-hidden />
+                        <a href={user.website} target="_blank" rel="noopener noreferrer nofollow" className="text-primary hover:underline truncate">
+                          {user.website.replace(/^https?:\/\//, '')}
+                        </a>
                       </div>
                     )}
                   </div>
@@ -408,171 +208,104 @@ export default function ProfilePage() {
               </motion.div>
             </div>
 
-            {/* Stats Row */}
             <motion.div variants={fadeUp} className="flex gap-6">
-              {[
-                { label: 'Posts', value: user.posts },
-                { label: 'Followers', value: user.followers },
-                { label: 'Following', value: user.following },
-              ].map(stat => (
-                <button
-                  key={stat.label}
-                  className="text-center focus-visible:ring-2 focus-visible:ring-ring rounded-lg px-3 py-1"
-                >
-                  <div className="font-display font-bold text-lg tabular-nums text-foreground">
-                    {stat.value.toLocaleString()}
-                  </div>
-                  <div className="text-xs text-foreground-secondary">
-                    {stat.label}
-                  </div>
-                </button>
-              ))}
+              <div className="text-center px-3 py-1">
+                <div className="font-display font-bold text-lg tabular-nums text-foreground">{formatCompactNumber(user.posts)}</div>
+                <div className="text-xs text-foreground-secondary">Posts</div>
+              </div>
+              <Link to={`/profile/${user.username}/followers`} className="text-center focus-visible:ring-2 focus-visible:ring-ring rounded-lg px-3 py-1">
+                <div className="font-display font-bold text-lg tabular-nums text-foreground">{formatCompactNumber(user.followers)}</div>
+                <div className="text-xs text-foreground-secondary">Followers</div>
+              </Link>
+              <Link to={`/profile/${user.username}/following`} className="text-center focus-visible:ring-2 focus-visible:ring-ring rounded-lg px-3 py-1">
+                <div className="font-display font-bold text-lg tabular-nums text-foreground">{formatCompactNumber(user.following)}</div>
+                <div className="text-xs text-foreground-secondary">Following</div>
+              </Link>
             </motion.div>
 
-            {/* Joined Meta */}
             <motion.div variants={fadeUp} className="flex items-center gap-2 text-xs text-foreground-secondary">
-              <Calendar className="size-4" />
-              Joined {user.joinDate}
+              <Calendar className="size-4" aria-hidden />
+              Joined {joined}
             </motion.div>
           </div>
         </motion.div>
 
-        {/* Action Row */}
-        <motion.div
-          variants={fadeUp}
-          className="mb-8 flex gap-2 flex-wrap items-center"
-        >
-          {isOwnProfile ? (
+        <motion.div variants={fadeUp} initial="hidden" animate="visible" className="mb-8 flex gap-2 flex-wrap items-center">
+          {isMe ? (
             <>
-              <Button variant="outline" size="md" leftIcon={<Edit className="size-5" />}>
-                Edit profile
+              <Button variant="outline" size="md" asChild>
+                <Link to="/profile/edit"><Edit className="size-5" aria-hidden />Edit profile</Link>
               </Button>
-              <Button variant="ghost" size="icon" aria-label="Settings">
-                <Settings className="size-5" />
+              <Button variant="ghost" size="icon" aria-label="Settings" asChild>
+                <Link to="/settings"><Settings className="size-5" /></Link>
               </Button>
-              <Button variant="link" asChild>
-                <Link to="/creator-dashboard">Creator dashboard</Link>
-              </Button>
+              {(user.role === 'creator' || user.role === 'seller') && (
+                <Button variant="link" asChild>
+                  <Link to={user.role === 'seller' ? '/seller-dashboard' : '/creator-dashboard'}>{user.role === 'seller' ? 'Seller hub' : 'Creator dashboard'}</Link>
+                </Button>
+              )}
             </>
           ) : (
             <>
-              <motion.button
-                key={state.isFollowing ? 'following' : 'follow'}
-                layout="position"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="flex items-center"
-              >
-                <Button
-                  variant={state.isFollowing ? 'secondary' : 'primary'}
-                  size="md"
-                  onClick={toggleFollow}
-                >
-                  {state.isFollowing ? 'Following' : 'Follow'}
-                </Button>
-              </motion.button>
-              <Button variant="outline" size="md" leftIcon={<MessageCircle className="size-5" />}>
-                Message
+              <Button variant={user.isFollowing ? 'secondary' : 'primary'} size="md" onClick={onFollow} loading={follow.isPending} aria-pressed={!!user.isFollowing}>
+                {user.isFollowing ? 'Following' : 'Follow'}
               </Button>
-              <Button variant="ghost" size="icon" aria-label="Share profile">
+              <Button variant="outline" size="md" asChild>
+                <Link to={authed ? `/messages?with=${encodeURIComponent(user.username)}` : '/login'}><MessageCircle className="size-5" aria-hidden />Message</Link>
+              </Button>
+              <Button variant="ghost" size="icon" aria-label="Share profile" onClick={onShare}>
                 <Share2 className="size-5" />
               </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="More options"><MoreHorizontal className="size-5" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => navigate(`/report-problem?type=user&id=${encodeURIComponent(user.id)}`)}>
+                    <Flag className="size-4" aria-hidden /> Report @{user.username}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={onBlock} className={isBlocked ? '' : 'text-error focus:text-error'}>
+                    <Ban className="size-4" aria-hidden /> {isBlocked ? 'Unblock' : 'Block'} @{user.username}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           )}
         </motion.div>
 
-        {/* Highlights Strip */}
-        {state.userPosts.length > 0 && (
-          <motion.div variants={fadeUp} className="mb-8 flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-            {[
-              { label: 'Outfits', image: state.userPosts[0]?.content?.images?.[0] },
-              { label: 'Hauls', image: state.userPosts[1]?.content?.images?.[0] },
-              { label: 'Travel', image: state.userPosts[2]?.content?.images?.[0] },
-              { label: 'Live', image: state.userPosts[3]?.content?.images?.[0] },
-            ]
-              .filter(h => h.image)
-              .map(h => (
-                <Link
-                  key={h.label}
-                  to={`/stories/${state.user?.username ?? ''}`}
-                  className="flex shrink-0 flex-col items-center gap-1.5"
-                  aria-label={`Highlight: ${h.label}`}
-                >
-                  <span className="story-ring-gradient rounded-full p-[2px]">
-                    <span className="block rounded-full bg-background p-[2px]">
-                      <ImageWithFallback src={h.image} alt="" className="size-16 rounded-full object-cover" />
-                    </span>
-                  </span>
-                  <span className="text-[11px] font-medium text-foreground-secondary">{h.label}</span>
-                </Link>
-              ))}
-          </motion.div>
-        )}
-
-        {/* Sticky Tab Bar */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm -mx-4 lg:-mx-6 mb-8 border-b border-border"
-        >
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm -mx-4 lg:-mx-6 mb-8 border-b border-border">
           <div className="max-w-4xl mx-auto px-4 lg:px-6">
-            <div className="flex gap-6 overflow-x-auto">
-              {(Object.entries(tabsData) as [Tab, any][]).map(([tabKey, tabInfo]) => (
+            <div role="tablist" aria-label="Profile sections" className="flex gap-6 overflow-x-auto">
+              {tabs.map(t => (
                 <button
-                  key={tabKey}
-                  onClick={() => setActiveTab(tabKey)}
-                  className={`relative py-4 text-sm font-medium whitespace-nowrap transition-colors ${
-                    activeTab === tabKey
-                      ? 'text-foreground'
-                      : 'text-foreground-secondary hover:text-foreground'
-                  }`}
+                  key={t.id}
+                  role="tab"
+                  aria-selected={tab === t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`relative py-4 text-sm font-medium whitespace-nowrap transition-colors ${tab === t.id ? 'text-foreground' : 'text-foreground-secondary hover:text-foreground'}`}
                 >
-                  <div className="flex items-center gap-1.5">
-                    {tabInfo.icon && <tabInfo.icon className="size-4" />}
-                    {tabInfo.label}
-                    {tabInfo.count > 0 && (
-                      <span className="text-xs text-foreground-tertiary">
-                        {tabInfo.count}
-                      </span>
-                    )}
-                  </div>
-                  {activeTab === tabKey && (
-                    <motion.div
-                      layoutId="tab-underline"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground"
-                      transition={{ duration: DURATION.fast }}
-                    />
-                  )}
+                  <span className="flex items-center gap-1.5">
+                    {t.icon && <t.icon className="size-4" aria-hidden />}
+                    {t.label}
+                    {t.count > 0 && <span className="text-xs text-foreground-tertiary">{t.count}</span>}
+                  </span>
+                  {tab === t.id && <motion.div layoutId="profile-tab-underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground" transition={{ duration: DURATION.fast }} />}
                 </button>
               ))}
             </div>
           </div>
+        </div>
+
+        <motion.div variants={staggerContainer(reduce ? 0 : 0.05)} initial="hidden" animate="visible" key={tab} role="tabpanel">
+          {content()}
         </motion.div>
 
-        {/* Tab Content */}
-        <motion.div
-          variants={staggerContainer(reduce ? 0 : 0.05)}
-          initial="hidden"
-          animate="visible"
-          key={activeTab}
-        >
-          {getTabContent()}
-        </motion.div>
-
-        {/* Seller Badge Card */}
-        {user.role === 'seller' && (
-          <motion.div variants={fadeUp} className="mt-12">
+        {user.role === 'seller' && !isMe && (
+          <motion.div variants={fadeUp} initial="hidden" animate="visible" className="mt-12">
             <Card variant="featured" className="p-6">
-              <h3 className="font-display font-bold text-lg mb-2">
-                {user.name}'s Store
-              </h3>
-              <p className="text-foreground-secondary text-sm mb-4">
-                ★★★★★ (2,340 reviews)
-              </p>
-              <Button asChild variant="primary" size="md">
-                <Link to={`/store/${user.username}`}>Visit store</Link>
-              </Button>
+              <h3 className="font-display font-bold text-lg mb-2">{user.name}’s store</h3>
+              <p className="text-foreground-secondary text-sm mb-4">Escrow‑protected checkout on every order.</p>
+              <Button asChild variant="primary" size="md"><Link to={`/seller/${user.username}`}>Visit store</Link></Button>
             </Card>
           </motion.div>
         )}

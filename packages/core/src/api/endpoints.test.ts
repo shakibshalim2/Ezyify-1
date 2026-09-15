@@ -1,10 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createApiClient } from './client.js';
 import { createEndpoints } from './endpoints.js';
+import { isMfaChallenge } from '../schemas/index.js';
 
 const product = {
   id: 'p1', slug: 'p1', name: 'Thing', imageUrl: 'https://img.test/a.jpg', price: { amount: 100, currency: 'USD' }, compareAtPrice: null,
   rating: 4.5, reviewCount: 3, seller: { id: 's1', username: 'seller', name: 'S', verified: true }, badge: null, inStock: true,
+};
+const liveSession = {
+  id: 'live-1', room: 'live-1', title: 'A live event', host: { id: 's1', username: 'seller', name: 'Seller', avatarUrl: null, verified: true, role: 'seller' },
+  status: 'live' as const, category: 'tech', coverUrl: 'https://img.test/live.jpg', productIds: ['p1'], pinnedProductId: 'p1', viewers: 12, peakViewers: 20, likes: 4,
+  scheduledFor: null, startedAt: new Date().toISOString(), endedAt: null, createdAt: new Date().toISOString(),
 };
 const respond = (data: unknown) => new Response(JSON.stringify({ success: true, data }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
@@ -50,6 +56,25 @@ describe('createEndpoints — request shapes match BACKEND_API_SPECIFICATION', (
     expect(call(1)).toMatchObject({ url: 'https://api.test/v1/cart/items/p%201', method: 'PATCH', body: { quantity: 3 } });
     await api.cart.remove('p 1');
     expect(call(2).method).toBe('DELETE');
+  });
+
+  it('live session endpoints validate bodies and encode session ids', async () => {
+    const page = { items: [liveSession], pagination: { page: 1, pageSize: 20, total: 1, hasMore: false } };
+    const list = harness(page);
+    await list.api.live.sessions({ status: 'live', category: 'tech' });
+    expect(list.call()).toMatchObject({ url: 'https://api.test/v1/live/sessions?status=live&category=tech', method: 'GET' });
+    const get = harness(liveSession);
+    await get.api.live.session('live / 1');
+    expect(get.call()).toMatchObject({ url: 'https://api.test/v1/live/sessions/live%20%2F%201', method: 'GET' });
+    const create = harness(liveSession);
+    await create.api.live.create({ title: 'A live event', productIds: ['p1'] });
+    expect(create.call()).toMatchObject({ method: 'POST', body: { title: 'A live event', productIds: ['p1'] } });
+    const pin = harness(liveSession);
+    await pin.api.live.pin('live-1', { productId: null });
+    expect(pin.call()).toMatchObject({ url: 'https://api.test/v1/live/sessions/live-1/pin', body: { productId: null } });
+    const heartbeat = harness({ viewers: 13, likes: 5 });
+    await heartbeat.api.live.heartbeat('live-1', true);
+    expect(heartbeat.call()).toMatchObject({ url: 'https://api.test/v1/live/sessions/live-1/heartbeat', body: { like: true } });
   });
 
   it('rejects malformed server payloads instead of leaking them into the UI', async () => {
@@ -120,6 +145,11 @@ describe('createEndpoints — every endpoint is wired to a path', () => {
       () => api.auth.logoutAll(),
       () => api.auth.sessions(),
       () => api.auth.revokeSession('s1'),
+      () => api.auth.mfa.status(),
+      () => api.auth.mfa.setup(),
+      () => api.auth.mfa.enable('123456'),
+      () => api.auth.mfa.disable('aaaaa-11111'),
+      () => api.auth.mfa.verify({ challengeToken: 'ch', code: '123456' }),
       () => api.users.updateMe({ bio: 'hi' }),
       () => api.users.followers('maya'),
       () => api.users.following('maya'),
@@ -133,6 +163,9 @@ describe('createEndpoints — every endpoint is wired to a path', () => {
       () => api.feed.remove('post-1'),
       () => api.feed.save('post-1'),
       () => api.feed.unsave('post-1'),
+      () => api.search.all('shoes', { type: 'all', limit: 10 }),
+      () => api.live.token({ room: 'live-maya', role: 'viewer' }),
+      () => api.live.callToken('c1'),
       () => api.feed.comments('post-1'),
       () => api.feed.comment('post-1', 'nice'),
       () => api.messaging.start('maya'),
@@ -153,6 +186,19 @@ describe('createEndpoints — every endpoint is wired to a path', () => {
     expect(urls).toContain('/v1/posts/saved');
     expect(urls).toContain('/v1/uploads/sign');
     expect(urls).toContain('/v1/users/me/blocked');
+    expect(urls).toContain('/v1/auth/mfa/verify');
+  });
+
+  it('login accepts both a session and an MFA challenge; mfa.verify is unauthenticated', async () => {
+    const { api, call } = harness({ mfaRequired: true, challengeToken: 'ch_1' });
+    const r = await api.auth.login({ identifier: 'seller@x.co', password: 'Password1' });
+    expect(isMfaChallenge(r)).toBe(true);
+    expect(r.challengeToken).toBe('ch_1');
+    expect(isMfaChallenge({ accessToken: 't', expiresIn: 900, user: {} })).toBe(false);
+    await api.auth.mfa.verify({ challengeToken: 'ch_1', code: '123456' }).catch(() => undefined);
+    expect(call(1)).toMatchObject({ url: 'https://api.test/v1/auth/mfa/verify', method: 'POST', body: { challengeToken: 'ch_1', code: '123456' } });
+    expect(call(1).headers.Authorization).toBeUndefined();
+    expect(() => api.auth.mfa.enable('12')).toThrow(/6-digit/);
   });
 
   it('native refresh sends the stored token in the body; web refresh sends an empty body', async () => {

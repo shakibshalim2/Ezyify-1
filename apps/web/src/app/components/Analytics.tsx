@@ -1,49 +1,27 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router';
-import { trackPageView, trackPerformance, initAnalytics } from '../utils/analytics';
+import { useAuth } from '../contexts/AuthContext';
+import { capturePageView, identifyUser, initTelemetry } from '../lib/telemetry';
 
 /**
- * Analytics Component - OPTIMIZED
- * Defers analytics initialization to avoid blocking first paint
- * Handles automatic page view tracking after initialization
+ * Route-change page views + user identity for the consent-gated telemetry layer (`lib/telemetry.ts`).
+ * Renders nothing; everything is a no-op until VITE_SENTRY_DSN / VITE_POSTHOG_KEY are set and consent is granted.
  */
 export function Analytics() {
   const location = useLocation();
+  const { user } = useAuth();
 
-  // Defer analytics initialization to avoid blocking first paint
   useEffect(() => {
-    const initAnalyticsDeferred = () => {
-      initAnalytics();
-
-      // Track initial performance metrics after load
-      if (typeof window !== 'undefined') {
-        window.addEventListener('load', () => {
-          setTimeout(trackPerformance, 0);
-        });
-      }
-    };
-
-    // Use requestIdleCallback for non-blocking initialization
-    if ('requestIdleCallback' in window) {
-      requestIdleCallback(initAnalyticsDeferred, { timeout: 3000 });
-    } else {
-      setTimeout(initAnalyticsDeferred, 1000);
-    }
+    initTelemetry();
   }, []);
 
-  // Track page views on route change
   useEffect(() => {
-    // Defer page view tracking slightly to ensure analytics is initialized
-    const timeout = setTimeout(() => {
-      trackPageView({
-        path: location.pathname,
-        title: document.title,
-        referrer: document.referrer,
-      });
-    }, 100);
+    capturePageView(location.pathname + location.search);
+  }, [location.pathname, location.search]);
 
-    return () => clearTimeout(timeout);
-  }, [location]);
+  useEffect(() => {
+    identifyUser(user ? { id: user.id, username: user.username } : null);
+  }, [user?.id, user?.username]);
 
   return null;
 }

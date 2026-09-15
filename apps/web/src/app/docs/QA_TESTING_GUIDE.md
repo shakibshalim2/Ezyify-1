@@ -800,11 +800,11 @@ Any other relevant information
 ## 📞 Contact
 
 **QA Lead:** [Name]  
-**Email:** qa@ezyify.com  
+**Email:** qa@ezyify.app  
 **Slack:** #qa-testing  
 
-**Bug Reports:** https://jira.ezyify.com/bugs  
-**Test Results:** https://testrail.ezyify.com
+**Bug Reports:** https://jira.ezyify.app/bugs  
+**Test Results:** https://testrail.ezyify.app
 
 ---
 

@@ -201,9 +201,16 @@ describe('wallet', () => {
     const tx = json(await inject('GET', '/wallet/transactions', { token: maya })).data;
     expect(valid(paginated(TransactionSchema), tx)).toBe(true);
     expect(tx.items[0]).toMatchObject({ type: 'topup', direction: 'in' });
-    expect((await inject('POST', '/wallet/withdraw', { token: maya, body: { amount: 10_000_000, payoutMethodId: 'pm1' } })).statusCode).toBe(422);
-    const w = json(await inject('POST', '/wallet/withdraw', { token: maya, body: { amount: 1000, payoutMethodId: 'pm1' } })).data;
-    expect(w).toMatchObject({ type: 'withdrawal', status: 'pending' });
+    // Withdrawals only go to a saved payout method owned by the caller.
+    expect((await inject('POST', '/wallet/withdraw', { token: maya, body: { amount: 1000, payoutMethodId: 'pm-not-mine' } })).statusCode).toBe(422);
+    const pm = json(await inject('POST', '/seller/payout-methods', { token: maya, body: { label: 'BCA', holderName: 'Maya Chen', institution: 'Bank Central Asia', accountNumber: '1234567890' } })).data;
+    expect(pm).toMatchObject({ accountLast4: '7890', isDefault: true });
+    expect(pm).not.toHaveProperty('accountEncrypted');
+    expect((await inject('POST', '/wallet/withdraw', { token: maya, body: { amount: 10_000_000, payoutMethodId: pm.id } })).statusCode).toBe(422);
+    const w = json(await inject('POST', '/wallet/withdraw', { token: maya, body: { amount: 1000, payoutMethodId: pm.id } })).data;
+    expect(w).toMatchObject({ type: 'withdrawal', status: 'pending', description: expect.stringContaining('••••7890') });
+    // A pending withdrawal blocks deleting its destination.
+    expect((await inject('DELETE', `/seller/payout-methods/${pm.id}`, { token: maya })).statusCode).toBe(422);
     expect(json(await inject('GET', '/wallet', { token: maya })).data.pending.amount).toBeGreaterThanOrEqual(1000);
   });
 });

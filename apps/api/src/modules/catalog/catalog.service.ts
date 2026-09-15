@@ -13,6 +13,8 @@ export const ProductQuerySchema = PageQuerySchema.extend({
   seller: z.string().optional(),
   minPrice: z.coerce.number().int().min(0).optional(),
   maxPrice: z.coerce.number().int().min(0).optional(),
+  /** Deals: only products with a compare‑at price above the current price. */
+  onSale: z.enum(['true', 'false']).optional(),
 });
 type ProductQuery = z.infer<typeof ProductQuerySchema>;
 
@@ -35,6 +37,7 @@ export class CatalogService {
       ...(q.seller ? { seller: { username: q.seller } } : {}),
       ...(q.q ? { OR: [{ name: { contains: q.q, mode: 'insensitive' } }, { tags: { has: q.q.toLowerCase() } }, { description: { contains: q.q, mode: 'insensitive' } }] } : {}),
       ...(q.minPrice != null || q.maxPrice != null ? { price: { gte: q.minPrice, lte: q.maxPrice } } : {}),
+      ...(q.onSale === 'true' ? { compareAtPrice: { not: null } } : {}),
     };
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({ where, include: productInclude, orderBy: ORDER[q.sort], ...skipTake(q) }),

@@ -1,311 +1,286 @@
 import type React from 'react';
-import { useState, useEffect } from 'react';
-import { useReducedMotion } from 'motion/react';
-import { motion } from 'motion/react';
+import { useMemo } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import { Link } from 'react-router';
-import {
-  DollarSign,
-  Package,
-  TrendingUp,
-  TrendingDown,
-  Users,
-  Eye,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  Plus,
-  ArrowUpRight,
-  ArrowDownRight,
-  ShoppingCart
-} from 'lucide-react';
-import { cn } from '../../components/ui/utils';
+import { DollarSign, Package, TrendingUp, ShoppingCart, ShieldCheck, Star, AlertTriangle, Plus, ArrowUpRight, ArrowDownRight, Minus, RotateCcw, Truck, Settings } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { ApiError, formatMoney, formatCompactNumber, useAuth, useMe, useSellerDashboard, useSellerOrders, type Money, type Order } from '@ezyify/core';
 import { Button } from '../../components/primitives/Button';
 import { Card } from '../../components/primitives/Card';
 import { Skeleton } from '../../components/primitives/Skeleton';
+import { Img } from '../../components/primitives/Img';
+import { QueryError } from '../../components/QueryError';
 import { EmptyState } from '../../components/primitives/EmptyState';
 import { SellerLayout } from '../../components/SellerLayout';
 import { SEO, SEOConfigs } from '../../components/SEO';
-import { fadeUp, staggerContainer, DURATION, EASE_EMPHASIZED } from '../../lib/motion';
+import { SELLER_STATUS } from '../../components/seller/SellerOrderActions';
+import { useInfiniteList } from '../../lib/data';
+import { fadeUp, staggerContainer } from '../../lib/motion';
+import { cn } from '../../components/ui/utils';
 
 function DashboardSkeleton() {
   return (
-    <SellerLayout>
-      <div className="space-y-6">
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {[1, 2, 3, 4].map(i => (
-            <Card key={i} padding="md">
-              <Skeleton className="h-4 w-20 mb-4" />
-              <Skeleton className="h-8 w-32 mb-2" />
-              <Skeleton className="h-4 w-16" />
-            </Card>
-          ))}
-        </div>
-
-        {/* Chart */}
-        <Card padding="lg">
-          <Skeleton className="h-64 w-full" />
-        </Card>
-
-        {/* Recent Orders */}
-        <Card padding="lg">
-          <Skeleton className="h-6 w-40 mb-6" />
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <Skeleton key={i} className="h-20 w-full" />
-            ))}
-          </div>
-        </Card>
+    <div className="space-y-6" aria-busy>
+      <Skeleton className="h-8 w-40" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {[1, 2, 3, 4].map(i => (
+          <Card key={i} padding="md">
+            <Skeleton className="h-4 w-20 mb-4" />
+            <Skeleton className="h-8 w-32 mb-2" />
+            <Skeleton className="h-4 w-16" />
+          </Card>
+        ))}
       </div>
-    </SellerLayout>
+      <Card padding="lg"><Skeleton className="h-64 w-full" /></Card>
+      <Card padding="lg">
+        <Skeleton className="h-6 w-40 mb-6" />
+        <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full" />)}</div>
+      </Card>
+    </div>
   );
 }
 
-interface KPICardProps {
-  title: string;
-  value: string;
-  delta: number;
-  icon: React.ComponentType<{ className?: string }>;
-  trend: 'up' | 'down';
-}
+/** Percentage delta vs previous window; `null` when there is no baseline so we never show a fake "+∞%". */
+const deltaPct = (current: number, previous: number): number | null => (previous > 0 ? Math.round(((current - previous) / previous) * 1000) / 10 : null);
 
-function KPICard({ title, value, delta, icon: Icon, trend }: KPICardProps) {
+function KPICard({ title, value, delta, icon: Icon, hint, testId }: { title: string; value: string; delta: number | null; icon: React.ComponentType<{ className?: string }>; hint: string; testId?: string }) {
+  const tone = delta == null ? 'neutral' : delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
   return (
-    <Card variant="default" padding="md" className="space-y-2">
+    <Card variant="default" padding="md" className="space-y-2" data-testid={testId}>
       <div className="flex items-start justify-between gap-2">
         <span className="text-xs sm:text-sm font-medium text-foreground-secondary">{title}</span>
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-subtle text-primary">
-          <Icon className="size-4" />
-        </span>
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-subtle text-primary"><Icon className="size-4" aria-hidden /></span>
       </div>
       <div className="font-display font-bold text-xl sm:text-2xl text-foreground tabular-nums">{value}</div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {trend === 'up' ? (
-          <span className="flex items-center gap-1 text-xs font-medium text-success bg-success-subtle px-2 py-1 rounded-lg">
-            <ArrowUpRight className="size-3" />
-            +{delta}%
-          </span>
+      <div className="flex flex-wrap items-center gap-1.5 min-h-6">
+        {tone === 'neutral' ? (
+          <span className="text-xs text-foreground-tertiary">No prior period yet</span>
         ) : (
-          <span className="flex items-center gap-1 text-xs font-medium text-error bg-error-subtle px-2 py-1 rounded-lg">
-            <ArrowDownRight className="size-3" />
-            {delta}%
-          </span>
+          <>
+            <span
+              className={cn(
+                'flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg tabular-nums',
+                tone === 'up' && 'text-success bg-success-subtle',
+                tone === 'down' && 'text-error bg-error-subtle',
+                tone === 'flat' && 'text-foreground-secondary bg-muted',
+              )}
+            >
+              {tone === 'up' ? <ArrowUpRight className="size-3" aria-hidden /> : tone === 'down' ? <ArrowDownRight className="size-3" aria-hidden /> : <Minus className="size-3" aria-hidden />}
+              {delta! > 0 ? '+' : ''}{delta}%
+            </span>
+            <span className="hidden sm:inline text-xs text-foreground-secondary">{hint}</span>
+          </>
         )}
-        <span className="hidden sm:inline text-xs text-foreground-secondary">vs last month</span>
       </div>
     </Card>
   );
 }
 
-const chartData = [
-  { date: 'Mon', revenue: 2400 },
-  { date: 'Tue', revenue: 2210 },
-  { date: 'Wed', revenue: 2290 },
-  { date: 'Thu', revenue: 2000 },
-  { date: 'Fri', revenue: 2181 },
-  { date: 'Sat', revenue: 2500 },
-  { date: 'Sun', revenue: 2100 }
-];
+const shortDay = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', timeZone: 'UTC' });
 
+function RecentOrderRow({ order }: { order: Order }) {
+  const cfg = SELLER_STATUS[order.status];
+  const Icon = cfg.icon;
+  return (
+    <Link to={`/seller/order-detail/${order.id}`} className="flex items-center justify-between gap-4 p-3 -mx-1 rounded-card hover:bg-background-elevated transition-colors" data-testid={`dash-order-${order.id}`}>
+      <div className="flex items-center gap-3 min-w-0">
+        <Img src={order.items[0].imageUrl} alt="" className="size-12 rounded-lg object-cover flex-shrink-0 bg-card" loading="lazy" />
+        <div className="min-w-0">
+          <p className="font-medium text-foreground text-sm truncate">{order.orderNumber} · {order.buyer.name}</p>
+          <p className="text-xs text-foreground-secondary truncate">{order.items[0].name}{order.items.length > 1 ? ` +${order.items.length - 1}` : ''}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 flex-shrink-0">
+        <span className="font-semibold text-foreground tabular-nums text-sm">{formatMoney(order.total)}</span>
+        <span className={cn('inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg', cfg.className)}><Icon className="size-3" aria-hidden />{cfg.label}</span>
+      </div>
+    </Link>
+  );
+}
+
+/** Seller overview on `GET /seller/dashboard` (30‑day KPIs, 14‑day series, attention counts) + the latest seller orders. */
 export default function SellerDashboard() {
   const reduce = useReducedMotion();
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
+  const status = useAuth(s => s.status);
+  const me = useMe();
+  const dash = useSellerDashboard({ days: 30 });
+  const recent = useSellerOrders({ pageSize: 5 });
+  const { items: recentOrders } = useInfiniteList<Order>(recent);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
-  }, []);
+  const d = dash.data;
+  const series = useMemo(() => (d?.series ?? []).map(p => ({ ...p, label: shortDay(p.date), grossMajor: p.gross / 100 })), [d]);
+  const alerts = useMemo(() => {
+    if (!d) return [];
+    const a = d.attention;
+    const out: { tone: 'error' | 'warning'; message: string; action: string; href: string; icon: typeof Truck }[] = [];
+    if (a.toShip) out.push({ tone: 'error', message: `${a.toShip} ${a.toShip === 1 ? 'order needs' : 'orders need'} accepting or shipping`, action: 'Ship now', href: '/seller/orders', icon: Truck });
+    if (a.refundRequests) out.push({ tone: 'error', message: `${a.refundRequests} refund ${a.refundRequests === 1 ? 'request awaits' : 'requests await'} your decision`, action: 'Review', href: '/seller/orders', icon: RotateCcw });
+    if (a.outOfStock) out.push({ tone: 'warning', message: `${a.outOfStock} ${a.outOfStock === 1 ? 'product is' : 'products are'} out of stock`, action: 'Restock', href: '/seller/products', icon: Package });
+    if (a.lowStock) out.push({ tone: 'warning', message: `${a.lowStock} ${a.lowStock === 1 ? 'product is' : 'products are'} low on stock`, action: 'Restock', href: '/seller/products', icon: AlertTriangle });
+    return out;
+  }, [d]);
 
-  if (isLoading) {
-    return <DashboardSkeleton />;
-  }
-
-  if (hasError) {
-    return (
-      <SellerLayout>
-        <div className="flex items-center justify-center min-h-96">
-          <Card variant="featured" padding="lg" className="max-w-md text-center space-y-4">
-            <div className="flex justify-center">
-              <XCircle className="size-12 text-error" />
-            </div>
-            <div>
-              <h2 className="font-display font-bold text-lg text-foreground">Unable to Load</h2>
-              <p className="text-sm text-foreground-secondary mt-1">Check your connection and try again.</p>
-            </div>
-            <Button onClick={() => window.location.reload()} variant="primary" fullWidth>
-              Retry
-            </Button>
-          </Card>
-        </div>
-      </SellerLayout>
-    );
-  }
+  const fmt = (m: Money) => formatMoney(m, { compact: m.amount >= 1_000_000 });
 
   return (
     <SellerLayout>
-      <SEO {...SEOConfigs.dashboard} />
-      <motion.div
-        variants={staggerContainer(reduce ? 0 : 0.05)}
-        initial="hidden"
-        animate="visible"
-        className="space-y-6"
-      >
-        {/* Header */}
-        <motion.div variants={fadeUp} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="font-display text-2xl font-semibold text-foreground">Overview</h1>
-            <p className="text-sm text-foreground-secondary mt-1">Welcome back — here’s how your store is doing today.</p>
-          </div>
-        </motion.div>
+      <SEO {...SEOConfigs.sellerDashboard} />
+      {status === 'anonymous' || (dash.error instanceof ApiError && dash.error.code === 'UNAUTHORIZED') ? (
+        <div className="max-w-xl mx-auto">
+          <EmptyState kind="orders" title="Overview" description="Sign in with your seller account to see sales, escrow and orders." action={<Button asChild><Link to="/login" state={{ next: '/seller-dashboard' }}>Sign in</Link></Button>} />
+        </div>
+      ) : dash.isLoading ? (
+        <DashboardSkeleton />
+      ) : dash.isError || !d ? (
+        <div className="max-w-xl mx-auto">
+          {dash.error instanceof ApiError && dash.error.code === 'FORBIDDEN' ? (
+            <EmptyState
+              kind="orders"
+              title="Overview"
+              description="This account isn’t a seller yet. Open a store to unlock the seller hub — escrow‑protected checkout, live shopping and payouts included."
+              action={<Button variant="gradient" asChild><Link to="/sell-on-ezyify">Open a store</Link></Button>}
+            />
+          ) : (
+            <QueryError error={dash.error} onRetry={() => void dash.refetch()} />
+          )}
+        </div>
+      ) : (
+        <motion.div variants={staggerContainer(reduce ? 0 : 0.05)} initial="hidden" animate="visible" className="space-y-6">
+          <motion.div variants={fadeUp} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="font-display text-2xl font-semibold text-foreground">Overview</h1>
+              <p className="text-sm text-foreground-secondary mt-1">
+                {me.data ? `Welcome back, ${me.data.name.split(' ')[0]} — ` : ''}last {d.window.days} days vs the {d.window.days} before.
+              </p>
+            </div>
+            <Button variant="gradient" size="md" asChild className="shadow-brand">
+              <Link to="/seller/add-product"><Plus className="size-4" aria-hidden />Add product</Link>
+            </Button>
+          </motion.div>
 
-        {/* KPI Cards */}
-        <motion.div variants={fadeUp} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <KPICard title="Revenue" value="$1,856" delta={18.2} icon={DollarSign} trend="up" />
-          <KPICard title="Orders" value="342" delta={12.5} icon={ShoppingCart} trend="up" />
-          <KPICard title="Visitors" value="45.6K" delta={15.4} icon={Eye} trend="up" />
-          <KPICard title="Conversion" value="3.2%" delta={0.3} icon={TrendingUp} trend="up" />
-        </motion.div>
-
-        {/* Alerts */}
-        <motion.div variants={fadeUp} className="space-y-2">
-          {[
-            { type: 'error', message: '12 orders need shipping today', action: 'Ship Now', href: '/seller/orders' },
-            { type: 'warning', message: '5 products low in stock', action: 'Restock', href: '/seller/products' }
-          ].map((alert, i) => (
-            <Card
-              key={i}
-              variant="elevated"
-              padding="md"
-              className="flex items-center justify-between gap-4"
-            >
-              <div className="flex items-center gap-3">
-                <AlertTriangle className={cn('size-5', alert.type === 'error' ? 'text-error' : 'text-warning')} />
-                <p className="text-sm font-medium text-foreground">{alert.message}</p>
+          <motion.div variants={fadeUp} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <KPICard testId="kpi-gross" title="Gross sales" value={fmt(d.gross.current)} delta={deltaPct(d.gross.current.amount, d.gross.previous.amount)} icon={DollarSign} hint={`vs ${fmt(d.gross.previous)}`} />
+            <KPICard testId="kpi-orders" title="Orders" value={formatCompactNumber(d.orders.current)} delta={deltaPct(d.orders.current, d.orders.previous)} icon={ShoppingCart} hint={`vs ${d.orders.previous}`} />
+            <KPICard title="Avg. order" value={fmt(d.averageOrder.current)} delta={deltaPct(d.averageOrder.current.amount, d.averageOrder.previous.amount)} icon={TrendingUp} hint={`vs ${fmt(d.averageOrder.previous)}`} />
+            <Card variant="default" padding="md" className="space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-xs sm:text-sm font-medium text-foreground-secondary">Store rating</span>
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-subtle text-primary"><Star className="size-4" aria-hidden /></span>
               </div>
-              <Link to={alert.href}>
-                <Button variant="outline" size="sm">
-                  {alert.action}
-                </Button>
-              </Link>
+              <div className="font-display font-bold text-xl sm:text-2xl text-foreground tabular-nums">{d.rating.count ? d.rating.average.toFixed(1) : '—'}</div>
+              <p className="text-xs text-foreground-secondary min-h-6 flex items-center">{d.rating.count ? `${formatCompactNumber(d.rating.count)} ${d.rating.count === 1 ? 'review' : 'reviews'}` : 'No reviews yet'}</p>
             </Card>
-          ))}
-        </motion.div>
+          </motion.div>
 
-        {/* Revenue Chart */}
-        <motion.div variants={fadeUp}>
-          <Card variant="default" padding="lg">
-            <h2 className="font-display font-semibold text-lg mb-6 text-foreground">Weekly Revenue</h2>
-            <div className="w-full h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="date" stroke="var(--color-foreground-tertiary)" />
-                  <YAxis stroke="var(--color-foreground-tertiary)" />
-                  <Tooltip contentStyle={{ backgroundColor: 'var(--color-background-elevated)', border: '1px solid var(--color-border)' }} />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="var(--color-primary)"
-                    fillOpacity={1}
-                    fill="url(#colorRevenue)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        </motion.div>
+          <motion.div variants={fadeUp} className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <Card variant="elevated" padding="md" className="flex items-center gap-4">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-subtle text-primary"><ShieldCheck className="size-5" aria-hidden /></span>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-foreground-secondary">Held in escrow</p>
+                <p className="font-display font-bold text-lg text-foreground tabular-nums" data-testid="kpi-escrow">{fmt(d.escrowHeld)}</p>
+                <p className="text-xs text-foreground-tertiary">Releases to your wallet as buyers confirm delivery</p>
+              </div>
+            </Card>
+            <Card variant="elevated" padding="md" className="flex items-center gap-4">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-success-subtle text-success"><DollarSign className="size-5" aria-hidden /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-foreground-secondary">Paid out to date</p>
+                <p className="font-display font-bold text-lg text-foreground tabular-nums">{fmt(d.paidOut)}</p>
+                <Link to="/seller/earnings" className="text-xs text-primary hover:underline">Earnings & withdrawals →</Link>
+              </div>
+            </Card>
+          </motion.div>
 
-        {/* Recent Orders */}
-        <motion.div variants={fadeUp}>
-          <Card variant="default" padding="lg">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-display font-semibold text-lg text-foreground">Recent Orders</h2>
-              <Link to="/seller/orders" className="text-sm font-medium text-primary hover:underline">
-                View All →
-              </Link>
-            </div>
+          {alerts.length > 0 && (
+            <motion.div variants={fadeUp} className="space-y-2" role="list" aria-label="Needs attention">
+              {alerts.map(alert => {
+                const Icon = alert.icon;
+                return (
+                  <Card key={alert.message} variant="elevated" padding="md" className="flex items-center justify-between gap-4" role="listitem">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Icon className={cn('size-5 shrink-0', alert.tone === 'error' ? 'text-error' : 'text-warning')} aria-hidden />
+                      <p className="text-sm font-medium text-foreground">{alert.message}</p>
+                    </div>
+                    <Button variant="outline" size="sm" asChild><Link to={alert.href}>{alert.action}</Link></Button>
+                  </Card>
+                );
+              })}
+            </motion.div>
+          )}
 
-            <div className="space-y-3">
-              {[
-                { id: 'EZY001', customer: 'Sarah Ahmed', product: 'Wireless Headphones', amount: '$45', status: 'pending' },
-                { id: 'EZY002', customer: 'Mike Rahman', product: 'Smart Watch Pro', amount: '$120', status: 'processing' },
-                { id: 'EZY003', customer: 'Emma Khan', product: 'Wireless Earbuds', amount: '$25', status: 'shipped' }
-              ].map(order => (
-                <div
-                  key={order.id}
-                  className="flex items-center justify-between p-4 bg-background-elevated rounded-xl hover:bg-background-elevated/80 transition-colors"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium text-foreground text-sm">{order.customer}</p>
-                    <p className="text-xs text-foreground-secondary mt-0.5">{order.product}</p>
+          <motion.div variants={fadeUp}>
+            <Card variant="default" padding="lg">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-display font-semibold text-lg text-foreground">Sales · last 14 days</h2>
+                <span className="text-xs text-foreground-secondary tabular-nums">{formatMoney({ amount: series.reduce((n, p) => n + p.gross, 0), currency: d.currency })} · {series.reduce((n, p) => n + p.orders, 0)} orders</span>
+              </div>
+              <div className="w-full h-64" role="img" aria-label={`Daily gross sales for the last 14 days, from ${series[0]?.date ?? ''} to ${series.at(-1)?.date ?? ''}`}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={series} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="dashGross" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                    <XAxis dataKey="label" stroke="var(--color-foreground-tertiary)" tickLine={false} axisLine={false} fontSize={12} />
+                    <YAxis stroke="var(--color-foreground-tertiary)" tickLine={false} axisLine={false} fontSize={12} width={56} tickFormatter={(v: number) => formatMoney({ amount: Math.round(v * 100), currency: d.currency }, { compact: true })} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: 'var(--color-background-elevated)', border: '1px solid var(--color-border)', borderRadius: 12 }}
+                      content={({ active, payload }) => {
+                        const p = payload?.[0]?.payload as { date: string; gross: number; orders: number } | undefined;
+                        if (!active || !p) return null;
+                        return (
+                          <div className="rounded-xl border border-border bg-background-elevated px-3 py-2 text-xs shadow-lg">
+                            <p className="font-medium text-foreground">{p.date}</p>
+                            <p className="text-foreground-secondary tabular-nums">{formatMoney({ amount: p.gross, currency: d.currency })} · {p.orders} {p.orders === 1 ? 'order' : 'orders'}</p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Area type="monotone" dataKey="grossMajor" stroke="var(--color-primary)" strokeWidth={2} fillOpacity={1} fill="url(#dashGross)" isAnimationActive={!reduce} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={fadeUp}>
+            <Card variant="default" padding="lg">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display font-semibold text-lg text-foreground">Recent orders</h2>
+                <Link to="/seller/orders" className="text-sm font-medium text-primary hover:underline">View all →</Link>
+              </div>
+              {recent.isLoading ? (
+                <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}</div>
+              ) : recentOrders.length === 0 ? (
+                <p className="text-sm text-foreground-secondary py-6 text-center">No orders yet — they’ll appear here the moment a shopper checks out.</p>
+              ) : (
+                <div className="divide-y divide-border">{recentOrders.slice(0, 5).map(o => <RecentOrderRow key={o.id} order={o} />)}</div>
+              )}
+            </Card>
+          </motion.div>
+
+          <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { to: '/seller/products', icon: Package, title: 'Products', text: 'Inventory, prices & drafts' },
+              { to: '/seller/analytics', icon: TrendingUp, title: 'Analytics', text: 'Deeper trends & top items' },
+              { to: '/seller/settings', icon: Settings, title: 'Store settings', text: 'Profile, shipping & payouts' },
+            ].map(({ to, icon: Icon, title, text }) => (
+              <Link key={to} to={to} className="rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <Card variant="elevated" padding="lg" interactive className="text-center space-y-3 h-full">
+                  <Icon className="size-8 text-primary mx-auto" aria-hidden />
+                  <div>
+                    <h3 className="font-display font-semibold text-foreground">{title}</h3>
+                    <p className="text-xs text-foreground-secondary mt-1">{text}</p>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="font-semibold text-foreground tabular-nums">{order.amount}</span>
-                    <span
-                      className={cn(
-                        'text-xs font-semibold px-2 py-1 rounded-lg',
-                        order.status === 'pending'
-                          ? 'bg-warning-subtle text-warning'
-                          : order.status === 'processing'
-                            ? 'bg-info-subtle text-info'
-                            : 'bg-success-subtle text-success'
-                      )}
-                    >
-                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <Link to="/seller/orders" className="block mt-4">
-              <Button variant="secondary" fullWidth>
-                View All Orders
-              </Button>
-            </Link>
-          </Card>
+                </Card>
+              </Link>
+            ))}
+          </motion.div>
         </motion.div>
-
-        {/* Quick Actions */}
-        <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Link to="/seller/add-product">
-            <Card variant="elevated" padding="lg" interactive className="text-center space-y-3">
-              <Plus className="size-8 text-primary mx-auto" />
-              <div>
-                <h3 className="font-display font-semibold text-foreground">Add Product</h3>
-                <p className="text-xs text-foreground-secondary mt-1">List a new item</p>
-              </div>
-            </Card>
-          </Link>
-          <Link to="/seller/analytics">
-            <Card variant="elevated" padding="lg" interactive className="text-center space-y-3">
-              <TrendingUp className="size-8 text-primary mx-auto" />
-              <div>
-                <h3 className="font-display font-semibold text-foreground">Analytics</h3>
-                <p className="text-xs text-foreground-secondary mt-1">View insights</p>
-              </div>
-            </Card>
-          </Link>
-          <Link to="/seller/settings">
-            <Card variant="elevated" padding="lg" interactive className="text-center space-y-3">
-              <Package className="size-8 text-primary mx-auto" />
-              <div>
-                <h3 className="font-display font-semibold text-foreground">Store Settings</h3>
-                <p className="text-xs text-foreground-secondary mt-1">Configure</p>
-              </div>
-            </Card>
-          </Link>
-        </motion.div>
-      </motion.div>
+      )}
     </SellerLayout>
   );
 }

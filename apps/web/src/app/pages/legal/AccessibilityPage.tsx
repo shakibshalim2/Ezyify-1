@@ -253,8 +253,8 @@ export default function AccessibilityPage() {
             <div className="space-y-3">
               <div className="p-4 bg-muted rounded-xl">
                 <p className="font-semibold mb-1">Email our Accessibility Team:</p>
-                <a href="mailto:accessibility@ezyify.com" className="text-primary hover:underline">
-                  accessibility@ezyify.com
+                <a href="mailto:accessibility@ezyify.app" className="text-primary hover:underline">
+                  accessibility@ezyify.app
                 </a>
               </div>
 

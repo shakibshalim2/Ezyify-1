@@ -19,6 +19,7 @@ const REASONS: { id: ReportRequest['reason']; label: string; hint: string }[] = 
   { id: 'harassment', label: 'Harassment or bullying', hint: 'Threats, insults, unwanted contact' },
   { id: 'hate', label: 'Hate speech', hint: 'Attacks on protected groups' },
   { id: 'nudity', label: 'Nudity or sexual content', hint: '' },
+  { id: 'child_safety', label: 'Child safety', hint: 'Sexualisation, exploitation or endangerment of a minor — reviewed first' },
   { id: 'violence', label: 'Violence or dangerous acts', hint: '' },
   { id: 'self_harm', label: 'Self-harm', hint: 'We’ll also share support resources' },
   { id: 'ip', label: 'Intellectual property', hint: 'Copyright or trademark' },

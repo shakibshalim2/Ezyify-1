@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useStore } from 'zustand';
-import { useRuntime, type Role } from '@ezyify/core';
+import { isMfaChallenge, useRuntime, type Role } from '@ezyify/core';
 import type { WebRuntime } from '../runtime';
 
 export type UserRole = 'guest' | Role;
@@ -21,7 +21,10 @@ interface AuthContextType {
   /** True until the cookie-based silent refresh has settled on cold start. */
   isLoading: boolean;
   userRole: UserRole;
-  login: (identifier: string, password: string) => Promise<void>;
+  /** Resolves `{ mfaRequired: true, challengeToken }` when the account has two-factor enabled; the caller routes to `/two-factor`. */
+  login: (identifier: string, password: string) => Promise<{ mfaRequired: false } | { mfaRequired: true; challengeToken: string }>;
+  /** Completes an MFA login challenge with a TOTP or recovery code. */
+  verifyMfa: (challengeToken: string, code: string) => Promise<void>;
   /** Creates the account; the caller sends the user to OTP verification with the returned id. */
   signup: (email: string, password: string, name: string) => Promise<{ userId: string }>;
   verifyOtp: (userId: string, otp: string, type?: 'email' | 'phone') => Promise<void>;
@@ -48,7 +51,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = useCallback(
     async (identifier: string, password: string) => {
-      const session = await runtime.api.auth.login({ identifier: identifier.trim(), password });
+      const result = await runtime.api.auth.login({ identifier: identifier.trim(), password });
+      if (isMfaChallenge(result)) return { mfaRequired: true as const, challengeToken: result.challengeToken };
+      await runtime.commitSession(result);
+      return { mfaRequired: false as const };
+    },
+    [runtime],
+  );
+
+  const verifyMfa = useCallback(
+    async (challengeToken: string, code: string) => {
+      const session = await runtime.api.auth.mfa.verify({ challengeToken, code: code.trim() });
       await runtime.commitSession(session);
     },
     [runtime],
@@ -80,8 +93,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       status === 'authenticated' && summary
         ? { id: summary.id, username: summary.username, name: summary.name, role: summary.role, avatar: summary.avatarUrl, isVerified: summary.verified }
         : null;
-    return { user, isAuthenticated: !!user, isLoading, userRole: user?.role ?? 'guest', login, signup, verifyOtp, logout };
-  }, [status, summary, isLoading, login, signup, verifyOtp, logout]);
+    return { user, isAuthenticated: !!user, isLoading, userRole: user?.role ?? 'guest', login, verifyMfa, signup, verifyOtp, logout };
+  }, [status, summary, isLoading, login, verifyMfa, signup, verifyOtp, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

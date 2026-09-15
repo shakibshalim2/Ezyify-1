@@ -231,7 +231,7 @@ export default function ProductDetailPage() {
           </div>
 
           <motion.div initial={reduce ? {} : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }} className="mt-12 lg:mt-16">
-            <ReviewsSection reviews={[]} stats={{ average: data.rating, total: data.reviewCount }} />
+            <ReviewsSection productId={data.id} fallback={{ average: data.rating, total: data.reviewCount }} />
           </motion.div>
 
           {relatedItems.length > 0 && (

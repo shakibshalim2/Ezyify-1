@@ -6,7 +6,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { requestPush } from '@/lib/push';
 import { biometricsAvailable } from '@/lib/biometrics';
-import { useAddresses, useApi, useAuth, useBlockedUsers } from '@ezyify/core';
+import { useAddresses, useApi, useAuth, useBlockedUsers, useMfaStatus } from '@ezyify/core';
 import { Header } from '@/components/Header';
 import { Text } from '@/components/Text';
 import { Avatar } from '@/components/Avatar';
@@ -25,6 +25,7 @@ export default function SettingsScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const interests = useAppStore(s => s.interests);
   const blocked = useBlockedUsers();
+  const mfa = useMfaStatus();
   const addresses = useAddresses();
   const api = useApi();
   const setPushAsked = useAppStore(s => s.setPushAsked);
@@ -57,6 +58,7 @@ export default function SettingsScreen() {
     { title: 'Privacy & security', rows: [
       { icon: 'lock-closed-outline', label: 'Private account', toggle: true, toggleValue: privateAcct, onToggle: setPrivateAcct },
       { icon: 'finger-print-outline', label: 'Biometric unlock', value: bioOk ? 'Available' : 'Not set up on device' },
+      { icon: 'shield-checkmark-outline', label: 'Two-factor authentication', value: mfa.data ? (mfa.data.enabled ? 'On' : mfa.data.requiredForRole ? 'Required' : 'Off') : undefined, onPress: () => router.push('/settings/two-factor') },
       { icon: 'phone-portrait-outline', label: 'Devices & sessions', onPress: () => router.push('/settings/sessions') },
       { icon: 'download-outline', label: 'Download your data', onPress: () => Alert.alert('Export your data', "We'll email you a download link within 24 hours.", [{ text: 'Cancel', style: 'cancel' }, { text: 'Request export', onPress: () => api.account.exportData().then(() => Alert.alert('Request received', 'Check your inbox soon.')).catch(() => Alert.alert('Something went wrong', 'Please try again later.')) }]) },
       { icon: 'ban-outline', label: 'Blocked accounts', value: `${blocked.data?.length ?? 0}`, onPress: () => router.push('/settings/blocked') },
@@ -65,6 +67,7 @@ export default function SettingsScreen() {
       { icon: 'help-circle-outline', label: 'Help center', onPress: () => WebBrowser.openBrowserAsync('https://ezyify.app/help') },
       { icon: 'document-text-outline', label: 'Terms of service', onPress: () => WebBrowser.openBrowserAsync('https://ezyify.app/legal/terms') },
       { icon: 'shield-outline', label: 'Privacy policy', onPress: () => WebBrowser.openBrowserAsync('https://ezyify.app/legal/privacy') },
+      { icon: 'heart-outline', label: 'Child safety standards', onPress: () => WebBrowser.openBrowserAsync('https://ezyify.app/legal/child-safety') },
       { icon: 'flag-outline', label: 'Report a problem', onPress: () => router.push({ pathname: '/report', params: { type: 'user', id: 'app' } }) },
       { icon: 'trash-outline', label: 'Delete account', danger: true, onPress: () => router.push('/settings/delete-account') },
     ]},
@@ -75,7 +78,7 @@ export default function SettingsScreen() {
       <Header title="Settings" />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 24, paddingBottom: 40 }}>
         {user && <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/profile/[username]', params: { username: user.username } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, backgroundColor: colors.card, borderRadius: radius.card, borderWidth: 1, borderColor: colors.borderSubtle }}>
-          <Avatar uri={user.avatarUrl} size={56} verified={user.verified} />
+          <Avatar uri={user.avatarUrl} name={user.name} size={56} verified={user.verified} />
           <View style={{ flex: 1 }}>
             <Text variant="heading">{user.name}</Text>
             <Text variant="caption" tone="secondary">@{user.username}</Text>

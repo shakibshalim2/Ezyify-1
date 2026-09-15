@@ -231,8 +231,8 @@ export default function InvestorsPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <div>
               <p className="text-sm text-white/80 mb-1">Email</p>
-              <a href="mailto:ir@ezyify.com" className="font-medium hover:underline">
-                ir@ezyify.com
+              <a href="mailto:ir@ezyify.app" className="font-medium hover:underline">
+                ir@ezyify.app
               </a>
             </div>
             <div className="hidden sm:block w-px bg-white/30"></div>

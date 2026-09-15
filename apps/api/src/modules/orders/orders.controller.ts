@@ -50,6 +50,18 @@ export class OrdersController {
   }
 
   // Seller side
+  @Get('seller/orders/summary')
+  @Roles('seller')
+  sellerSummary(@CurrentUser() user: AccessClaims) {
+    return this.orders.sellerSummary(user.sub);
+  }
+
+  @Post('seller/orders/:id/cancel')
+  @Roles('seller')
+  sellerCancel(@CurrentUser() user: AccessClaims, @Param('id') id: string) {
+    return this.orders.setStatus(user.sub, id, 'cancelled', 'seller', 'Cancelled by seller · refunded to buyer');
+  }
+
   @Post('seller/orders/:id/accept')
   @Roles('seller')
   accept(@CurrentUser() user: AccessClaims, @Param('id') id: string) {

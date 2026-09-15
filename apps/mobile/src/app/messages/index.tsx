@@ -55,7 +55,7 @@ export default function MessagesScreen() {
           const unread = item.unreadCount > 0;
           return (
             <Pressable accessibilityRole="button" accessibilityLabel={`Chat with ${u.name}`} onPress={() => router.push({ pathname: '/messages/[id]', params: { id: item.id } })} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: pressed ? colors.muted : 'transparent' })}>
-              <Avatar uri={u.avatarUrl} size={52} verified={u.verified} />
+              <Avatar uri={u.avatarUrl} name={u.name} size={52} verified={u.verified} />
               <View style={{ flex: 1, gap: 2 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <Text variant="bodyMedium">{u.name}</Text>

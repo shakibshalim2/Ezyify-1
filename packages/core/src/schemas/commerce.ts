@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IdSchema, IsoDateSchema, MoneySchema } from './common.js';
+import { IdSchema, IsoDateSchema, MoneySchema, PaginationSchema } from './common.js';
 import { ProductSummarySchema } from './catalog.js';
 import { UserSummarySchema } from './user.js';
 
@@ -59,6 +59,11 @@ export const OrderSchema = z.object({
     autoReleaseAt: IsoDateSchema.nullable(),
   }),
   seller: UserSummarySchema,
+  buyer: UserSummarySchema,
+  /** Snapshot of where the parcel goes — only what a seller needs to ship; no full address book exposure. */
+  shippingTo: z.object({ recipient: z.string(), city: z.string(), region: z.string().nullable(), country: z.string() }),
+  paymentMethod: z.enum(['wallet', 'card', 'bank_transfer', 'cod']),
+  note: z.string().nullable(),
   items: z.array(OrderItemSchema).min(1),
   subtotal: MoneySchema,
   shipping: MoneySchema,
@@ -70,6 +75,80 @@ export const OrderSchema = z.object({
   deliveredAt: IsoDateSchema.nullable(),
 });
 export type Order = z.infer<typeof OrderSchema>;
+
+export const ShipOrderRequestSchema = z.object({
+  carrier: z.string().min(1).max(60),
+  number: z.string().min(1).max(80),
+  url: z.string().url().optional(),
+});
+export type ShipOrderRequest = z.infer<typeof ShipOrderRequestSchema>;
+
+/** Seller‑side order counts for hub tabs; `needsAction` = paid (accept) + processing (ship) + refund_requested (decide). */
+export const SellerOrdersSummarySchema = z.object({
+  total: z.number().int().min(0),
+  needsAction: z.number().int().min(0),
+  toShip: z.number().int().min(0),
+  inTransit: z.number().int().min(0),
+  completed: z.number().int().min(0),
+  refunds: z.number().int().min(0),
+});
+export type SellerOrdersSummary = z.infer<typeof SellerOrdersSummarySchema>;
+
+/** Seller overview (`GET /seller/dashboard`): 30‑day window vs the previous 30 days, plus what needs attention today. */
+export const SellerDashboardSchema = z.object({
+  currency: MoneySchema.shape.currency,
+  window: z.object({ from: IsoDateSchema, to: IsoDateSchema, days: z.number().int().min(1) }),
+  gross: z.object({ current: MoneySchema, previous: MoneySchema }),
+  orders: z.object({ current: z.number().int().min(0), previous: z.number().int().min(0) }),
+  averageOrder: z.object({ current: MoneySchema, previous: MoneySchema }),
+  escrowHeld: MoneySchema,
+  paidOut: MoneySchema,
+  rating: z.object({ average: z.number().min(0).max(5), count: z.number().int().min(0) }),
+  series: z.array(z.object({ date: z.string(), gross: z.number().int().min(0), orders: z.number().int().min(0) })),
+  attention: z.object({ toShip: z.number().int().min(0), refundRequests: z.number().int().min(0), lowStock: z.number().int().min(0), outOfStock: z.number().int().min(0) }),
+});
+export type SellerDashboard = z.infer<typeof SellerDashboardSchema>;
+
+/** Seller analytics (`GET /seller/analytics`): everything is computed from real order lines in the window. */
+export const SellerAnalyticsSchema = z.object({
+  currency: MoneySchema.shape.currency,
+  window: z.object({ from: IsoDateSchema, to: IsoDateSchema, days: z.number().int().min(1) }),
+  totals: z.object({ gross: MoneySchema, orders: z.number().int().min(0), units: z.number().int().min(0), averageOrder: MoneySchema }),
+  series: z.array(z.object({ date: z.string(), gross: z.number().int().min(0), orders: z.number().int().min(0), units: z.number().int().min(0) })),
+  topProducts: z.array(z.object({ id: IdSchema, name: z.string(), imageUrl: z.string().url(), units: z.number().int().min(0), orders: z.number().int().min(0), gross: MoneySchema, share: z.number().min(0).max(1) })),
+  categories: z.array(z.object({ name: z.string(), gross: MoneySchema, units: z.number().int().min(0), share: z.number().min(0).max(1) })),
+  customers: z.object({ unique: z.number().int().min(0), repeat: z.number().int().min(0), firstTime: z.number().int().min(0) }),
+  fulfillment: z.object({
+    /** Mean hours from payment to shipment for orders shipped in the window; null when nothing shipped. */
+    avgHoursToShip: z.number().min(0).nullable(),
+    completionRate: z.number().min(0).max(1),
+    refundRate: z.number().min(0).max(1),
+    cancelRate: z.number().min(0).max(1),
+  }),
+  paymentMix: z.array(z.object({ method: z.enum(['wallet', 'card', 'bank_transfer', 'cod']), orders: z.number().int().min(0), share: z.number().min(0).max(1) })),
+});
+export type SellerAnalytics = z.infer<typeof SellerAnalyticsSchema>;
+
+/** Seller customers (`GET /seller/customers`): buyers aggregated from the seller's paid orders — no email/phone exposure. */
+export const SellerCustomerSchema = z.object({
+  user: UserSummarySchema,
+  orders: z.number().int().min(1),
+  spent: MoneySchema,
+  firstOrderAt: IsoDateSchema,
+  lastOrderAt: IsoDateSchema,
+  /** City/country of the most recent shipment — what a seller needs for logistics, nothing more. */
+  lastShippedTo: z.object({ city: z.string(), country: z.string() }).nullable(),
+  openOrders: z.number().int().min(0),
+});
+export type SellerCustomer = z.infer<typeof SellerCustomerSchema>;
+
+export const SellerCustomersResponseSchema = z.object({
+  items: z.array(SellerCustomerSchema),
+  pagination: PaginationSchema,
+  summary: z.object({ total: z.number().int().min(0), repeat: z.number().int().min(0), averageOrder: MoneySchema, averageLifetime: MoneySchema }),
+});
+export type SellerCustomersResponse = z.infer<typeof SellerCustomersResponseSchema>;
+export type SellerCustomerSort = 'recent' | 'spent' | 'orders';
 
 export const OrderEventSchema = z.object({
   status: OrderStatusSchema,
@@ -92,6 +171,32 @@ export const WalletSchema = z.object({
 });
 export type Wallet = z.infer<typeof WalletSchema>;
 
+export const PayoutMethodSchema = z.object({
+  id: IdSchema,
+  type: z.enum(['bank_account', 'ewallet']),
+  label: z.string(),
+  holderName: z.string(),
+  institution: z.string(),
+  /** Only the last 4 digits ever leave the server. */
+  accountLast4: z.string().length(4),
+  country: z.string().length(2),
+  isDefault: z.boolean(),
+  createdAt: IsoDateSchema,
+});
+export type PayoutMethod = z.infer<typeof PayoutMethodSchema>;
+
+export const CreatePayoutMethodRequestSchema = z.object({
+  type: z.enum(['bank_account', 'ewallet']).default('bank_account'),
+  label: z.string().trim().min(1).max(30),
+  holderName: z.string().trim().min(2).max(80),
+  institution: z.string().trim().min(2).max(80),
+  accountNumber: z.string().trim().regex(/^[0-9A-Za-z-]{6,34}$/, 'Enter a valid account number'),
+  routing: z.string().trim().max(34).optional(),
+  country: z.string().length(2).default('ID'),
+  isDefault: z.boolean().default(false),
+});
+export type CreatePayoutMethodRequest = z.infer<typeof CreatePayoutMethodRequestSchema>;
+
 export const TransactionSchema = z.object({
   id: IdSchema,
   type: z.enum(['topup', 'purchase', 'refund', 'commission', 'withdrawal', 'transfer']),
@@ -102,6 +207,25 @@ export const TransactionSchema = z.object({
   createdAt: IsoDateSchema,
 });
 export type Transaction = z.infer<typeof TransactionSchema>;
+
+/** Seller earnings (`GET /seller/earnings`): escrow → wallet → bank, with a daily payout series. */
+export const SellerEarningsSchema = z.object({
+  currency: MoneySchema.shape.currency,
+  available: MoneySchema,
+  pendingWithdrawal: MoneySchema,
+  escrowHeld: MoneySchema,
+  paidOutAllTime: MoneySchema,
+  /** Month‑to‑date, and the same day range of the previous month for an honest comparison. */
+  paidOutThisMonth: MoneySchema,
+  paidOutLastMonth: MoneySchema,
+  platformFeeAllTime: MoneySchema,
+  feeBps: z.number().int().min(0).max(10_000),
+  withdrawalMin: MoneySchema,
+  series: z.array(z.object({ date: z.string(), released: z.number().int().min(0), withdrawn: z.number().int().min(0) })),
+  recentPayouts: z.array(TransactionSchema),
+});
+export type SellerEarnings = z.infer<typeof SellerEarningsSchema>;
+
 
 /** Address book entry (GET/POST /addresses). Country is ISO‑3166‑1 alpha‑2. */
 export const AddressSchema = z.object({

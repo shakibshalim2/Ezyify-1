@@ -53,7 +53,7 @@ export default function FollowScreen() {
             const on = followedIds.has(u.id);
             return (
               <Card key={u.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }}>
-                <Avatar uri={u.avatarUrl} size={48} verified={u.verified} />
+                <Avatar uri={u.avatarUrl} name={u.name} size={48} verified={u.verified} />
                 <View style={{ flex: 1 }}>
                   <Text variant="bodyMedium">{u.name}</Text>
                   <Text variant="caption" tone="secondary">@{u.username} · {u.role === 'seller' ? 'Seller' : 'Creator'}</Text>

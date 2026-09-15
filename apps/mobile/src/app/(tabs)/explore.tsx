@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { formatCompactNumber, useCategories, useFeed, useLoops, useSearch, type Post } from '@ezyify/core';
+import { formatCompactNumber, useCategories, useFeed, useLiveSessions, useLoops, useSearch, type Post } from '@ezyify/core';
 import { Text } from '@/components/Text';
 import { SearchBar } from '@/components/SearchBar';
 import { Chip } from '@/components/Chip';
@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ProductCard } from '@/components/ProductCard';
 import { Skeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/QueryState';
+import { LiveSessionCard } from '@/components/LiveSessionCard';
 import { useInfiniteList, useRefresh } from '@/lib/data';
 import { useTheme } from '@/theme';
 import { useDebounced } from '@/lib/useDebounced';
@@ -48,9 +49,10 @@ export default function ExploreScreen() {
   const posts = useFeed(hashtag ? { hashtag } : {});
   const loops = useLoops(hashtag ? { hashtag } : {});
   const search = useSearch(query);
+  const live = useLiveSessions({ status: 'live', pageSize: 20 });
   const postList = useInfiniteList<Post>(posts);
   const loopList = useInfiniteList<Post>(loops);
-  const { refreshing, onRefresh } = useRefresh(async () => Promise.all([posts.refetch(), loops.refetch()]));
+  const { refreshing, onRefresh } = useRefresh(async () => Promise.all([posts.refetch(), loops.refetch(), live.refetch()]));
 
   const grid = useMemo<Item[]>(() => {
     const items: Item[] = [...loopList.items.map(l => ({ kind: 'loop' as const, post: l })), ...postList.items.map(p => ({ kind: 'post' as const, post: p }))];
@@ -89,7 +91,7 @@ export default function ExploreScreen() {
           ListEmptyComponent={loading ? <GridSkeleton /> : <EmptyState icon="people-outline" title="No creators found" body="Try a different name." />}
           renderItem={({ item }) => (
             <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/profile/[username]', params: { username: item.username } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, backgroundColor: colors.card, borderRadius: radius.card, borderWidth: 1, borderColor: colors.borderSubtle }}>
-              <Avatar uri={item.avatarUrl} size={48} verified={item.verified} />
+              <Avatar uri={item.avatarUrl} name={item.name} size={48} verified={item.verified} />
               <View style={{ flex: 1 }}>
                 <Text variant="bodyMedium">{item.name}</Text>
                 <Text variant="caption" tone="secondary">@{item.username}</Text>
@@ -99,7 +101,16 @@ export default function ExploreScreen() {
           )}
         />
       ) : filter === 'Live' ? (
-        <EmptyState icon="videocam-outline" title="No one is live right now" body="Follow creators to get notified when they go live with new drops." actionLabel="Browse creators" onAction={() => setFilter('Creators')} />
+        <FlatList
+          key="live"
+          data={live.data?.items ?? []}
+          keyExtractor={session => session.id}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 24 }}
+          ListEmptyComponent={live.isLoading ? <GridSkeleton /> : live.error ? <ErrorState error={live.error} onRetry={() => live.refetch()} /> : <EmptyState icon="videocam-outline" title="No one is live right now" body="Follow creators to get notified when they go live with new drops." actionLabel="See upcoming streams" onAction={() => router.push('/live')} />}
+          renderItem={({ item }) => <LiveSessionCard session={item} />}
+        />
       ) : (
         <FlatList
           key="grid"
@@ -158,7 +169,7 @@ export default function ExploreScreen() {
                 <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 80 }} />
                 {tall && <View style={{ position: 'absolute', top: 8, left: 8 }}><Badge label="LOOP" tone="primary" /></View>}
                 <View style={{ position: 'absolute', left: 8, right: 8, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Avatar uri={item.post.author.avatarUrl} size={20} />
+                  <Avatar uri={item.post.author.avatarUrl} name={item.post.author.name} size={20} />
                   <Text variant="caption" style={{ color: '#fff', flex: 1 }} numberOfLines={1}>{item.post.author.username}</Text>
                   <Ionicons name={tall ? 'play' : 'heart'} size={12} color="#fff" />
                   <Text variant="caption" style={{ color: '#fff' }}>{formatCompactNumber(tall ? item.post.engagement.views ?? 0 : item.post.engagement.likes)}</Text>

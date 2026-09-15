@@ -81,7 +81,7 @@ export default function EditProfileScreen() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
         <View style={{ alignItems: 'center', gap: 8 }}>
           <Pressable accessibilityRole="button" accessibilityLabel="Change profile photo" onPress={changeAvatar} disabled={uploading} style={{ opacity: uploading ? 0.6 : 1 }}>
-            {me.data ? <Avatar uri={avatarUrl === undefined ? me.data.avatarUrl : avatarUrl} size={96} /> : <Skeleton width={96} height={96} radius={48} />}
+            {me.data ? <Avatar uri={avatarUrl === undefined ? me.data.avatarUrl : avatarUrl} name={me.data.name} size={96} /> : <Skeleton width={96} height={96} radius={48} />}
             <View style={{ position: 'absolute', right: -2, bottom: -2, width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary, borderWidth: 2, borderColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="camera" size={15} color={colors.primaryForeground} />
             </View>

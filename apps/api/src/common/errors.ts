@@ -15,10 +15,14 @@ const STATUS: Record<Code, number> = {
 
 /** Every thrown error carries a spec error code so the client's `ApiError` maps 1:1. */
 export class ApiException extends HttpException {
-  constructor(public readonly code: Code, message: string, public readonly details?: Record<string, string>) {
-    super({ success: false, error: { code, message, details } }, STATUS[code]);
+  /** `status` overrides the default mapping (e.g. 503 for a disabled provider) while keeping a spec `code`. */
+  constructor(public readonly code: Code, message: string, public readonly details?: Record<string, string>, status: number = STATUS[code]) {
+    super({ success: false, error: { code, message, details } }, status);
   }
 }
+
+/** Provider not configured on this deployment → 503. `details.code` carries the feature-specific reason (e.g. LIVE_UNAVAILABLE). */
+export const serviceUnavailable = (feature: string, reason: string) => new ApiException('SERVER_ERROR', `${feature} is not enabled on this server`, { code: reason }, HttpStatus.SERVICE_UNAVAILABLE);
 
 export const notFound = (what: string) => new ApiException('NOT_FOUND', `${what} not found`);
 export const forbidden = (msg = 'You do not have access to this resource') => new ApiException('FORBIDDEN', msg);
