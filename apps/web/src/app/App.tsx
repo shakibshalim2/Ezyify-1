@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useEffect, useState, memo } from 'react';
-import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from 'react-router';
+import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation, useParams } from 'react-router';
 import { AuthProvider } from './contexts/AuthContext';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { EzyifyContext } from '@ezyify/core';
@@ -107,6 +107,11 @@ const WalletPage = createLazyComponent(() => import('./pages/user/index').then(m
 const OrdersPage = createLazyComponent(() => import('./pages/user/index').then(m => ({ default: m.OrdersPage })));
 const OrderSuccessPage = createLazyComponent(() => import('./pages/OrderSuccessPage'));
 const OrderTrackingPage = createLazyComponent(() => import('./pages/user/OrderTrackingPage'));
+/** Figma-era `/user/order-tracking/:orderId` → canonical `/orders/:orderId`. */
+function LegacyOrderRedirect() {
+  const { orderId } = useParams();
+  return <Navigate to={`/orders/${orderId ?? ''}`} replace />;
+}
 
 // Batch 3
 const CreatorDashboardPage = createLazyComponent(() => import('./pages/creator/index').then(m => ({ default: m.DashboardPage })));
@@ -183,21 +188,15 @@ const FollowersPage = createLazyComponent(() => import('./pages/profile/Follower
 // Batch 9
 const RefundRequestPage = createLazyComponent(() => import('./pages/orders/RefundRequestPage'));
 const RefundStatusPage = createLazyComponent(() => import('./pages/orders/RefundStatusPage'));
-const ReturnRequestPage = createLazyComponent(() => import('./pages/orders/ReturnRequestPage'));
-const DisputePage = createLazyComponent(() => import('./pages/orders/DisputePage'));
-const DisputeDetailPage = createLazyComponent(() => import('./pages/orders/DisputeDetailPage'));
-const RefundHistoryPage = createLazyComponent(() => import('./pages/user/RefundHistoryPage'));
 const DisputeResolutionDashboard = createLazyComponent(() => import('./pages/admin/DisputeResolutionDashboard'));
 const AffiliateRulesPage = createLazyComponent(() => import('./pages/AffiliateRulesPage'));
 const ReferralTrackingPage = createLazyComponent(() => import('./pages/ReferralTrackingPage'));
 const VerificationStatusPage = createLazyComponent(() => import('./pages/VerificationStatusPage'));
-const MultiSellerOrderTrackingPage = createLazyComponent(() => import('./pages/user/MultiSellerOrderTrackingPage'));
 const UserManagementDashboard = createLazyComponent(() => import('./pages/admin/users/UserManagementDashboard'));
 const ContentModerationQueue = createLazyComponent(() => import('./pages/admin/moderation/ContentModerationQueue'));
 const FraudDetectionDashboard = createLazyComponent(() => import('./pages/admin/fraud/FraudDetectionDashboard'));
 const SellerApprovalQueue = createLazyComponent(() => import('./pages/admin/operations/SellerApprovalQueue'));
 const LiveShoppingPage = createLazyComponent(() => import('./pages/LiveShoppingPage'));
-const RefundNegotiationPage = createLazyComponent(() => import('./pages/orders/RefundNegotiationPage'));
 
 
 function PageLoader() {
@@ -345,7 +344,8 @@ export default function App() {
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/order/:orderId" element={<OrderSuccessPage />} />
                 <Route path="/order-success" element={<OrderSuccessPage />} />
-                <Route path="/user/order-tracking/:orderId" element={<OrderTrackingPage />} />
+                <Route path="/orders/:orderId" element={<OrderTrackingPage />} />
+                <Route path="/user/order-tracking/:orderId" element={<LegacyOrderRedirect />} />
                 <Route path="/creator-dashboard" element={<CreatorDashboardPage />} />
                 <Route path="/live-schedule" element={<LiveSchedulePage />} />
                 <Route path="/affiliate-manager" element={<AffiliateManagerPage />} />
@@ -382,7 +382,7 @@ export default function App() {
                 <Route path="/settings/notifications" element={<NotificationSettingsPage />} />
                 <Route path="/settings/account-management" element={<AccountManagementPage />} />
                 <Route path="/seller/kyc-verification" element={<KYCVerificationPage />} />
-                <Route path="/user/order-tracking" element={<OrderTrackingPage />} />
+                <Route path="/user/order-tracking" element={<Navigate to="/orders" replace />} />
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/contact" element={<ContactPage />} />
                 <Route path="/careers" element={<CareersPage />} />
@@ -406,25 +406,28 @@ export default function App() {
                 <Route path="/seller/withdraw" element={<WithdrawPage />} />
                 <Route path="/seller/payout-settings" element={<PayoutSettingsPage />} />
                 <Route path="/seller/security-monitor" element={<SecurityMonitorPage />} />
-                <Route path="/orders/refund-request" element={<RefundRequestPage />} />
-                <Route path="/orders/refund-status/:refundId" element={<RefundStatusPage />} />
-                <Route path="/orders/return-request" element={<ReturnRequestPage />} />
-                <Route path="/orders/dispute" element={<DisputePage />} />
-                <Route path="/orders/dispute/:disputeId" element={<DisputeDetailPage />} />
-                <Route path="/user/refund-history" element={<RefundHistoryPage />} />
+                <Route path="/orders/:id/refund/new" element={<RefundRequestPage />} />
+                <Route path="/orders/:id/refund" element={<RefundStatusPage />} />
+                {/* Legacy Figma-era paths; the case now lives under the order. */}
+                <Route path="/orders/refund-request" element={<Navigate to="/orders" replace />} />
+                <Route path="/orders/refund-status/:refundId" element={<Navigate to="/orders?filter=refunds" replace />} />
+                <Route path="/orders/return-request" element={<Navigate to="/orders" replace />} />
+                <Route path="/orders/dispute" element={<Navigate to="/orders?filter=refunds" replace />} />
+                <Route path="/orders/dispute/:disputeId" element={<Navigate to="/orders?filter=refunds" replace />} />
+                <Route path="/orders/refund-negotiation" element={<Navigate to="/orders?filter=refunds" replace />} />
+                <Route path="/user/refund-history" element={<Navigate to="/orders?filter=refunds" replace />} />
                 <Route path="/admin/disputes" element={<DisputeResolutionDashboard />} />
                 <Route path="/affiliate-rules" element={<AffiliateRulesPage />} />
                 <Route path="/referral-tracking" element={<ReferralTrackingPage />} />
                 <Route path="/verification-status" element={<VerificationStatusPage />} />
                 <Route path="/transparency" element={<TransparencyPage />} />
                 <Route path="/commission-policy" element={<CommissionPolicyPage />} />
-                <Route path="/user/multi-seller-order-tracking" element={<MultiSellerOrderTrackingPage />} />
+                <Route path="/user/multi-seller-order-tracking" element={<Navigate to="/orders" replace />} />
                 <Route path="/admin/users" element={<UserManagementDashboard />} />
                 <Route path="/admin/moderation" element={<ContentModerationQueue />} />
                 <Route path="/admin/fraud" element={<FraudDetectionDashboard />} />
                 <Route path="/admin/operations/seller-approval" element={<SellerApprovalQueue />} />
                 <Route path="/live-shopping" element={<LiveShoppingPage />} />
-                <Route path="/orders/refund-negotiation" element={<RefundNegotiationPage />} />
                 {devRoutes}
                 {/* Catch-all: any unmatched path shows 404 */}
                 <Route path="*" element={<NotFoundPage />} />

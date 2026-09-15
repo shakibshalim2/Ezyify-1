@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { z } from 'zod';
-import { RegisterDeviceRequestSchema, type RegisterDeviceRequest } from '@ezyify/core';
+import { RegisterDeviceRequestSchema, UpdateNotificationPreferencesRequestSchema, type RegisterDeviceRequest, type UpdateNotificationPreferencesRequest } from '@ezyify/core';
 import { NotificationsService } from './notifications.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import type { AccessClaims } from '../auth/auth.guard.js';
@@ -41,5 +41,15 @@ export class NotificationsController {
   @Delete('devices/:token')
   unregister(@CurrentUser() user: AccessClaims, @Param('token') token: string) {
     return this.notifications.unregisterDevice(user.sub, token);
+  }
+
+  @Get('users/me/notification-preferences')
+  preferences(@CurrentUser() user: AccessClaims) {
+    return this.notifications.preferences(user.sub);
+  }
+
+  @Patch('users/me/notification-preferences')
+  updatePreferences(@CurrentUser() user: AccessClaims, @Body(zod(UpdateNotificationPreferencesRequestSchema)) body: UpdateNotificationPreferencesRequest) {
+    return this.notifications.updatePreferences(user.sub, body);
   }
 }

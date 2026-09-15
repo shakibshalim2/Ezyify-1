@@ -6,7 +6,7 @@ import { loadEnv } from '../src/config.js';
 import { PrismaService } from '../src/infra/prisma/prisma.service.js';
 import { OrdersService } from '../src/modules/orders/orders.service.js';
 import { NotificationsService } from '../src/modules/notifications/notifications.service.js';
-import { CategorySchema, ConversationSchema, MessageSchema, NotificationSchema, PostSchema, ProductDetailSchema, TransactionSchema, UserProfileSchema, WalletSchema, paginated } from '@ezyify/core';
+import { CategorySchema, ConversationSchema, MessageSchema, NotificationSchema, PostSchema, ProductDetailSchema, TransactionSchema, UserProfileSchema, WalletSchema, paginated, DEFAULT_NOTIFICATION_PREFERENCES } from '@ezyify/core';
 import { z } from 'zod';
 
 /** Broad behavioural coverage of the remaining modules: users, catalog detail, cart edge cases, feed authoring, messaging, wallet, account, orders refund/cancel. */
@@ -66,6 +66,50 @@ describe('users', () => {
     expect((await inject('POST', '/users/buyer/follow', { token: buyer })).statusCode).toBe(422);
     expect(json(await inject('DELETE', '/users/fashionista_maya/follow', { token: buyer })).data.ok).toBe(true);
     expect(json(await inject('POST', '/users/fashionista_maya/follow', { token: buyer })).data.ok).toBe(true);
+  });
+
+  it('account details, private accounts gate posts/followers, and change-password re-auths + revokes other sessions', async () => {
+    const alex = await login('alex@ezyify.test');
+    const acct = json(await inject('GET', '/users/me/account', { token: alex })).data;
+    expect(acct).toMatchObject({ email: 'alex@ezyify.test', emailVerified: true, role: 'creator', deletionScheduledAt: null });
+    expect(JSON.stringify(json(await inject('GET', '/users/tech_reviews_pro')).data)).not.toContain('alex@ezyify.test');
+    // Go private: anonymous + non-followers lose posts/followers/following; the owner and followers keep them.
+    expect(json(await inject('PATCH', '/users/me', { token: alex, body: { isPrivate: true } })).data.isPrivate).toBe(true);
+    expect((await inject('GET', '/users/tech_reviews_pro/followers')).statusCode).toBe(403);
+    expect((await inject('GET', '/users/tech_reviews_pro/following', { token: seller })).statusCode).toBe(403);
+    expect((await inject('GET', '/users/tech_reviews_pro/followers', { token: alex })).statusCode).toBe(200);
+    expect(json(await inject('GET', '/feed?author=tech_reviews_pro')).data.items).toHaveLength(0);
+    expect(json(await inject('GET', '/users/tech_reviews_pro')).data.isPrivate).toBe(true); // profile card stays discoverable
+    await inject('POST', '/users/tech_reviews_pro/follow', { token: seller });
+    expect((await inject('GET', '/users/tech_reviews_pro/followers', { token: seller })).statusCode).toBe(200);
+    await inject('DELETE', '/users/tech_reviews_pro/follow', { token: seller });
+    await inject('PATCH', '/users/me', { token: alex, body: { isPrivate: false } });
+    expect((await inject('GET', '/users/tech_reviews_pro/followers')).statusCode).toBe(200);
+    // Change password: wrong current → 401; weak → 422; success → old password refused, other sessions revoked.
+    const other = await login('alex@ezyify.test');
+    expect((await inject('POST', '/auth/change-password', { token: alex, body: { currentPassword: 'Wrong1234', newPassword: 'Newpass123' } })).statusCode).toBe(401);
+    expect((await inject('POST', '/auth/change-password', { token: alex, body: { currentPassword: 'Password1', newPassword: 'short' } })).statusCode).toBe(422);
+    expect(json(await inject('POST', '/auth/change-password', { token: alex, body: { currentPassword: 'Password1', newPassword: 'Newpass123' } })).data.ok).toBe(true);
+    expect((await inject('POST', '/auth/login', { body: { identifier: 'alex@ezyify.test', password: 'Password1' } })).statusCode).toBe(401);
+    // Access tokens outlive the change, but every refresh session was revoked (the test client has no cookie to keep).
+    expect(json(await inject('GET', '/auth/sessions', { token: other })).data).toHaveLength(0);
+    // Restore the seed password for later suites.
+    const fresh = json(await inject('POST', '/auth/login', { body: { identifier: 'alex@ezyify.test', password: 'Newpass123' } })).data.accessToken;
+    expect(json(await inject('POST', '/auth/change-password', { token: fresh, body: { currentPassword: 'Newpass123', newPassword: 'Password1' } })).data.ok).toBe(true);
+  });
+
+  it('notification preferences default from core, patch per category/channel, and gate push delivery', async () => {
+    expect((await inject('GET', '/users/me/notification-preferences')).statusCode).toBe(401);
+    const initial = json(await inject('GET', '/users/me/notification-preferences', { token: buyer })).data;
+    expect(initial).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+    const patched = json(await inject('PATCH', '/users/me/notification-preferences', { token: buyer, body: { promos: { email: true }, social: { push: false } } })).data;
+    expect(patched.promos).toEqual({ push: false, email: true });
+    expect(patched.social).toEqual({ push: false, email: false });
+    expect(patched.orders).toEqual(DEFAULT_NOTIFICATION_PREFERENCES.orders);
+    expect(json(await inject('GET', '/users/me/notification-preferences', { token: buyer })).data).toEqual(patched);
+    expect((await inject('PATCH', '/users/me/notification-preferences', { token: buyer, body: { social: { push: 'yes' } } })).statusCode).toBe(422);
+    // Restore so later suites see defaults.
+    await inject('PATCH', '/users/me/notification-preferences', { token: buyer, body: { promos: { email: false }, social: { push: true } } });
   });
 });
 
@@ -237,6 +281,47 @@ describe('orders: refund, cancel, seller list, errors', () => {
     expect((await inject('GET', '/orders/nope', { token: buyer })).statusCode).toBe(404);
   });
 
+  it('refund case: seller declines → buyer withdraws (order resumes) → re-requests → escalates → admin resolves', async () => {
+    const prisma = app.get(PrismaService);
+    await inject('POST', '/cart/items', { token: buyer, body: { productId: 'prod-003', quantity: 1 } });
+    const orders = json(await inject('POST', '/checkout', { token: buyer, body: { addressId: 'addr_buyer_home', paymentMethod: 'wallet' } })).data;
+    const order = orders.find((o: { seller: { username: string } }) => o.seller.username === 'homebyjules');
+    const jules = await login('jules@ezyify.test');
+    const admin = await login('admin@ezyify.test');
+    expect(json(await inject('GET', `/orders/${order.id}`, { token: buyer })).data.refund).toBeNull();
+    // Unknown item id → 422; a valid request attaches an open case.
+    expect((await inject('POST', `/orders/${order.id}/refund`, { token: buyer, body: { reason: 'Arrived cracked', itemIds: ['nope'] } })).statusCode).toBe(422);
+    const req = json(await inject('POST', `/orders/${order.id}/refund`, { token: buyer, body: { reason: 'Arrived cracked', itemIds: [order.items[0].id] } })).data;
+    expect(req.refund).toMatchObject({ status: 'requested', reason: 'Arrived cracked', sellerResponse: null });
+    // Decline needs a reason and seller ownership; the order stays refund_requested so the buyer keeps options.
+    expect((await inject('POST', `/seller/orders/${order.id}/refund/decline`, { token: jules, body: { response: 'no' } })).statusCode).toBe(422);
+    expect((await inject('POST', `/seller/orders/${order.id}/refund/decline`, { token: seller, body: { response: 'Not my order' } })).statusCode).toBe(403);
+    const declined = json(await inject('POST', `/seller/orders/${order.id}/refund/decline`, { token: jules, body: { response: 'Packaging photos show it left intact' } })).data;
+    expect(declined).toMatchObject({ status: 'refund_requested', refund: { status: 'rejected', sellerResponse: 'Packaging photos show it left intact' } });
+    // Buyer withdraws → order resumes at `paid`, seller notified, case closed as withdrawn.
+    const wres = await inject('POST', `/orders/${order.id}/refund/withdraw`, { token: buyer });
+    expect(wres.statusCode, wres.body).toBe(201);
+    const resumed = json(wres).data;
+    expect(resumed).toMatchObject({ status: 'paid', escrow: { status: 'held' }, refund: { status: 'withdrawn' } });
+    expect((await inject('POST', `/orders/${order.id}/refund/withdraw`, { token: buyer })).statusCode).toBe(409);
+    // Re-request, then escalate: escrow frozen, admin queue lists it, non-admin can't see the queue.
+    await inject('POST', `/orders/${order.id}/refund`, { token: buyer, body: { reason: 'Still cracked', itemIds: [] } });
+    expect((await inject('POST', `/orders/${order.id}/dispute`, { token: buyer, body: { reason: 'short' } })).statusCode).toBe(422);
+    const disputed = json(await inject('POST', `/orders/${order.id}/dispute`, { token: buyer, body: { reason: 'Seller refuses to acknowledge the damage; photos attached in chat.' } })).data;
+    expect(disputed).toMatchObject({ status: 'disputed', escrow: { status: 'disputed' }, refund: { status: 'disputed' } });
+    expect((await inject('GET', '/admin/disputes', { token: jules })).statusCode).toBe(403);
+    const queue = json(await inject('GET', '/admin/disputes', { token: admin })).data;
+    expect(queue.items.some((o: { id: string }) => o.id === order.id)).toBe(true);
+    // Seller can no longer approve/decline a disputed order; admin refunds the buyer.
+    expect((await inject('POST', `/seller/orders/${order.id}/refund/decline`, { token: jules, body: { response: 'Too late' } })).statusCode).toBe(409);
+    const walletBefore = json(await inject('GET', '/wallet', { token: buyer })).data.balance.amount;
+    const resolved = json(await inject('POST', `/admin/orders/${order.id}/resolve`, { token: admin, body: { decision: 'refund', note: 'Damage confirmed from buyer photos' } })).data;
+    expect(resolved).toMatchObject({ status: 'refunded', escrow: { status: 'refunded' }, refund: { status: 'refunded', resolution: 'Damage confirmed from buyer photos' } });
+    expect(json(await inject('GET', '/wallet', { token: buyer })).data.balance.amount - walletBefore).toBe(order.total.amount);
+    expect((await inject('POST', `/admin/orders/${order.id}/resolve`, { token: admin, body: { decision: 'release', note: 'again' } })).statusCode).toBe(409);
+    expect(await prisma.refundRequest.count({ where: { orderId: order.id } })).toBe(2);
+  });
+
   it('buyer cancels a paid order; empty cart / bad address / non-wallet payment paths', async () => {
     await inject('POST', '/cart/items', { token: buyer, body: { productId: 'prod-007', quantity: 1 } });
     const [order] = json(await inject('POST', '/checkout', { token: buyer, body: { addressId: 'addr_buyer_home', paymentMethod: 'wallet' } })).data;
@@ -264,6 +349,41 @@ describe('orders: refund, cancel, seller list, errors', () => {
     expect(done).toMatchObject({ status: 'completed', escrow: { status: 'released' }, tracking: { carrier: 'JNE', number: 'X1' } });
     await expect(app.get(OrdersService).housekeeping()).resolves.toBeUndefined();
     expect(await app.get(NotificationsService).push('u_buyer', 'Hi', 'there')).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('kyc', () => {
+  it('submit → pending (no full id number back) → admin reject → resubmit → approve flips User.verified', async () => {
+    const sara = await login('sara@ezyify.test');
+    const admin = await login('admin@ezyify.test');
+    const doc = { documentType: 'national_id', fullName: 'Sara Kim', idNumber: 'ID-1234567890', dateOfBirth: '1990-04-12', country: 'id', documentFrontUrl: 'https://cdn.example/kyc/front.jpg', documentBackUrl: 'https://cdn.example/kyc/back.jpg', selfieUrl: 'https://cdn.example/kyc/selfie.jpg' };
+    expect((await inject('GET', '/kyc')).statusCode).toBe(401);
+    expect(json(await inject('GET', '/kyc', { token: sara })).data).toEqual({ verified: false, submission: null, canSubmit: true });
+    // Validation: minors and missing back-of-card are 422.
+    expect((await inject('POST', '/kyc', { token: sara, body: { ...doc, dateOfBirth: '2015-01-01' } })).statusCode).toBe(422);
+    expect((await inject('POST', '/kyc', { token: sara, body: { ...doc, documentBackUrl: null } })).statusCode).toBe(422);
+    const sub = json(await inject('POST', '/kyc', { token: sara, body: doc })).data;
+    expect(sub).toMatchObject({ status: 'pending', idNumberLast4: '7890', country: 'ID' });
+    expect(JSON.stringify(sub)).not.toContain('ID-1234567890');
+    expect((await inject('POST', '/kyc', { token: sara, body: doc })).statusCode).toBe(409);
+    expect(json(await inject('GET', '/kyc', { token: sara })).data.canSubmit).toBe(false);
+    // Admin queue is admin-only and shows the submitter's email for the reviewer.
+    expect((await inject('GET', '/admin/kyc', { token: sara })).statusCode).toBe(403);
+    const queue = json(await inject('GET', '/admin/kyc', { token: admin })).data;
+    expect(queue.items.some((k: { id: string; email: string }) => k.id === sub.id && k.email === 'sara@ezyify.test')).toBe(true);
+    expect((await inject('PATCH', `/admin/kyc/${sub.id}`, { token: admin, body: { decision: 'reject' } })).statusCode).toBe(422);
+    const rejected = json(await inject('PATCH', `/admin/kyc/${sub.id}`, { token: admin, body: { decision: 'reject', reason: 'Selfie is blurry' } })).data;
+    expect(rejected).toMatchObject({ status: 'rejected', rejectionReason: 'Selfie is blurry' });
+    expect((await inject('PATCH', `/admin/kyc/${sub.id}`, { token: admin, body: { decision: 'approve' } })).statusCode).toBe(409);
+    const state = json(await inject('GET', '/kyc', { token: sara })).data;
+    expect(state).toMatchObject({ verified: false, canSubmit: true, submission: { status: 'rejected' } });
+    const again = json(await inject('POST', '/kyc', { token: sara, body: doc })).data;
+    expect(json(await inject('PATCH', `/admin/kyc/${again.id}`, { token: admin, body: { decision: 'approve' } })).data.status).toBe('approved');
+    expect(json(await inject('GET', '/kyc', { token: sara })).data).toMatchObject({ verified: true, canSubmit: false });
+    expect(json(await inject('GET', '/users/glow.with.sara')).data.verified).toBe(true);
+    expect((await inject('POST', '/kyc', { token: sara, body: doc })).statusCode).toBe(409);
+    const notes = json(await inject('GET', '/notifications', { token: sara })).data;
+    expect(notes.items.some((n: { message: string }) => /identity is verified/.test(n.message))).toBe(true);
   });
 });
 

@@ -44,6 +44,13 @@ export const ResetPasswordRequestSchema = z.object({
   password: PasswordSchema,
 });
 
+/** Signed-in password change: current password is the re-auth proof; every other session is revoked. */
+export const ChangePasswordRequestSchema = z.object({
+  currentPassword: z.string().min(1, 'Enter your current password'),
+  newPassword: PasswordSchema,
+}).refine(v => v.currentPassword !== v.newPassword, { path: ['newPassword'], message: 'Choose a password you have not used before' });
+export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequestSchema>;
+
 export const LoginResponseSchema = SessionSchema;
 export const VerifyOtpResponseSchema = SessionSchema;
 export const RefreshResponseSchema = SessionSchema.pick({ accessToken: true, expiresIn: true, refreshToken: true });

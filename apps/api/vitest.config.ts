@@ -1,5 +1,13 @@
 import { defineConfig } from 'vitest/config';
+import { BaseSequencer, type TestSpecification } from 'vitest/node';
 import swc from 'unplugin-swc';
+
+/** E2E files share one seeded database, so run them in a fixed (path) order instead of vitest's duration-based one. */
+class PathSequencer extends BaseSequencer {
+  override async sort(files: TestSpecification[]) {
+    return [...files].sort((a, b) => a.moduleId.localeCompare(b.moduleId));
+  }
+}
 
 /** SWC handles legacy decorators + emitDecoratorMetadata, which esbuild (vitest default) cannot emit for Nest DI. */
 export default defineConfig({
@@ -11,6 +19,7 @@ export default defineConfig({
     globalSetup: ['test/setup.ts'],
     env: { NODE_ENV: 'test' },
     fileParallelism: false,
+    sequence: { sequencer: PathSequencer },
     testTimeout: 30_000,
     hookTimeout: 60_000,
     coverage: {

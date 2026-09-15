@@ -25,7 +25,10 @@ test.describe('seller hub · overview on GET /seller/dashboard', () => {
     // Sidebar figures are real too — no "$48,200" placeholder anywhere.
     await expect(page.getByText('$48,200')).toHaveCount(0);
     await expect(page.getByText(/TechHub Store/)).toHaveCount(0);
-    await expect(page.getByText(/last 30 days/i).first()).toBeVisible();
-    await expect(page.getByRole('link', { name: /orders/i }).filter({ hasText: /^Orders1$/ }).first()).toBeVisible();
+    // The sidebar (30-day gross + orders badge) only renders at lg and up.
+    if (test.info().project.name !== 'mobile') {
+      await expect(page.getByText(/last 30 days/i).first()).toBeVisible();
+      await expect(page.getByRole('link', { name: /orders/i }).filter({ hasText: /^Orders1$/ }).first()).toBeVisible();
+    }
   });
 });

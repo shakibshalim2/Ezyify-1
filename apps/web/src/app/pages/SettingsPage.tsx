@@ -1,422 +1,142 @@
-import { SEO } from '../components/SEO';
-import { toast } from 'sonner';
-import { useState, useEffect } from 'react';
-import { 
-  Bell, Lock, Moon, User, CreditCard, HelpCircle, LogOut, Shield, 
-  Sun, FileText, Wallet, Package, ChevronRight, Edit2, LogIn,
-  MapPin, Globe, Eye, MessageSquare, Mail, Heart
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Switch } from '../components/ui/switch';
-import { Separator } from '../components/ui/separator';
-import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar';
-import { Skeleton } from '../components/ui/skeleton';
-import { useTheme } from '../contexts/ThemeContext';
+import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
+import { motion, useReducedMotion } from 'motion/react';
+import { toast } from 'sonner';
+import { User, Mail, Lock, Wallet, MapPin, Bell, Shield, Moon, Sun, ShoppingBag, Store, HelpCircle, FileText, LogOut, ChevronRight, Ban, ShieldCheck, Smartphone } from 'lucide-react';
+import { avatarUrlFor, useAccount, useAddresses, useAuth, useBlockedUsers, useMe, useMfaStatus, useRuntime, useSessions } from '@ezyify/core';
+import { SEO, SEOConfigs } from '../components/SEO';
+import { Card } from '../components/primitives/Card';
+import { Button } from '../components/primitives/Button';
+import { Img } from '../components/primitives/Img';
+import { Skeleton } from '../components/primitives/Skeleton';
+import { VerifiedBadge } from '../components/VerifiedBadge';
+import { Switch } from '../components/ui/switch';
+import { useTheme } from '../contexts/ThemeContext';
+import { fadeUp, staggerContainer } from '../lib/motion';
+import type { WebRuntime } from '../runtime';
 
-function SettingsSkeleton() {
+type Row = { icon: typeof User; label: string; description?: string; to?: string; toggle?: { checked: boolean; onChange: (v: boolean) => void; label: string }; testId?: string };
+
+function Group({ title, icon: Icon, rows }: { title: string; icon: typeof User; rows: Row[] }) {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-        <div className="mb-8">
-          <Skeleton className="h-8 w-32 mb-2" />
-          <Skeleton className="h-4 w-64" />
-        </div>
-        <div className="space-y-6">
-          {[1, 2, 3, 4].map(i => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-6 w-48" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {[1, 2, 3].map(j => (
-                  <Skeleton key={j} className="h-10 w-full" />
-                ))}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    </div>
+    <motion.section variants={fadeUp}>
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-foreground-secondary"><Icon className="size-4" aria-hidden />{title}</h2>
+      <Card variant="default" padding="none" className="overflow-hidden">
+        <ul className="divide-y divide-border">
+          {rows.map(r => {
+            const RowIcon = r.icon;
+            const body = (
+              <>
+                <span className="size-10 rounded-lg bg-primary/15 grid place-items-center flex-shrink-0"><RowIcon className="size-5 text-primary" aria-hidden /></span>
+                <span className="flex-1 min-w-0">
+                  <span className="block font-medium text-foreground">{r.label}</span>
+                  {r.description && <span className="block text-xs text-foreground-secondary truncate" data-testid={r.testId}>{r.description}</span>}
+                </span>
+              </>
+            );
+            return (
+              <li key={r.label}>
+                {r.toggle ? (
+                  <label className="flex items-center gap-3 px-4 py-3">
+                    {body}
+                    <Switch checked={r.toggle.checked} onCheckedChange={r.toggle.onChange} aria-label={r.toggle.label} />
+                  </label>
+                ) : (
+                  <Link to={r.to ?? '#'} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/60 transition-colors">
+                    {body}
+                    <ChevronRight className="size-5 text-foreground-tertiary" aria-hidden />
+                  </Link>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
+    </motion.section>
   );
 }
 
+/** Settings hub: every row reflects live account state (`/users/me`, `/users/me/account`, sessions, MFA, addresses, blocks). */
 export default function SettingsPage() {
-  const { theme, toggleTheme } = useTheme();
+  const reduce = useReducedMotion();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
-
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: true,
-    sms: false,
-    likes: true,
-    comments: true,
-    follows: true,
-    purchases: true,
-    promotions: false
-  });
-
-  const [privacy, setPrivacy] = useState({
-    profileVisible: true,
-    showActivity: true,
-    showPurchases: false,
-    allowMessages: true,
-    allowTags: true
-  });
+  const { theme, toggleTheme } = useTheme();
+  const status = useAuth(s => s.status);
+  const runtime = useRuntime() as WebRuntime;
+  const me = useMe();
+  const account = useAccount();
+  const mfa = useMfaStatus();
+  const sessions = useSessions();
+  const addresses = useAddresses();
+  const blocked = useBlockedUsers();
 
   useEffect(() => {
-    const loadSettings = () => {
-      try {
-        const savedNotifications = localStorage.getItem('ezyify_notification_settings');
-        if (savedNotifications) setNotifications(JSON.parse(savedNotifications));
-        const savedPrivacy = localStorage.getItem('ezyify_privacy_settings');
-        if (savedPrivacy) setPrivacy(JSON.parse(savedPrivacy));
-      } catch (e) {
-        console.error('Failed to load settings', e);
-      }
-      setIsLoading(false);
-    };
+    if (status === 'anonymous') navigate('/login', { replace: true, state: { next: '/settings' } });
+  }, [status, navigate]);
 
-    if ('requestIdleCallback' in window) {
-      const handle = requestIdleCallback(loadSettings, { timeout: 100 });
-      return () => cancelIdleCallback(handle);
-    } else {
-      setTimeout(loadSettings, 16);
-    }
-  }, []);
-
-  if (isLoading) return <SettingsSkeleton />;
-
-  // Settings list items - icon in tinted circle, toggle/chevron trailing
-  const SettingRow = ({ 
-    icon: Icon, 
-    label, 
-    description, 
-    onAction,
-    toggle,
-    toggleValue,
-    href
-  }: {
-    icon: any;
-    label: string;
-    description?: string;
-    onAction?: () => void;
-    toggle?: boolean;
-    toggleValue?: boolean;
-    toggleOnChange?: (v: boolean) => void;
-    href?: string;
-  }) => {
-    const content = (
-      <>
-        <div className="flex items-center gap-3 flex-1">
-          <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0">
-            <Icon className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <p className="font-medium text-foreground">{label}</p>
-            {description && <p className="text-xs text-foreground-secondary">{description}</p>}
-          </div>
-        </div>
-        {toggle ? (
-          <Switch checked={toggleValue || false} onCheckedChange={onAction} />
-        ) : (
-          <ChevronRight className="w-5 h-5 text-foreground-secondary" />
-        )}
-      </>
-    );
-
-    const className = "flex items-center justify-between gap-4 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer";
-
-    return href ? (
-      <Link to={href} className={className}>
-        {content}
-      </Link>
-    ) : (
-      <button onClick={onAction} className={className}>
-        {content}
-      </button>
-    );
+  const signOut = async () => {
+    await runtime.signOut();
+    toast.success('Signed out');
+    navigate('/', { replace: true });
   };
+
+  const u = me.data;
+  const isSeller = u?.role === 'seller' || u?.role === 'admin';
 
   return (
     <div className="min-h-screen bg-background">
-      <SEO title="Settings — Ezyify" description="Manage your Ezyify account settings, notifications, privacy, and security preferences." />
-      <div className="max-w-screen-lg mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        {/* Header */}
-        <div className="mb-8 pt-6">
-          <h1 className="font-display text-2xl font-semibold text-foreground mb-1">Settings</h1>
-          <p className="text-sm text-foreground-secondary">Manage your account and preferences</p>
-        </div>
+      <SEO {...SEOConfigs.settings} />
+      <motion.div variants={staggerContainer(reduce ? 0 : 0.04)} initial="hidden" animate="visible" className="max-w-2xl mx-auto px-4 py-6 lg:py-8 space-y-6">
+        <motion.header variants={fadeUp}>
+          <h1 className="font-display text-2xl font-semibold text-foreground">Settings</h1>
+          <p className="text-sm text-foreground-secondary">Account, privacy, security and preferences</p>
+        </motion.header>
 
-        {/* Profile Header Card */}
-        <Card className="mb-8 border-border">
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="w-16 h-16">
-                  <AvatarImage src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200" />
-                  <AvatarFallback className="bg-primary/20 text-primary font-bold">JD</AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-semibold text-foreground">John Doe</p>
-                  <p className="text-sm text-foreground-secondary">@johndoe</p>
-                  <Badge className="mt-1" variant="outline">Creator Account</Badge>
-                </div>
+        <motion.div variants={fadeUp}>
+          {me.isLoading || !u ? (
+            <Skeleton className="h-24 rounded-card" />
+          ) : (
+            <Card variant="featured" padding="md" className="flex items-center gap-4">
+              <Img src={avatarUrlFor(u, 128)} alt="" className="size-16 rounded-full object-cover bg-muted" />
+              <div className="min-w-0 flex-1">
+                <p className="font-display font-semibold text-foreground flex items-center gap-1.5 truncate">{u.name}{u.verified && <VerifiedBadge size="sm" />}</p>
+                <p className="text-sm text-foreground-secondary truncate">@{u.username}{account.data ? ` · ${account.data.email}` : ''}</p>
+                <p className="text-xs text-foreground-tertiary capitalize">{u.role} account{u.isPrivate ? ' · private' : ''}</p>
               </div>
-              <Link to="/profile/edit">
-                <Button variant="outline" size="sm">
-                  <Edit2 className="w-4 h-4 mr-2" />
-                  Edit Profile
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+              <Button size="sm" variant="outline" asChild><Link to="/profile/edit">Edit profile</Link></Button>
+            </Card>
+          )}
+        </motion.div>
 
-        {/* Account Section */}
-        <div className="mb-8">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-              <User className="w-5 h-5" />
-              Account
-            </h2>
-          </div>
-          <Card className="overflow-hidden border-border">
-            <CardContent className="p-0 divide-y divide-border">
-              <SettingRow
-                icon={Mail}
-                label="Email Address"
-                description="john@example.com"
-                href="/settings/account-management"
-              />
-              <SettingRow
-                icon={Lock}
-                label="Password"
-                description="Change your password"
-                href="/settings/security"
-              />
-              <SettingRow
-                icon={Wallet}
-                label="Payment Methods"
-                description="Manage cards and wallets"
-                href="/wallet"
-              />
-              <SettingRow
-                icon={MapPin}
-                label="Addresses"
-                description="Shipping and billing"
-                href="/settings/account-management"
-              />
-            </CardContent>
-          </Card>
-        </div>
+        <Group title="Account" icon={User} rows={[
+          { icon: Mail, label: 'Email & phone', description: account.data ? `${account.data.email}${account.data.emailVerified ? ' · verified' : ' · unverified'}` : 'Contact details', to: '/settings/account-management', testId: 'settings-email' },
+          { icon: MapPin, label: 'Addresses', description: addresses.data ? `${addresses.data.length} saved` : 'Shipping addresses', to: '/settings/account-management#addresses' },
+          { icon: Wallet, label: 'Wallet & payments', description: 'Balance, top-ups and history', to: '/wallet' },
+          { icon: ShoppingBag, label: 'Orders', description: 'Purchases, tracking and refunds', to: '/orders' },
+          ...(isSeller ? [{ icon: Store, label: 'Seller hub', description: 'Store settings, products, payouts', to: '/seller-dashboard' } as Row] : []),
+        ]} />
 
-        {/* Preferences Section */}
-        <div className="mb-8">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-              <Globe className="w-5 h-5" />
-              Preferences
-            </h2>
-          </div>
-          <Card className="overflow-hidden border-border">
-            <CardContent className="p-0 divide-y divide-border">
-              <SettingRow
-                icon={theme === 'dark' ? Moon : Sun}
-                label="Theme"
-                description={theme === 'dark' ? 'Dark mode' : 'Light mode'}
-                toggle
-                toggleValue={theme === 'dark'}
-                onAction={toggleTheme}
-              />
-              <SettingRow
-                icon={Globe}
-                label="Language"
-                description="English"
-                href="/settings/account-management"
-              />
-            </CardContent>
-          </Card>
-        </div>
+        <Group title="Privacy & security" icon={Shield} rows={[
+          { icon: Lock, label: 'Security', description: mfa.data ? `Two-factor ${mfa.data.enabled ? 'on' : mfa.data.requiredForRole ? 'required' : 'off'}${sessions.data ? ` · ${sessions.data.length} active device${sessions.data.length === 1 ? '' : 's'}` : ''}` : 'Password, two-factor, devices', to: '/settings/security', testId: 'settings-security' },
+          { icon: ShieldCheck, label: 'Privacy', description: u ? (u.isPrivate ? 'Private account' : 'Public account') : 'Who can see your activity', to: '/settings/privacy', testId: 'settings-privacy' },
+          { icon: Ban, label: 'Blocked accounts', description: blocked.data ? `${blocked.data.length} blocked` : 'People you have blocked', to: '/settings/privacy#blocked' },
+          { icon: Bell, label: 'Notifications', description: 'Push and email, per category', to: '/settings/notifications' },
+        ]} />
 
-        {/* Notifications Section */}
-        <div className="mb-8">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-              <Bell className="w-5 h-5" />
-              Notifications
-            </h2>
-          </div>
-          <Card className="overflow-hidden border-border">
-            <CardContent className="p-0 divide-y divide-border">
-              <SettingRow
-                icon={Bell}
-                label="Push Notifications"
-                description="Receive notifications on this device"
-                toggle
-                toggleValue={notifications.push}
-                onAction={() => {
-                  const updated = { ...notifications, push: !notifications.push };
-                  setNotifications(updated);
-                  localStorage.setItem('ezyify_notification_settings', JSON.stringify(updated));
-                }}
-              />
-              <SettingRow
-                icon={Mail}
-                label="Email Notifications"
-                description="Receive emails about your account"
-                toggle
-                toggleValue={notifications.email}
-                onAction={() => {
-                  const updated = { ...notifications, email: !notifications.email };
-                  setNotifications(updated);
-                  localStorage.setItem('ezyify_notification_settings', JSON.stringify(updated));
-                }}
-              />
-              <SettingRow
-                icon={Heart}
-                label="Activity Notifications"
-                description="Likes, comments, and follows"
-                toggle
-                toggleValue={notifications.follows}
-                onAction={() => {
-                  const updated = { ...notifications, follows: !notifications.follows };
-                  setNotifications(updated);
-                  localStorage.setItem('ezyify_notification_settings', JSON.stringify(updated));
-                }}
-              />
-              <SettingRow
-                icon={Package}
-                label="Order Updates"
-                description="Track your purchases"
-                toggle
-                toggleValue={notifications.purchases}
-                onAction={() => {
-                  const updated = { ...notifications, purchases: !notifications.purchases };
-                  setNotifications(updated);
-                  localStorage.setItem('ezyify_notification_settings', JSON.stringify(updated));
-                }}
-              />
-            </CardContent>
-          </Card>
-        </div>
+        <Group title="Preferences" icon={Smartphone} rows={[
+          { icon: theme === 'dark' ? Moon : Sun, label: 'Dark mode', description: theme === 'dark' ? 'On' : 'Off', toggle: { checked: theme === 'dark', onChange: () => toggleTheme(), label: 'Dark mode' } },
+        ]} />
 
-        {/* Privacy & Security Section */}
-        <div className="mb-8">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-              <Shield className="w-5 h-5" />
-              Privacy & Security
-            </h2>
-          </div>
-          <Card className="overflow-hidden border-border">
-            <CardContent className="p-0 divide-y divide-border">
-              <SettingRow
-                icon={Eye}
-                label="Privacy Settings"
-                description="Control who sees your profile"
-                href="/settings/privacy"
-              />
-              <SettingRow
-                icon={Lock}
-                label="Security"
-                description="Two-factor authentication, sessions"
-                href="/settings/security"
-              />
-              <SettingRow
-                icon={MessageSquare}
-                label="Messages"
-                description="Control who can message you"
-                href="/settings/privacy"
-              />
-            </CardContent>
-          </Card>
-        </div>
+        <Group title="Support" icon={HelpCircle} rows={[
+          { icon: HelpCircle, label: 'Help centre', to: '/help' },
+          { icon: FileText, label: 'Terms of service', to: '/terms' },
+          { icon: FileText, label: 'Privacy policy', to: '/privacy-policy' },
+        ]} />
 
-        {/* Orders & Wallet Section */}
-        <div className="mb-8">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-              <Package className="w-5 h-5" />
-              Orders & Payments
-            </h2>
-          </div>
-          <Card className="overflow-hidden border-border">
-            <CardContent className="p-0 divide-y divide-border">
-              <SettingRow
-                icon={Package}
-                label="Orders"
-                description="View and manage orders"
-                href="/orders"
-              />
-              <SettingRow
-                icon={Wallet}
-                label="Wallet & Balance"
-                description="Manage funds and earnings"
-                href="/wallet"
-              />
-              <SettingRow
-                icon={CreditCard}
-                label="Billing & Subscriptions"
-                description="Manage subscriptions"
-                href="/wallet"
-              />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Support & Legal Section */}
-        <div className="mb-8">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-              <HelpCircle className="w-5 h-5" />
-              Support & Legal
-            </h2>
-          </div>
-          <Card className="overflow-hidden border-border">
-            <CardContent className="p-0 divide-y divide-border">
-              <SettingRow
-                icon={HelpCircle}
-                label="Help Center"
-                description="FAQs and support articles"
-                href="/help"
-              />
-              <SettingRow
-                icon={FileText}
-                label="Terms of Service"
-                description="Read our terms and conditions"
-                href="/terms"
-              />
-              <SettingRow
-                icon={Shield}
-                label="Privacy Policy"
-                description="Learn how we protect your data"
-                href="/privacy-policy"
-              />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Logout Section */}
-        <div className="mb-8">
-          <Button 
-            onClick={() => {
-              toast.success('Logged out successfully');
-              navigate('/login');
-            }}
-            variant="outline" 
-            className="w-full border-error/40 text-error hover:bg-error/5 hover:border-error/60"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Log Out
-          </Button>
-        </div>
-      </div>
+        <motion.div variants={fadeUp} className="pt-2">
+          <Button variant="outline" fullWidth leftIcon={<LogOut className="size-4" aria-hidden />} onClick={() => void signOut()}>Sign out</Button>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

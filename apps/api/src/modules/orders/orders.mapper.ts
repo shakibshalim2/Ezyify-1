@@ -1,10 +1,16 @@
-import type { Order } from '@ezyify/core';
+import type { Order, RefundCase } from '@ezyify/core';
 import type { Prisma } from '../../generated/prisma/client.js';
 import { money } from '../../common/money.js';
 import { toUserSummary } from '../users/users.mapper.js';
 
-export const orderInclude = { items: true, seller: true, buyer: true, address: { select: { recipient: true, city: true, region: true, country: true } } } satisfies Prisma.OrderInclude;
+export const orderInclude = { items: true, seller: true, buyer: true, address: { select: { recipient: true, city: true, region: true, country: true } }, refunds: { orderBy: { createdAt: 'desc' }, take: 1 } } satisfies Prisma.OrderInclude;
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
+
+type RefundRow = OrderRow['refunds'][number];
+const toRefundCase = (r: RefundRow): RefundCase => ({
+  id: r.id, status: r.status as RefundCase['status'], reason: r.reason, itemIds: r.itemIds, sellerResponse: r.sellerResponse, disputeReason: r.disputeReason, resolution: r.resolution,
+  requestedAt: r.createdAt.toISOString(), resolvedAt: r.resolvedAt?.toISOString() ?? null,
+});
 
 export function toOrder(o: OrderRow): Order {
   return {
@@ -22,6 +28,7 @@ export function toOrder(o: OrderRow): Order {
     shipping: money(o.shipping, o.currency),
     total: money(o.total, o.currency),
     tracking: o.trackingNumber ? { carrier: o.trackingCarrier ?? 'Courier', number: o.trackingNumber, url: o.trackingUrl } : null,
+    refund: o.refunds[0] ? toRefundCase(o.refunds[0]) : null,
     placedAt: o.placedAt.toISOString(),
     deliveredAt: o.deliveredAt?.toISOString() ?? null,
   };

@@ -1,20 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
-import { conflict, notFound, validation } from '../../common/errors.js';
-import { toUserProfile } from './users.mapper.js';
+import { UpdateProfileRequestSchema, type AccountDetails } from '@ezyify/core';
+import { conflict, forbidden, notFound, validation } from '../../common/errors.js';
+import { publicRole, toUserProfile } from './users.mapper.js';
 import { SearchIndexer } from '../search/search.indexer.js';
 
-export const UpdateProfileSchema = z.object({
-  name: z.string().min(1).max(50).optional(),
-  username: z.string().regex(/^[a-z0-9._]{2,30}$/, 'Lowercase letters, numbers, dots and underscores only').optional(),
-  bio: z.string().max(160).nullable().optional(),
-  website: z.string().url().nullable().optional(),
-  location: z.string().max(80).nullable().optional(),
-  avatarUrl: z.string().url().nullable().optional(),
-  coverUrl: z.string().url().nullable().optional(),
-  interests: z.array(z.string()).max(20).optional(),
-});
+/** Same contract the clients validate against (`@ezyify/core`), so `isPrivate` etc. can't drift. */
+export const UpdateProfileSchema = UpdateProfileRequestSchema;
 
 @Injectable()
 export class UsersService {
@@ -58,9 +51,23 @@ export class UsersService {
     return { ok: true as const };
   }
 
-  async followers(username: string, kind: 'followers' | 'following') {
-    const user = await this.prisma.user.findUnique({ where: { username }, select: { id: true } });
+  /** Private accounts expose posts / followers / following only to the owner, admins and accepted followers. */
+  async canSeeContent(target: { id: string; isPrivate: boolean }, viewerId?: string, viewerRole?: string) {
+    if (!target.isPrivate) return true;
+    if (!viewerId) return false;
+    if (viewerId === target.id || viewerRole === 'admin' || viewerRole === 'superadmin') return true;
+    return !!(await this.prisma.follow.findUnique({ where: { followerId_followingId: { followerId: viewerId, followingId: target.id } } }));
+  }
+
+  async account(userId: string): Promise<AccountDetails> {
+    const u = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { email: true, emailVerified: true, phone: true, role: true, createdAt: true, deletedAt: true } });
+    return { email: u.email, emailVerified: u.emailVerified, phone: u.phone, role: publicRole(u.role), createdAt: u.createdAt.toISOString(), deletionScheduledAt: u.deletedAt?.toISOString() ?? null };
+  }
+
+  async followers(username: string, kind: 'followers' | 'following', viewerId?: string, viewerRole?: string) {
+    const user = await this.prisma.user.findUnique({ where: { username }, select: { id: true, isPrivate: true } });
     if (!user) throw notFound('User');
+    if (!(await this.canSeeContent(user, viewerId, viewerRole))) throw forbidden('This account is private');
     const rows = kind === 'followers'
       ? await this.prisma.follow.findMany({ where: { followingId: user.id }, include: { follower: true }, take: 100 })
       : await this.prisma.follow.findMany({ where: { followerId: user.id }, include: { following: true }, take: 100 });

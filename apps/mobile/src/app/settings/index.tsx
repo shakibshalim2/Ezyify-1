@@ -52,6 +52,7 @@ export default function SettingsScreen() {
     ]},
     { title: 'Preferences', rows: [
       { icon: 'notifications-outline', label: 'Push notifications', toggle: true, toggleValue: pushOn, onToggle: enablePush },
+      { icon: 'options-outline', label: 'Notification preferences', value: 'Per category', onPress: () => router.push('/settings/notifications') },
       { icon: 'moon-outline', label: 'Appearance', value: 'System' },
       { icon: 'language-outline', label: 'Language', value: 'English' },
     ]},

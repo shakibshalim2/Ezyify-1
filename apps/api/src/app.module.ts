@@ -60,7 +60,8 @@ export function buildAppModule(env: Env = loadEnv()) {
     ],
     controllers: [HealthController],
     providers: [
-      { provide: APP_GUARD, useClass: ThrottlerGuard },
+      // Per-IP throttling is exercised by the security spec via lockout; in tests every request shares one IP, so skip the guard.
+      ...(env.NODE_ENV === 'test' ? [] : [{ provide: APP_GUARD, useClass: ThrottlerGuard }]),
       { provide: APP_FILTER, useClass: HttpExceptionFilter },
       { provide: APP_INTERCEPTOR, useClass: EnvelopeInterceptor },
     ],

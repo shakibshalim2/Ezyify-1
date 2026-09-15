@@ -82,6 +82,53 @@ export const SellerProductsResponseSchema = z.object({
 });
 export type SellerProductsResponse = z.infer<typeof SellerProductsResponseSchema>;
 
+/** Owner view of one product (`GET /seller/products/:id`): the public detail plus draft state and the editable fields. */
+export const SellerProductDetailSchema = ProductDetailSchema.extend({
+  published: z.boolean(),
+  /** Base stock (variants carry their own). */
+  stock: z.number().int().min(0),
+  categoryId: IdSchema,
+  updatedAt: IsoDateSchema,
+});
+export type SellerProductDetail = z.infer<typeof SellerProductDetailSchema>;
+
+/** Prices/stock are minor units and whole numbers; shared by web, mobile and the API so validation is identical everywhere. */
+const productBody = z.object({
+  name: z.string().trim().min(3, 'Name needs at least 3 characters').max(120),
+  description: z.string().trim().min(10, 'Describe the product in at least 10 characters').max(5000),
+  /** Category id or slug. */
+  categoryId: z.string().trim().min(1, 'Pick a category'),
+  price: z.number().int('Price must be a whole amount').min(1, 'Price must be greater than zero'),
+  compareAtPrice: z.number().int().min(1).nullable().optional(),
+  stock: z.number().int('Stock must be a whole number').min(0, 'Stock cannot be negative').max(1_000_000),
+  images: z.array(z.string().url('Each image must be a valid URL')).min(1, 'Add at least one image').max(8),
+  tags: z.array(z.string().trim().toLowerCase().min(1).max(30)).max(10),
+  badge: ProductBadgeSchema.nullable().optional(),
+  published: z.boolean(),
+  freeShipOver: z.number().int().min(0).nullable().optional(),
+  etaDays: z.tuple([z.number().int().min(0).max(90), z.number().int().min(0).max(90)]).optional(),
+});
+const priceRule = { path: ['compareAtPrice'], message: 'Compare-at price must be higher than the selling price' };
+const etaRule = { path: ['etaDays'], message: 'Delivery window is out of order' };
+
+/** Body for `POST /seller/products`. */
+export const UpsertProductRequestSchema = productBody
+  .extend({ tags: productBody.shape.tags.default([]), published: productBody.shape.published.default(true) })
+  .refine(b => b.compareAtPrice == null || b.compareAtPrice > b.price, priceRule)
+  .refine(b => !b.etaDays || b.etaDays[0] <= b.etaDays[1], etaRule);
+export type UpsertProductRequest = z.input<typeof UpsertProductRequestSchema>;
+
+/** `PATCH /seller/products/:id` — any subset of the create body; cross-field rules only apply when both sides are sent. */
+export const UpdateProductRequestSchema = productBody
+  .partial()
+  .refine(b => b.compareAtPrice == null || b.price == null || b.compareAtPrice > b.price, priceRule)
+  .refine(b => !b.etaDays || b.etaDays[0] <= b.etaDays[1], etaRule);
+export type UpdateProductRequest = z.infer<typeof UpdateProductRequestSchema>;
+
+/** Products with order history are archived (unpublished) instead of removed so past orders keep their lines. */
+export const DeleteProductResultSchema = z.object({ ok: z.literal(true), mode: z.enum(['deleted', 'archived']) });
+export type DeleteProductResult = z.infer<typeof DeleteProductResultSchema>;
+
 /** A product review; `reply` is the seller's public answer. */
 export const ReviewSchema = z.object({
   id: IdSchema,

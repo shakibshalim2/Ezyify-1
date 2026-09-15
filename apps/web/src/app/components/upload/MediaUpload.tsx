@@ -12,9 +12,16 @@ export interface UploadedMedia {
   file: File;
   preview: string;
   size: number;
+  /** Seconds (video only). */
   duration?: number;
+  width?: number;
+  height?: number;
   error?: string;
 }
+
+/** Mirrors the API's `ALLOWED_UPLOADS` allow-list so a rejected file fails here instead of at publish time. */
+const ALLOWED_TYPES: Record<string, 'image' | 'video'> = { 'image/jpeg': 'image', 'image/png': 'image', 'image/webp': 'image', 'image/heic': 'image', 'video/mp4': 'video', 'video/quicktime': 'video' };
+const MAX_BYTES = { image: 12 * 1024 * 1024, video: 250 * 1024 * 1024 };
 
 interface MediaUploadProps {
   onMediasChange: (medias: UploadedMedia[]) => void;
@@ -36,58 +43,45 @@ export function MediaUpload({
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-
     setIsUploading(true);
-    const newMedias: UploadedMedia[] = [];
-
     try {
-      Array.from(files).forEach((file, idx) => {
-        // Validate file type
-        const isImage = file.type.startsWith('image/');
-        const isVideo = file.type.startsWith('video/');
-
-        if (!isImage && !isVideo) {
-          toast.error(`${file.name} is not a supported file type`);
-          return;
+      const accepted: UploadedMedia[] = [];
+      for (const [idx, file] of Array.from(files).entries()) {
+        const kind = ALLOWED_TYPES[file.type];
+        if (!kind) {
+          toast.error(`${file.name}: use JPG, PNG, WebP, HEIC, MP4 or MOV`);
+          continue;
         }
-
-        const reader = new FileReader();
-        reader.onload = e => {
-          const media: UploadedMedia = {
-            id: `${Date.now()}-${idx}`,
-            type: contentType,
-            file,
-            preview: e.target?.result as string,
-            size: file.size
-          };
-
-          // For videos, get duration
-          if (isVideo) {
+        if (file.size > MAX_BYTES[kind]) {
+          toast.error(`${file.name} is over ${MAX_BYTES[kind] / 1024 / 1024} MB`);
+          continue;
+        }
+        const preview = URL.createObjectURL(file);
+        const media: UploadedMedia = { id: `${Date.now()}-${idx}`, type: contentType, file, preview, size: file.size };
+        // Dimensions/duration ride along to `POST /posts` so feeds can reserve layout before the media loads.
+        await new Promise<void>(resolve => {
+          if (kind === 'video') {
             const video = document.createElement('video');
-            video.onloadedmetadata = () => {
-              media.duration = video.duration;
-              newMedias.push(media);
-              if (newMedias.length === files.length) {
-                onMediasChange(multiple ? [...medias, ...newMedias] : newMedias);
-                toast.success(`${files.length} file(s) uploaded`);
-              }
-            };
-            video.src = media.preview;
+            video.preload = 'metadata';
+            video.onloadedmetadata = () => { media.duration = video.duration; media.width = video.videoWidth; media.height = video.videoHeight; resolve(); };
+            video.onerror = () => resolve();
+            video.src = preview;
           } else {
-            newMedias.push(media);
-            if (newMedias.length === files.length) {
-              onMediasChange(multiple ? [...medias, ...newMedias] : newMedias);
-              toast.success(`${files.length} file(s) uploaded`);
-            }
+            const img = new Image();
+            img.onload = () => { media.width = img.naturalWidth; media.height = img.naturalHeight; resolve(); };
+            img.onerror = () => resolve();
+            img.src = preview;
           }
-        };
-        reader.readAsDataURL(file);
-      });
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Failed to upload files');
+        });
+        accepted.push(media);
+      }
+      if (accepted.length) {
+        onMediasChange(multiple ? [...medias, ...accepted] : accepted.slice(0, 1));
+        toast.success(`${accepted.length} file${accepted.length === 1 ? '' : 's'} added`);
+      }
     } finally {
       setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -150,10 +144,10 @@ export function MediaUpload({
           </p>
           <p className="text-sm text-foreground-secondary">
             {contentType === 'video' || contentType === 'loop'
-              ? 'MP4, WebM up to 500MB'
+              ? 'MP4 or MOV up to 250MB'
               : contentType === 'story'
               ? 'Photo or video for story'
-              : 'JPG, PNG up to 10MB'}
+              : 'JPG, PNG, WebP or HEIC up to 12MB'}
           </p>
         </motion.div>
       ) : null}
@@ -177,14 +171,14 @@ export function MediaUpload({
                 <Card className="overflow-hidden">
                   <CardContent className="p-0 relative aspect-square bg-muted">
                     {/* Preview */}
-                    <img
-                      src={media.preview}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                    />
+                    {media.file.type.startsWith('video/') ? (
+                      <video src={media.preview} muted playsInline preload="metadata" className="w-full h-full object-cover" aria-label={`Preview of ${media.file.name}`} />
+                    ) : (
+                      <img src={media.preview} alt={`Preview of ${media.file.name}`} className="w-full h-full object-cover" />
+                    )}
 
                     {/* Video play icon */}
-                    {media.type === 'video' || media.type === 'loop' ? (
+                    {media.file.type.startsWith('video/') ? (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-black/60 transition-colors">
                         <Play className="w-8 h-8 text-white fill-white" />
                         {media.duration && (
@@ -197,8 +191,10 @@ export function MediaUpload({
 
                     {/* Remove button */}
                     <motion.button
+                      type="button"
+                      aria-label={`Remove ${media.file.name}`}
                       onClick={() => removeMedia(media.id)}
-                      className="absolute top-1 right-1 w-7 h-7 rounded-full bg-error text-error-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-error/90"
+                      className="absolute top-1 right-1 w-7 h-7 rounded-full bg-error text-error-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity flex items-center justify-center hover:bg-error/90"
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                     >
@@ -243,12 +239,13 @@ export function MediaUpload({
         ref={fileInputRef}
         type="file"
         multiple={multiple && medias.length === 0}
+        aria-label="Choose media files"
         accept={
           contentType === 'video' || contentType === 'loop'
-            ? 'video/*'
+            ? 'video/mp4,video/quicktime'
             : contentType === 'story'
-            ? 'image/*,video/*'
-            : 'image/*'
+            ? 'image/jpeg,image/png,image/webp,image/heic,video/mp4,video/quicktime'
+            : 'image/jpeg,image/png,image/webp,image/heic'
         }
         onChange={e => handleFiles(e.target.files)}
         className="hidden"

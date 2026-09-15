@@ -4,6 +4,7 @@ import { Throttle } from '@nestjs/throttler';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
+  ChangePasswordRequestSchema,
   ForgotPasswordRequestSchema,
   LoginRequestSchema,
   MfaDisableRequestSchema,
@@ -12,6 +13,7 @@ import {
   ResetPasswordRequestSchema,
   SignupRequestSchema,
   VerifyOtpRequestSchema,
+  type ChangePasswordRequest,
   type LoginRequest,
   type MfaDisableRequest,
   type MfaEnableRequest,
@@ -143,6 +145,16 @@ export class AuthController {
   async logoutAll(@CurrentUser() user: AccessClaims, @Res({ passthrough: true }) reply: FastifyReply) {
     await this.auth.logoutAll(user.sub);
     reply.clearCookie(REFRESH_COOKIE, { path: '/' });
+    return { ok: true };
+  }
+
+  @Post('change-password')
+  @Public(false)
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async changePassword(@CurrentUser() user: AccessClaims, @Body(zod(ChangePasswordRequestSchema)) body: ChangePasswordRequest, @Req() req: FastifyRequest) {
+    // Keep this device signed in; every other session is revoked.
+    await this.auth.changePassword(user.sub, body.currentPassword, body.newPassword, req.cookies?.[REFRESH_COOKIE]);
     return { ok: true };
   }
 

@@ -6,6 +6,7 @@ import { useSellerOrderAction, useStartConversation, type Order, type OrderStatu
 import { Button } from '../primitives/Button';
 import { Field } from '../primitives/Field';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Textarea } from '../ui/textarea';
 import { ConfirmDialog, type ConfirmState } from '../ConfirmDialog';
 import { formErrors } from '../../lib/apiErrors';
 
@@ -81,9 +82,11 @@ export function SellerOrderActions({ order, size = 'md', className }: { order: O
   const startChat = useStartConversation();
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [shipping, setShipping] = useState(false);
+  const [declining, setDeclining] = useState(false);
+  const [declineNote, setDeclineNote] = useState('');
 
   const run = (vars: Parameters<typeof action.mutate>[0], ok: string) =>
-    action.mutate(vars, { onSuccess: () => { toast.success(ok); setShipping(false); }, onError: err => toast.error(formErrors(err).message ?? 'Something went wrong') });
+    action.mutate(vars, { onSuccess: () => { toast.success(ok); setShipping(false); setDeclining(false); setDeclineNote(''); }, onError: err => toast.error(formErrors(err).message ?? 'Something went wrong') });
 
   const message = () =>
     startChat.mutate(order.buyer.username, { onSuccess: r => navigate(`/messages?c=${encodeURIComponent(r.id)}`), onError: err => toast.error(formErrors(err).message ?? 'Could not open chat') });
@@ -95,6 +98,21 @@ export function SellerOrderActions({ order, size = 'md', className }: { order: O
     <div className={className}>
       <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
       <ShipDialog order={order} open={shipping} onClose={() => setShipping(false)} pending={pending} onSubmit={body => run({ id: order.id, action: 'ship', body }, `${order.orderNumber} marked as shipped`)} />
+      <Dialog open={declining} onOpenChange={o => { if (!o) { setDeclining(false); setDeclineNote(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Decline refund for {order.orderNumber}?</DialogTitle>
+            <DialogDescription>The buyer sees your note and can withdraw or escalate to Ezyify, where escrow is frozen until we decide.</DialogDescription>
+          </DialogHeader>
+          {order.refund && <p className="text-sm text-foreground rounded-lg bg-muted px-3 py-2"><span className="font-medium">Buyer:</span> {order.refund.reason}</p>}
+          <label htmlFor="decline-note" className="text-sm font-semibold text-foreground">Your response</label>
+          <Textarea id="decline-note" value={declineNote} onChange={e => setDeclineNote(e.target.value.slice(0, 500))} rows={3} maxLength={500} placeholder="e.g. Tracking shows it was delivered and signed for on the 12th; happy to send the proof of delivery." autoFocus />
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => { setDeclining(false); setDeclineNote(''); }} disabled={pending}>Cancel</Button>
+            <Button type="button" variant="destructive" loading={pending} disabled={declineNote.trim().length < 5} onClick={() => run({ id: order.id, action: 'declineRefund', body: { response: declineNote.trim() } }, 'Refund declined — buyer notified')}>Decline refund</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="flex flex-wrap gap-2">
         {s === 'paid' && (
           <Button size={size} variant="gradient" loading={pending} leftIcon={<Package className="size-4" aria-hidden />} onClick={() => run({ id: order.id, action: 'accept' }, 'Order accepted — start packing')}>
@@ -118,15 +136,22 @@ export function SellerOrderActions({ order, size = 'md', className }: { order: O
           </Button>
         )}
         {s === 'refund_requested' && (
-          <Button
-            size={size}
-            variant="outline"
-            loading={pending}
-            leftIcon={<RotateCcw className="size-4" aria-hidden />}
-            onClick={() => setConfirm({ title: 'Approve refund?', message: 'The full order amount is returned to the buyer from escrow and stock is restored. This cannot be undone.', confirmLabel: 'Approve refund', destructive: true, onConfirm: () => run({ id: order.id, action: 'approveRefund' }, 'Refund approved') })}
-          >
-            Approve refund
-          </Button>
+          <>
+            <Button
+              size={size}
+              variant="outline"
+              loading={pending}
+              leftIcon={<RotateCcw className="size-4" aria-hidden />}
+              onClick={() => setConfirm({ title: 'Approve refund?', message: 'The full order amount is returned to the buyer from escrow and stock is restored. This cannot be undone.', confirmLabel: 'Approve refund', destructive: true, onConfirm: () => run({ id: order.id, action: 'approveRefund' }, 'Refund approved') })}
+            >
+              Approve refund
+            </Button>
+            {order.refund?.status === 'requested' && (
+              <Button size={size} variant="ghost" disabled={pending} leftIcon={<XCircle className="size-4" aria-hidden />} onClick={() => setDeclining(true)}>
+                Decline
+              </Button>
+            )}
+          </>
         )}
         {(s === 'paid' || s === 'processing') && (
           <Button
