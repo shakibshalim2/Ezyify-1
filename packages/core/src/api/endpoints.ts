@@ -35,6 +35,11 @@ import {
   PostSchema,
   ProductDetailSchema,
   ProductSummarySchema,
+  ProductReviewsResponseSchema,
+  ReviewSchema,
+  CreateReviewRequestSchema,
+  ReplyReviewRequestSchema,
+  SellerReviewsResponseSchema,
   RefreshResponseSchema,
   RegisterDeviceRequestSchema,
   ReportRequestSchema,
@@ -70,6 +75,9 @@ import {
   type LoginRequest,
   type SellerProductStatus,
   type SellerCustomerSort,
+  type SellerReviewFilter,
+  type CreateReviewRequest,
+  type ReplyReviewRequest,
   type ShipOrderRequest,
   type LoginResult,
   type MfaVerifyRequest,
@@ -130,6 +138,9 @@ export function createEndpoints(api: ApiClient) {
       products: (query: ProductQuery = {}) => api.get('/products', paginated(ProductSummarySchema), { query, auth: false }),
       product: (id: string) => api.get(`/products/${enc(id)}`, ProductDetailSchema, { auth: false }),
       categories: () => api.get('/categories', z.array(CategorySchema), { auth: false }),
+      reviews: (productId: string, query: PageQuery = {}) => api.get(`/products/${enc(productId)}/reviews`, ProductReviewsResponseSchema, { query, auth: false }),
+      /** One review per buyer per product; requires a completed order for "verified purchase" (server decides). */
+      review: (productId: string, body: CreateReviewRequest) => api.post(`/products/${enc(productId)}/reviews`, CreateReviewRequestSchema.parse(body), ReviewSchema),
       search: (q: string, query: PageQuery = {}) => api.get('/search', paginated(ProductSummarySchema), { query: { q, ...query }, auth: false }),
     },
     seller: {
@@ -141,6 +152,8 @@ export function createEndpoints(api: ApiClient) {
       analytics: (query: { days?: number } = {}) => api.get('/seller/analytics', SellerAnalyticsSchema, { query }),
       /** Buyers aggregated from the seller's orders; `q` matches name/username, `sort` recent|spent|orders. */
       customers: (query: PageQuery & { q?: string; sort?: SellerCustomerSort } = {}) => api.get('/seller/customers', SellerCustomersResponseSchema, { query }),
+      reviews: (query: PageQuery & { filter?: SellerReviewFilter; productId?: string } = {}) => api.get('/seller/reviews', SellerReviewsResponseSchema, { query }),
+      replyReview: (reviewId: string, body: ReplyReviewRequest) => api.post(`/seller/reviews/${enc(reviewId)}/reply`, ReplyReviewRequestSchema.parse(body), ReviewSchema),
     },
     search: {
       /** Unified products + users + posts search (Meilisearch or Postgres fallback server-side). */

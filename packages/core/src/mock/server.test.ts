@@ -161,6 +161,26 @@ describe('mock API server', () => {
     expect((await api.seller.customers({ q: 'test buyer' })).items.map(c => c.user.username)).toEqual(['buyer']);
   });
 
+  it('reviews: public list + stats, one per buyer, seller reply flow in mock mode', async () => {
+    const { api, login } = harness();
+    const pub = await api.catalog.reviews('prod-001');
+    expect(pub.stats.total).toBe(2);
+    await expect(api.catalog.review('prod-001', { rating: 5 })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await login();
+    const created = await api.catalog.review('prod-001', { rating: 5, text: 'Love them.' });
+    expect(created.user.username).toBe('buyer');
+    await expect(api.catalog.review('prod-001', { rating: 4 })).rejects.toMatchObject({ code: 'CONFLICT' });
+    await login('techstore@ezyify.test');
+    const mine = await api.seller.reviews({ filter: 'unreplied' });
+    expect(mine.items.some(r => r.id === created.id)).toBe(true);
+    const replied = await api.seller.replyReview(created.id, { text: 'Thank you!' });
+    expect(replied.reply?.text).toBe('Thank you!');
+    expect((await api.seller.reviews({ filter: 'unreplied' })).stats.awaitingReply).toBe(mine.stats.awaitingReply - 1);
+    // fashion cannot reply to a techstore review
+    await login('fashion@ezyify.test');
+    await expect(api.seller.replyReview('rev-003', { text: 'nope' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
   it('login → native refresh rotation → protected route; rejects bad credentials', async () => {
     const { api, login, tokens, setAccess } = harness();
     await expect(api.auth.login({ identifier: 'buyer@ezyify.test', password: 'nope' })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });

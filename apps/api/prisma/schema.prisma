@@ -371,9 +371,14 @@ model Review {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   rating    Int
   text      String?
+  /** Set when the review was left from a completed order → "Verified purchase". */
+  orderId   String?
+  reply     String?
+  repliedAt DateTime?
   createdAt DateTime @default(now())
 
   @@unique([productId, userId])
+  @@index([productId, createdAt(sort: Desc)])
 }
 
 model Cart {

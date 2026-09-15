@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApp } from '../src/bootstrap.js';
 import { loadEnv } from '../src/config.js';
-import { OrderSchema, ProductSummarySchema, SellerAnalyticsSchema, SellerCustomersResponseSchema, SellerDashboardSchema, SellerProductsResponseSchema, SessionSchema, paginated } from '@ezyify/core';
+import { OrderSchema, ProductReviewsResponseSchema, ProductSummarySchema, SellerReviewsResponseSchema, SellerAnalyticsSchema, SellerCustomersResponseSchema, SellerDashboardSchema, SellerProductsResponseSchema, SessionSchema, paginated } from '@ezyify/core';
 
 let app: NestFastifyApplication;
 const inject = (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, opts: { token?: string; body?: unknown; headers?: Record<string, string> } = {}) =>
@@ -217,6 +217,38 @@ describe('commerce: cart → checkout → escrow → release', () => {
     expect(c.lastShippedTo).toMatchObject({ city: expect.any(String), country: expect.any(String) });
     expect(r.summary).toMatchObject({ total: 1, repeat: 0, averageOrder: { amount: 7999 }, averageLifetime: { amount: 7999 } });
     expect(json(await inject('GET', '/seller/customers?q=nobody', { token: seller })).data.items).toHaveLength(0);
+  });
+
+  it('reviews: one per buyer, verified from a completed order, seller replies are scoped and public', async () => {
+    const before = json(await inject('GET', '/products/prod-001/reviews')).data;
+    expect(ProductReviewsResponseSchema.safeParse(before).success).toBe(true);
+    expect(before.stats.total).toBe(2);
+    const countBefore = json(await inject('GET', '/products/prod-001')).data.reviewCount as number;
+    // Seller cannot review own product; buyer with the completed headphones order gets "verified purchase".
+    expect((await inject('POST', '/products/prod-001/reviews', { token: seller, body: { rating: 5 } })).statusCode).toBe(403);
+    const created = json(await inject('POST', '/products/prod-001/reviews', { token: buyer, body: { rating: 4, text: 'Solid ANC, comfy for hours.' } })).data;
+    expect(created).toMatchObject({ rating: 4, verifiedPurchase: true, reply: null, user: { username: 'buyer' } });
+    expect(json(await inject('POST', '/products/prod-001/reviews', { token: buyer, body: { rating: 5 } })).error.code).toBe('CONFLICT');
+    const after = json(await inject('GET', '/products/prod-001/reviews')).data;
+    expect(after.stats.total).toBe(3);
+    expect(after.stats.distribution['4']).toBe(2);
+    // Product aggregate (seeded marketing count + real reviews) moves with the new review.
+    expect(json(await inject('GET', '/products/prod-001')).data.reviewCount).toBe(countBefore + 1);
+
+    // Seller hub: scoped to own products, filter works, reply notifies + shows publicly.
+    expect((await inject('GET', '/seller/reviews', { token: buyer })).statusCode).toBe(403);
+    const mine = json(await inject('GET', '/seller/reviews?filter=unreplied', { token: seller })).data;
+    expect(SellerReviewsResponseSchema.safeParse(mine).success).toBe(true);
+    expect(mine.items.every((r: { product: { id: string } }) => ['prod-001', 'prod-002'].includes(r.product.id))).toBe(true);
+    expect(mine.items.every((r: { reply: unknown }) => r.reply === null)).toBe(true);
+    const other = (await login('fashion@ezyify.test')).accessToken;
+    expect((await inject('POST', `/seller/reviews/${created.id}/reply`, { token: other, body: { text: 'Not my product' } })).statusCode).toBe(403);
+    const replied = json(await inject('POST', `/seller/reviews/${created.id}/reply`, { token: seller, body: { text: 'Thanks! Enjoy the music.' } })).data;
+    expect(replied.reply).toMatchObject({ text: 'Thanks! Enjoy the music.' });
+    const stats = json(await inject('GET', '/seller/reviews', { token: seller })).data.stats;
+    expect(stats.awaitingReply).toBe(mine.stats.awaitingReply - 1);
+    const notes = json(await inject('GET', '/notifications', { token: buyer })).data;
+    expect(JSON.stringify(notes)).toMatch(/replied to your review/);
   });
 
   it('timeline records every transition', async () => {

@@ -13,7 +13,7 @@ const img = (id: string, w = 800) => `https://images.unsplash.com/${id}?w=${w}&q
 export async function seed() {
   // Transactional state is wiped so repeated seeds (tests, dev resets) start from the same balances and empty carts.
   await prisma.$transaction([
-    prisma.liveViewer.deleteMany(), prisma.liveSession.deleteMany(),
+    prisma.liveViewer.deleteMany(), prisma.liveSession.deleteMany(), prisma.review.deleteMany(),
     prisma.cartItem.deleteMany(), prisma.order.deleteMany(), prisma.transaction.deleteMany(), prisma.refreshSession.deleteMany(),
     prisma.otpCode.deleteMany(), prisma.report.deleteMany(), prisma.block.deleteMany(), prisma.device.deleteMany(), prisma.webhookEvent.deleteMany(),
     prisma.auditLog.deleteMany(), prisma.notification.deleteMany(), prisma.like.deleteMany(), prisma.save.deleteMany(),
@@ -98,6 +98,18 @@ export async function seed() {
       create: session,
       update: { ...session },
     });
+  }
+
+  const reviews = [
+    { id: 'rev-001', productId: 'prod-001', userId: 'u_maya', rating: 5, text: 'ANC is genuinely class‑leading and the 30h battery is real. Shipped in a day.', createdAt: ago(24 * 3) },
+    { id: 'rev-002', productId: 'prod-001', userId: 'u_alex', rating: 4, text: 'Great sound. Ear cups run a little warm on long sessions.', reply: 'Thanks Alex — the vented cushions ship free to existing buyers, DM us!', repliedAt: ago(24 * 1.5), createdAt: ago(24 * 2) },
+    { id: 'rev-003', productId: 'prod-002', userId: 'u_sara', rating: 3, text: 'Strap clasp popped open twice during runs. Watch itself is fine.', createdAt: ago(20) },
+    { id: 'rev-004', productId: 'prod-004', userId: 'u_jules', rating: 5, text: 'Leather smells amazing and the laptop sleeve fits my 15”.', createdAt: ago(24 * 6) },
+  ];
+  // Reviews are wiped above and recreated so the product aggregates (already reset by the upsert) stay in sync.
+  for (const r of reviews) {
+    await prisma.review.create({ data: r });
+    await prisma.product.update({ where: { id: r.productId }, data: { ratingSum: { increment: r.rating }, ratingCount: { increment: 1 } } });
   }
 
   for (const [followerId, followingId] of [['u_buyer', 'u_maya'], ['u_buyer', 'u_alex'], ['u_buyer', 'u_sara'], ['u_maya', 'u_sara'], ['u_alex', 'u_maya']]) {

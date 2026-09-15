@@ -1,4 +1,4 @@
-import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, Post, ProductDetail, SellerCustomer, SellerProduct, UserProfile } from '../schemas/index.js';
+import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, Post, ProductDetail, Review, SellerCustomer, SellerProduct, SellerReview, UserProfile } from '../schemas/index.js';
 import { sellerProductStatus } from '../schemas/index.js';
 import * as fx from './fixtures.js';
 
@@ -87,6 +87,7 @@ export function createMockState() {
   const blocks = new Map<string, Set<string>>();
   const carts = new Map<string, { lines: { productId: string; variantId: string | null; quantity: number }[]; coupon: string | null }>();
   const orders: Order[] = fx.orders.map(o => ({ ...o }));
+  const reviews: Review[] = fx.reviews.map(r => ({ ...r }));
   const addresses = new Map<string, Address[]>([['u_buyer', fx.addresses.map(a => ({ ...a }))]]);
   const wallets = new Map<string, { balance: number; pending: number }>([['u_buyer', { balance: fx.wallet.balance.amount, pending: fx.wallet.pending.amount }]]);
   const transactions = new Map<string, typeof fx.transactions>([['u_buyer', [...fx.transactions]]]);
@@ -96,7 +97,7 @@ export function createMockState() {
   const comments = new Map<string, Comment[]>();
   const uploads = new Map<string, { contentType: string; sizeBytes: number }>();
   const liveSessions = fx.liveSessions.map(session => ({ ...session, host: { ...session.host }, productIds: [...session.productIds] }));
-  return { users, passwords, sessions, refreshTokens, revoked, pendingOtp, mfa, mfaChallenges, posts, likes, saves, follows, blocks, carts, orders, addresses, wallets, transactions, conversations, messages, notifications, comments, uploads, liveSessions, counter: 1000 };
+  return { users, passwords, sessions, refreshTokens, revoked, pendingOtp, mfa, mfaChallenges, posts, likes, saves, follows, blocks, carts, orders, reviews, addresses, wallets, transactions, conversations, messages, notifications, comments, uploads, liveSessions, counter: 1000 };
 }
 export type MockState = ReturnType<typeof createMockState>;
 
@@ -141,6 +142,11 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
     const pageSize = Math.min(100, Math.max(1, Number(q.get('pageSize') ?? 20)));
     const start = (page - 1) * pageSize;
     return { items: items.slice(start, start + pageSize), pagination: { page, pageSize, total: items.length, hasMore: start + pageSize < items.length } };
+  };
+  const reviewStats = (list: Review[]) => {
+    const distribution = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 } as Record<'1' | '2' | '3' | '4' | '5', number>;
+    for (const r of list) distribution[String(r.rating) as keyof typeof distribution] += 1;
+    return { average: list.length ? Math.round((list.reduce((n, r) => n + r.rating, 0) / list.length) * 10) / 10 : 0, total: list.length, distribution };
   };
   const jar = options.cookieJar;
   const session = (user: fx.SeedUser, native: boolean) => {
@@ -393,6 +399,52 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       const p = fx.findProduct(c.params.id);
       if (!p) throw notFound('Product');
       return p;
+    }],
+    ['GET', '/products/:id/reviews', c => {
+      const p = fx.findProduct(c.params.id);
+      if (!p) throw notFound('Product');
+      const list = state.reviews.filter(r => r.productId === p.id).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+      return { ...paginate(list, c.query), stats: reviewStats(list) };
+    }],
+    ['POST', '/products/:id/reviews', c => {
+      const u = requireUser(c);
+      const p = fx.findProduct(c.params.id);
+      if (!p) throw notFound('Product');
+      if (p.seller.id === u.id) throw forbidden('You cannot review your own product');
+      if (state.reviews.some(r => r.productId === p.id && r.user.id === u.id)) throw new MockApiError(409, 'CONFLICT', 'You have already reviewed this product');
+      const rating = Number(c.body.rating);
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw validation({ rating: 'Pick 1–5 stars' });
+      const verified = state.orders.some(o => o.buyer.id === u.id && o.status === 'completed' && o.items.some(i => i.productId === p.id));
+      const review: Review = { id: nextId('rev'), productId: p.id, user: fx.summary(u), rating, text: typeof c.body.text === 'string' && c.body.text.trim() ? c.body.text.trim() : null, verifiedPurchase: verified, reply: null, createdAt: iso() };
+      state.reviews.unshift(review);
+      c.status(201);
+      return review;
+    }],
+    ['GET', '/seller/reviews', c => {
+      const u = requireUser(c);
+      if (u.role !== 'seller' && u.role !== 'admin') throw forbidden('Seller account required');
+      const mineIds = new Set(fx.products.filter(p => p.seller.id === u.id).map(p => p.id));
+      const productId = c.query.get('productId');
+      const base = state.reviews.filter(r => mineIds.has(r.productId) && (!productId || r.productId === productId));
+      const filter = c.query.get('filter') ?? 'all';
+      const list = (filter === 'unreplied' ? base.filter(r => !r.reply) : filter === 'low' ? base.filter(r => r.rating <= 3) : base).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+      const rows: SellerReview[] = list.map(r => { const p = fx.findProduct(r.productId)!; return { ...r, product: { id: p.id, name: p.name, imageUrl: p.imageUrl } }; });
+      const awaiting = base.filter(r => !r.reply).length;
+      return { ...paginate(rows, c.query), stats: { ...reviewStats(base), awaitingReply: awaiting, replyRate: base.length ? Math.round(((base.length - awaiting) / base.length) * 1000) / 1000 : 0 } };
+    }],
+    ['POST', '/seller/reviews/:id/reply', c => {
+      const u = requireUser(c);
+      if (u.role !== 'seller' && u.role !== 'admin') throw forbidden('Seller account required');
+      const r = state.reviews.find(x => x.id === c.params.id);
+      if (!r) throw notFound('Review');
+      if (fx.findProduct(r.productId)?.seller.id !== u.id && u.role !== 'admin') throw forbidden();
+      const text = typeof c.body.text === 'string' ? c.body.text.trim() : '';
+      if (text.length < 2) throw validation({ text: 'Write a short reply' });
+      r.reply = { text, at: iso() };
+      const notes = state.notifications.get(r.user.id) ?? [];
+      notes.unshift({ id: nextId('n'), type: 'system', actor: fx.summary(u), message: `${fx.findProduct(r.productId)?.name ?? 'Product'} · the seller replied to your review`, href: `/product/${r.productId}`, thumbnailUrl: null, read: false, createdAt: iso() });
+      state.notifications.set(r.user.id, notes);
+      return r;
     }],
     ['GET', '/categories', () => fx.categories],
     ['GET', '/search', c => {

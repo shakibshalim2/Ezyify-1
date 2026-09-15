@@ -81,3 +81,46 @@ export const SellerProductsResponseSchema = z.object({
   summary: SellerProductsSummarySchema,
 });
 export type SellerProductsResponse = z.infer<typeof SellerProductsResponseSchema>;
+
+/** A product review; `reply` is the seller's public answer. */
+export const ReviewSchema = z.object({
+  id: IdSchema,
+  productId: IdSchema,
+  user: UserSummarySchema,
+  rating: z.number().int().min(1).max(5),
+  text: z.string().nullable(),
+  verifiedPurchase: z.boolean(),
+  reply: z.object({ text: z.string(), at: IsoDateSchema }).nullable(),
+  createdAt: IsoDateSchema,
+});
+export type Review = z.infer<typeof ReviewSchema>;
+
+export const ReviewStatsSchema = z.object({
+  average: z.number().min(0).max(5),
+  total: z.number().int().min(0),
+  distribution: z.record(z.enum(['1', '2', '3', '4', '5']), z.number().int().min(0)),
+});
+export type ReviewStats = z.infer<typeof ReviewStatsSchema>;
+
+export const ProductReviewsResponseSchema = z.object({ items: z.array(ReviewSchema), pagination: PaginationSchema, stats: ReviewStatsSchema });
+export type ProductReviewsResponse = z.infer<typeof ProductReviewsResponseSchema>;
+
+export const CreateReviewRequestSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  text: z.string().trim().min(3, 'Say a little more').max(2000).optional(),
+});
+export type CreateReviewRequest = z.infer<typeof CreateReviewRequestSchema>;
+
+export const ReplyReviewRequestSchema = z.object({ text: z.string().trim().min(2, 'Write a short reply').max(1000) });
+export type ReplyReviewRequest = z.infer<typeof ReplyReviewRequestSchema>;
+
+/** Seller hub row: the review plus which product it belongs to. */
+export const SellerReviewSchema = ReviewSchema.extend({ product: z.object({ id: IdSchema, name: z.string(), imageUrl: z.string().url() }) });
+export type SellerReview = z.infer<typeof SellerReviewSchema>;
+export const SellerReviewsResponseSchema = z.object({
+  items: z.array(SellerReviewSchema),
+  pagination: PaginationSchema,
+  stats: ReviewStatsSchema.extend({ awaitingReply: z.number().int().min(0), replyRate: z.number().min(0).max(1) }),
+});
+export type SellerReviewsResponse = z.infer<typeof SellerReviewsResponseSchema>;
+export type SellerReviewFilter = 'all' | 'unreplied' | 'low';

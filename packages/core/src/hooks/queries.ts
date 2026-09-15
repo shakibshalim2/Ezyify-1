@@ -1,7 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type { z } from 'zod';
 import type { FeedQuery, ProductQuery, SellerProductQuery } from '../api/endpoints.js';
-import type { ShipOrderRequest } from '../schemas/index.js';
+import type { CreateReviewRequest, SellerReviewFilter, ShipOrderRequest } from '../schemas/index.js';
 import type { SearchType } from '../schemas/index.js';
 import type { paginated } from '../schemas/common.js';
 import type { Cart, CheckoutRequest, CreateAddressRequest, CreatePostRequest, Post, UpdateProfileRequest, UserProfile } from '../schemas/index.js';
@@ -22,6 +22,8 @@ export const queryKeys = {
   sellerDashboard: (params: Record<string, unknown> = {}) => ['seller', 'dashboard', params] as const,
   sellerAnalytics: (params: Record<string, unknown> = {}) => ['seller', 'analytics', params] as const,
   sellerCustomers: (params: Record<string, unknown> = {}) => ['seller', 'customers', params] as const,
+  sellerReviews: (params: Record<string, unknown> = {}) => ['seller', 'reviews', params] as const,
+  productReviews: (productId: string, params: Record<string, unknown> = {}) => ['products', productId, 'reviews', params] as const,
   search: (q: string) => ['search', q] as const,
   unifiedSearch: (q: string, type: SearchType = 'all') => ['search', 'all', q, type] as const,
   cart: ['cart'] as const,
@@ -110,6 +112,41 @@ export function useSellerCustomers(query: PageQuery & { q?: string; sort?: 'rece
   const api = useApi();
   const authed = useAuthed();
   return useQuery({ queryKey: queryKeys.sellerCustomers(query), queryFn: () => api.seller.customers(query), enabled: authed, placeholderData: keepPreviousData });
+}
+
+export function useProductReviews(productId: string | undefined, query: PageQuery = {}) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.productReviews(productId ?? '', query), queryFn: () => api.catalog.reviews(productId!, query), enabled: !!productId, staleTime: 60_000 });
+}
+
+export function useCreateReview(productId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateReviewRequest) => api.catalog.review(productId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['products', productId] });
+      qc.invalidateQueries({ queryKey: queryKeys.product(productId) });
+    },
+  });
+}
+
+export function useSellerReviews(query: PageQuery & { filter?: SellerReviewFilter; productId?: string } = {}) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sellerReviews(query), queryFn: () => api.seller.reviews(query), enabled: authed, placeholderData: keepPreviousData });
+}
+
+export function useReplyReview() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { reviewId: string; text: string }) => api.seller.replyReview(v.reviewId, { text: v.text }),
+    onSuccess: r => {
+      qc.invalidateQueries({ queryKey: ['seller', 'reviews'] });
+      qc.invalidateQueries({ queryKey: ['products', r.productId, 'reviews'] });
+    },
+  });
 }
 
 // ---------- Social ----------

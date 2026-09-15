@@ -1,4 +1,4 @@
-import type {
+import type { Review,
   Address,
   Category,
   Conversation,
@@ -198,6 +198,14 @@ export const orders: Order[] = [
   { id: 'o2', orderNumber: 'EZ-10391', status: 'processing', escrow: { status: 'held', autoReleaseAt: ahead(7) }, seller: seller('techstore'), ...buyerBits, items: [orderItem(products[0], 1)], subtotal: usd(79.99), shipping: usd(0), total: usd(79.99), tracking: null, placedAt: ago(20), deliveredAt: null },
   { id: 'o3', orderNumber: 'EZ-10240', status: 'completed', escrow: { status: 'released', autoReleaseAt: null }, seller: seller('glowcare'), ...buyerBits, items: [orderItem(products[5], 2)], subtotal: usd(69.98), shipping: usd(0), total: usd(69.98), tracking: { carrier: 'DHL', number: 'DHL77120931', url: null }, placedAt: ago(24 * 12), deliveredAt: ago(24 * 8) },
   { id: 'o4', orderNumber: 'EZ-10188', status: 'refund_requested', escrow: { status: 'disputed', autoReleaseAt: null }, seller: seller('workspace'), ...buyerBits, items: [orderItem(products[2], 1)], subtotal: usd(45.99), shipping: usd(4.99), total: usd(50.98), tracking: null, placedAt: ago(24 * 18), deliveredAt: ago(24 * 14) },
+];
+
+export const reviews: Review[] = [
+  { id: 'rev-001', productId: 'prod-001', user: summary(byUsername('fashionista_maya')!), rating: 5, text: 'ANC is genuinely class‑leading and the 30h battery is real. Shipped in a day.', verifiedPurchase: true, reply: null, createdAt: ago(24 * 3) },
+  { id: 'rev-002', productId: 'prod-001', user: summary(byUsername('tech_reviews_pro')!), rating: 4, text: 'Great sound. Ear cups run a little warm on long sessions.', verifiedPurchase: true, reply: { text: 'Thanks Alex — the vented cushions ship free to existing buyers, DM us!', at: ago(24 * 1.5) }, createdAt: ago(24 * 2) },
+  { id: 'rev-003', productId: 'prod-002', user: summary(byUsername('fitwithdan')!), rating: 3, text: 'Strap clasp popped open twice during runs. Watch itself is fine.', verifiedPurchase: true, reply: null, createdAt: ago(20) },
+  { id: 'rev-004', productId: 'prod-004', user: summary(byUsername('noor.travels')!), rating: 5, text: 'Leather smells amazing and the laptop sleeve fits my 15”.', verifiedPurchase: false, reply: null, createdAt: ago(24 * 6) },
+  { id: 'rev-005', productId: 'prod-002', user: summary(byUsername('glow.with.sara')!), rating: 5, text: 'Sleep tracking finally matches my ring. Battery lasted 8 days.', verifiedPurchase: true, reply: null, createdAt: ago(24 * 9) },
 ];
 
 export const addresses: Address[] = [
