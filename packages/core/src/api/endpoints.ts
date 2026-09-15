@@ -53,6 +53,10 @@ import {
   SellerDashboardSchema,
   SellerOrdersSummarySchema,
   SellerProductsResponseSchema,
+  SellerProductDetailSchema,
+  UpsertProductRequestSchema,
+  UpdateProductRequestSchema,
+  DeleteProductResultSchema,
   ShipOrderRequestSchema,
   SendMessageRequestSchema,
   SignUploadRequestSchema,
@@ -61,6 +65,19 @@ import {
   SignupResponseSchema,
   TransactionSchema,
   UpdateProfileRequestSchema,
+  NotificationPreferencesSchema,
+  AccountDetailsSchema,
+  ChangePasswordRequestSchema,
+  RefundRequestBodySchema,
+  DeclineRefundRequestSchema,
+  DisputeRequestSchema,
+  ResolveDisputeRequestSchema,
+  KycStateSchema,
+  KycSubmissionSchema,
+  SubmitKycRequestSchema,
+  AdminKycSubmissionSchema,
+  ReviewKycRequestSchema,
+  UpdateNotificationPreferencesRequestSchema,
   UserProfileSchema,
   UserSummarySchema,
   VerifyOtpRequestSchema,
@@ -77,6 +94,8 @@ import {
   type LiveTokenRequest,
   type LoginRequest,
   type SellerProductStatus,
+  type UpsertProductRequest,
+  type UpdateProductRequest,
   type SellerCustomerSort,
   type SellerReviewFilter,
   type CreateReviewRequest,
@@ -92,6 +111,13 @@ import {
   type SignUploadRequest,
   type SignupRequest,
   type UpdateProfileRequest,
+  type UpdateNotificationPreferencesRequest,
+  type DeclineRefundRequest,
+  type ChangePasswordRequest,
+  type DisputeRequest,
+  type ResolveDisputeRequest,
+  type SubmitKycRequest,
+  type ReviewKycRequest,
   type VerifyOtpRequest,
 } from '../schemas/index.js';
 
@@ -118,6 +144,7 @@ export function createEndpoints(api: ApiClient) {
       refresh: (refreshToken?: string) => api.post('/auth/refresh', refreshToken ? { refreshToken } : {}, RefreshResponseSchema, { auth: false }),
       logout: (refreshToken?: string) => api.post('/auth/logout', refreshToken ? { refreshToken } : {}, Ok),
       logoutAll: () => api.post('/auth/logout-all', {}, Ok),
+      changePassword: (body: ChangePasswordRequest) => api.post('/auth/change-password', ChangePasswordRequestSchema.parse(body), Ok),
       sessions: () => api.get('/auth/sessions', z.array(DeviceSessionSchema)),
       revokeSession: (id: string) => api.delete(`/auth/sessions/${enc(id)}`, Ok),
       mfa: {
@@ -131,6 +158,7 @@ export function createEndpoints(api: ApiClient) {
     },
     users: {
       me: () => api.get('/users/me', UserProfileSchema),
+      account: () => api.get('/users/me/account', AccountDetailsSchema),
       updateMe: (body: UpdateProfileRequest) => api.patch('/users/me', UpdateProfileRequestSchema.parse(body), UserProfileSchema),
       profile: (username: string) => api.get(`/users/${enc(username)}`, UserProfileSchema),
       followers: (username: string) => api.get(`/users/${enc(username)}/followers`, z.array(UserSummarySchema)),
@@ -150,6 +178,12 @@ export function createEndpoints(api: ApiClient) {
     seller: {
       /** Seller hub inventory: the caller's own products (incl. drafts) with stock, sales and revenue, plus status counts. */
       products: (query: SellerProductQuery = {}) => api.get('/seller/products', SellerProductsResponseSchema, { query }),
+      /** Owner view of one product (drafts included) for the edit form. */
+      product: (id: string) => api.get(`/seller/products/${enc(id)}`, SellerProductDetailSchema),
+      createProduct: (body: UpsertProductRequest) => api.post('/seller/products', UpsertProductRequestSchema.parse(body), SellerProductDetailSchema),
+      updateProduct: (id: string, body: UpdateProductRequest) => api.patch(`/seller/products/${enc(id)}`, UpdateProductRequestSchema.parse(body), SellerProductDetailSchema),
+      /** Deletes, or archives (unpublishes) when the product already has order lines. */
+      deleteProduct: (id: string) => api.delete(`/seller/products/${enc(id)}`, DeleteProductResultSchema),
       /** Overview KPIs, 14‑day series and attention counts; `days` widens the comparison window (7–90). */
       dashboard: (query: { days?: number } = {}) => api.get('/seller/dashboard', SellerDashboardSchema, { query }),
       /** Top products, category mix, customers, fulfilment and payment mix for the window (7–90 days). */
@@ -198,8 +232,17 @@ export function createEndpoints(api: ApiClient) {
       get: (id: string) => api.get(`/orders/${enc(id)}`, OrderSchema),
       timeline: (id: string) => api.get(`/orders/${enc(id)}/timeline`, z.array(OrderEventSchema)),
       confirmDelivery: (id: string) => api.post(`/orders/${enc(id)}/confirm-delivery`, {}, OrderSchema),
-      requestRefund: (id: string, reason: string, itemIds: string[]) => api.post(`/orders/${enc(id)}/refund`, { reason, itemIds }, OrderSchema),
+      requestRefund: (id: string, reason: string, itemIds: string[]) => api.post(`/orders/${enc(id)}/refund`, RefundRequestBodySchema.parse({ reason, itemIds }), OrderSchema),
+      /** Buyer drops an open refund case; the order resumes its pre-refund status. */
+      withdrawRefund: (id: string) => api.post(`/orders/${enc(id)}/refund/withdraw`, {}, OrderSchema),
+      /** Buyer escalates an open refund case to Ezyify; escrow is frozen until an admin resolves it. */
+      dispute: (id: string, body: DisputeRequest) => api.post(`/orders/${enc(id)}/dispute`, DisputeRequestSchema.parse(body), OrderSchema),
       cancel: (id: string) => api.post(`/orders/${enc(id)}/cancel`, {}, OrderSchema),
+    },
+    disputes: {
+      /** Admin: orders currently in dispute, oldest first. */
+      list: (query: PageQuery = {}) => api.get('/admin/disputes', paginated(OrderSchema), { query }),
+      resolve: (id: string, body: ResolveDisputeRequest) => api.post(`/admin/orders/${enc(id)}/resolve`, ResolveDisputeRequestSchema.parse(body), OrderSchema),
     },
     sellerOrders: {
       /** Orders where the caller is the seller (`GET /orders?role=seller`). */
@@ -209,6 +252,7 @@ export function createEndpoints(api: ApiClient) {
       ship: (id: string, body: ShipOrderRequest) => api.post(`/seller/orders/${enc(id)}/ship`, ShipOrderRequestSchema.parse(body), OrderSchema),
       deliver: (id: string) => api.post(`/seller/orders/${enc(id)}/deliver`, {}, OrderSchema),
       approveRefund: (id: string) => api.post(`/seller/orders/${enc(id)}/refund`, {}, OrderSchema),
+      declineRefund: (id: string, body: DeclineRefundRequest) => api.post(`/seller/orders/${enc(id)}/refund/decline`, DeclineRefundRequestSchema.parse(body), OrderSchema),
       cancel: (id: string) => api.post(`/seller/orders/${enc(id)}/cancel`, {}, OrderSchema),
     },
     addresses: {
@@ -254,6 +298,16 @@ export function createEndpoints(api: ApiClient) {
       /** Register/refresh this device's push token (FCM on Android, APNs on iOS, web push). */
       registerDevice: (body: RegisterDeviceRequest) => api.post('/devices', RegisterDeviceRequestSchema.parse(body), Ok),
       unregisterDevice: (token: string) => api.delete(`/devices/${enc(token)}`, Ok),
+      preferences: () => api.get('/users/me/notification-preferences', NotificationPreferencesSchema),
+      updatePreferences: (body: UpdateNotificationPreferencesRequest) => api.patch('/users/me/notification-preferences', UpdateNotificationPreferencesRequestSchema.parse(body), NotificationPreferencesSchema),
+    },
+    kyc: {
+      /** Own verification state; `submission` is null before the first submit. */
+      state: () => api.get('/kyc', KycStateSchema),
+      submit: (body: SubmitKycRequest) => api.post('/kyc', SubmitKycRequestSchema.parse(body), KycSubmissionSchema),
+      /** Admin review queue (`status` defaults to pending on the server). */
+      adminQueue: (query: PageQuery & { status?: string } = {}) => api.get('/admin/kyc', paginated(AdminKycSubmissionSchema), { query }),
+      adminReview: (id: string, body: ReviewKycRequest) => api.patch(`/admin/kyc/${enc(id)}`, ReviewKycRequestSchema.parse(body), AdminKycSubmissionSchema),
     },
     uploads: {
       sign: (body: SignUploadRequest) => api.post('/uploads/sign', SignUploadRequestSchema.parse(body), SignedUploadSchema),

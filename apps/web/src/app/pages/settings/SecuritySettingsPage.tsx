@@ -4,37 +4,44 @@ import { ChevronLeft, Lock, LogOut, AlertCircle, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
+import { Field } from '../../components/primitives/Field';
+import { useMutation } from '@tanstack/react-query';
+import { formErrors } from '../../lib/apiErrors';
 import { SEO } from '../../components/SEO';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
-import { useRevokeSession, useSessions } from '@ezyify/core';
+import { ApiError, ChangePasswordRequestSchema, useApi, useRevokeSession, useSessions, type ChangePasswordRequest } from '@ezyify/core';
 import { TwoFactorSection } from './TwoFactorSection';
 
 export default function SecuritySettingsPage() {
   const navigate = useNavigate();
   const [showChangePasswordDialog, setShowChangePasswordDialog] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwErrors, setPwErrors] = useState<Record<string, string>>({});
+  const api = useApi();
+  const changePassword = useMutation({ mutationFn: (body: ChangePasswordRequest) => api.auth.changePassword(body) });
 
+  const closePasswordDialog = () => { setShowChangePasswordDialog(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setPwErrors({}); };
   const handleChangePassword = () => {
-    if (!newPassword || !confirmPassword) {
-      toast.error('Please fill in all fields');
-      return;
+    if (newPassword !== confirmPassword) return void setPwErrors({ confirmPassword: 'Passwords do not match' });
+    const parsed = ChangePasswordRequestSchema.safeParse({ currentPassword, newPassword });
+    if (!parsed.success) {
+      const next: Record<string, string> = {};
+      for (const i of parsed.error.issues) next[String(i.path[0] ?? '_')] ??= i.message;
+      return void setPwErrors(next);
     }
-    if (newPassword !== confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
-    if (newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters');
-      return;
-    }
-    toast.success('Password changed successfully');
-    setShowChangePasswordDialog(false);
-    setNewPassword('');
-    setConfirmPassword('');
+    setPwErrors({});
+    changePassword.mutate(parsed.data, {
+      onSuccess: () => { toast.success('Password changed — other devices were signed out'); closePasswordDialog(); },
+      onError: err => {
+        const f = formErrors(err);
+        if (err instanceof ApiError && err.code === 'UNAUTHORIZED') setPwErrors({ currentPassword: f.message ?? 'Incorrect current password' });
+        else if (Object.keys(f.fields).length) setPwErrors(f.fields);
+        else toast.error(f.message ?? 'Could not change password');
+      },
+    });
   };
 
   const sessions = useSessions();
@@ -208,46 +215,23 @@ export default function SecuritySettingsPage() {
       </div>
 
       {/* Change Password Dialog */}
-      <Dialog open={showChangePasswordDialog} onOpenChange={setShowChangePasswordDialog}>
+      <Dialog open={showChangePasswordDialog} onOpenChange={o => { if (!o) closePasswordDialog(); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Change Password</DialogTitle>
+            <DialogTitle>Change password</DialogTitle>
             <DialogDescription>
-              Enter your new password below. Make sure it's at least 8 characters long.
+              At least 8 characters with an uppercase letter, a lowercase letter and a number. Every other device is signed out afterwards.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="new-password">New Password</Label>
-              <Input
-                id="new-password"
-                type="password"
-                placeholder="Enter new password"
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="confirm-password">Confirm Password</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                placeholder="Confirm new password"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowChangePasswordDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleChangePassword}>
-              Change Password
-            </Button>
-          </DialogFooter>
+          <form className="space-y-4" noValidate onSubmit={e => { e.preventDefault(); handleChangePassword(); }}>
+            <Field label="Current password" type="password" autoComplete="current-password" value={currentPassword} onChange={e => { setCurrentPassword(e.target.value); setPwErrors({}); }} error={pwErrors.currentPassword} required />
+            <Field label="New password" type="password" autoComplete="new-password" value={newPassword} onChange={e => { setNewPassword(e.target.value); setPwErrors({}); }} error={pwErrors.newPassword} required />
+            <Field label="Confirm new password" type="password" autoComplete="new-password" value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setPwErrors({}); }} error={pwErrors.confirmPassword} required />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closePasswordDialog} disabled={changePassword.isPending}>Cancel</Button>
+              <Button type="submit" disabled={changePassword.isPending}>{changePassword.isPending ? 'Saving…' : 'Change password'}</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

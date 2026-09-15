@@ -22,7 +22,7 @@ export const ALLOWED_UPLOADS: Record<string, { ext: string; maxBytes: number; ki
 const SignSchema = z.object({
   contentType: z.enum(Object.keys(ALLOWED_UPLOADS) as [string, ...string[]]),
   sizeBytes: z.number().int().positive(),
-  purpose: z.enum(['post', 'loop', 'story', 'avatar', 'cover', 'product', 'message']),
+  purpose: z.enum(['post', 'loop', 'story', 'avatar', 'cover', 'product', 'message', 'kyc']),
 });
 const FinalizeSchema = z.object({ key: z.string().regex(/^u\/[a-z0-9]+\/[a-z]+\/[0-9a-f-]{36}\.[a-z0-9]+$/) });
 

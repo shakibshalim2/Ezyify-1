@@ -2,7 +2,8 @@ import { Body, Controller, Get, Headers, Param, Post, Query } from '@nestjs/comm
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 import type { z } from 'zod';
 import { CheckoutRequestSchema, type CheckoutRequest } from '@ezyify/core';
-import { OrderQuerySchema, OrdersService, RefundSchema, ShipSchema } from './orders.service.js';
+import { DeclineSchema, DisputeSchema, OrderQuerySchema, OrdersService, RefundSchema, ResolveSchema, ShipSchema } from './orders.service.js';
+import { PageQuerySchema } from '../../common/pagination.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles, type AccessClaims } from '../auth/auth.guard.js';
 import { zod } from '../../common/zod.pipe.js';
@@ -41,6 +42,28 @@ export class OrdersController {
   @Post('orders/:id/refund')
   refund(@CurrentUser() user: AccessClaims, @Param('id') id: string, @Body(zod(RefundSchema)) body: z.infer<typeof RefundSchema>) {
     return this.orders.requestRefund(user.sub, id, body);
+  }
+
+  @Post('orders/:id/refund/withdraw')
+  withdrawRefund(@CurrentUser() user: AccessClaims, @Param('id') id: string) {
+    return this.orders.withdrawRefund(user.sub, id);
+  }
+
+  @Post('orders/:id/dispute')
+  dispute(@CurrentUser() user: AccessClaims, @Param('id') id: string, @Body(zod(DisputeSchema)) body: z.infer<typeof DisputeSchema>) {
+    return this.orders.dispute(user.sub, id, body);
+  }
+
+  @Get('admin/disputes')
+  @Roles('admin')
+  disputes(@Query(zod(PageQuerySchema)) q: z.infer<typeof PageQuerySchema>) {
+    return this.orders.listDisputes(q);
+  }
+
+  @Post('admin/orders/:id/resolve')
+  @Roles('admin')
+  resolve(@CurrentUser() user: AccessClaims, @Param('id') id: string, @Body(zod(ResolveSchema)) body: z.infer<typeof ResolveSchema>) {
+    return this.orders.resolveDispute(user.sub, id, body);
   }
 
   @Post('orders/:id/cancel')
@@ -84,5 +107,11 @@ export class OrdersController {
   @Roles('seller')
   approveRefund(@CurrentUser() user: AccessClaims, @Param('id') id: string) {
     return this.orders.setStatus(user.sub, id, 'refunded', 'seller', 'Refund approved by seller');
+  }
+
+  @Post('seller/orders/:id/refund/decline')
+  @Roles('seller')
+  declineRefund(@CurrentUser() user: AccessClaims, @Param('id') id: string, @Body(zod(DeclineSchema)) body: z.infer<typeof DeclineSchema>) {
+    return this.orders.declineRefund(user.sub, id, body);
   }
 }

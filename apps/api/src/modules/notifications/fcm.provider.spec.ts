@@ -79,8 +79,18 @@ describe('NotificationsService.push', () => {
     return {
       deleted,
       device: { findMany: vi.fn().mockResolvedValue(devices), deleteMany: vi.fn(async (args: unknown) => void deleted.push(args)) },
+      user: { findUnique: vi.fn().mockResolvedValue({ notificationPrefs: { promos: { push: false } } }), update: vi.fn() },
     };
   };
+
+  it('skips delivery entirely when the recipient opted out of that channel', async () => {
+    const prisma = prismaStub();
+    const send = vi.fn();
+    const svc = new NotificationsService(prisma as unknown as PrismaService, { enabled: true, send });
+    expect(await svc.push('u1', 'Sale!', '50% off', {}, 'promos')).toBe(0);
+    expect(send).not.toHaveBeenCalled();
+    expect(prisma.device.findMany).not.toHaveBeenCalled();
+  });
 
   it('logs and counts devices when FCM is disabled', async () => {
     const prisma = prismaStub();

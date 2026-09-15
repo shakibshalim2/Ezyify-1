@@ -29,6 +29,8 @@ export interface WebRuntime extends EzyifyRuntime {
   signOut(): Promise<void>;
   /** Cold start: exchange the httpOnly refresh cookie for an access token and hydrate `me`. */
   restoreSession(): Promise<boolean>;
+  /** Transport for signed direct-to-bucket uploads: the in-process mock bucket in demo mode, the network otherwise. */
+  uploadFetch: typeof fetch;
 }
 
 /** Single shared runtime (API client + stores) for the web app; mobile builds its own with SecureStore. */
@@ -157,5 +159,5 @@ export function createWebRuntime(): WebRuntime {
     return true;
   };
 
-  return { api, auth, cart, queryClient, commitSession, signOut, restoreSession };
+  return { api, auth, cart, queryClient, commitSession, signOut, restoreSession, uploadFetch: fetchImpl };
 }

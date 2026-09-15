@@ -28,6 +28,11 @@ export interface SeedUser extends UserSummary {
   email: string;
   bio: string | null;
   location: string | null;
+  /** Set by `PATCH /users/me` in demo mode; unset users fall back to the role-based fixture value. */
+  coverUrl?: string | null;
+  website?: string | null;
+  isPrivate?: boolean;
+  phone?: string | null;
 }
 
 export const users: SeedUser[] = [
@@ -42,6 +47,7 @@ export const users: SeedUser[] = [
   { id: 'u_glowcare', email: 'glowcare@ezyify.test', username: 'glowcare', name: 'GlowCare', avatarUrl: img('photo-1596462502278-27bfdc403348', 200), verified: true, role: 'seller', bio: 'Clean beauty, dermatologist tested', location: 'Seoul' },
   { id: 'u_workspace', email: 'workspace@ezyify.test', username: 'workspace', name: 'WorkSpace', avatarUrl: img('photo-1497366216548-37526070297c', 200), verified: false, role: 'seller', bio: 'Desk gear for makers', location: 'Berlin' },
   { id: 'u_fit', email: 'fit@ezyify.test', username: 'fit', name: 'FitLife', avatarUrl: img('photo-1517836357463-d25dfeac3438', 200), verified: false, role: 'seller', bio: 'Sustainable fitness gear', location: 'Denver' },
+  { id: 'u_admin', email: 'admin@ezyify.test', username: 'admin', name: 'Ezyify Admin', avatarUrl: null, verified: true, role: 'admin', bio: null, location: null },
   { id: 'u_buyer', email: 'buyer@ezyify.test', username: 'buyer', name: 'Test Buyer', avatarUrl: img('photo-1500648767791-00dcc994a43e', 200), verified: false, role: 'user', bio: null, location: null },
 ];
 
@@ -98,6 +104,8 @@ export const products: ProductDetail[] = seeds.map(s => ({
 }));
 export const productSummary = (p: ProductDetail): ProductSummary => ({ id: p.id, slug: p.slug, name: p.name, imageUrl: p.imageUrl, price: p.price, compareAtPrice: p.compareAtPrice, rating: p.rating, reviewCount: p.reviewCount, seller: p.seller, badge: p.badge, inStock: p.inStock });
 export const findProduct = (id: string | undefined) => products.find(p => p.id === id || p.slug === id);
+/** Base stock for a fixture product (variants carry their own); deterministic so demo builds match the seeded DB shape. */
+export const fixtureStock = (p: ProductDetail) => (p.variants.length ? 0 : p.inStock ? 12 + (Number(p.id.replace(/\D/g, '')) * 37) % 140 : 0);
 
 /** Live shopping fixtures mirror the seeded API sessions so mock-mode screens never need hard-coded streams. */
 export const liveSessions: LiveSession[] = [
@@ -142,6 +150,7 @@ export const buyerFollows = ['u_maya', 'u_alex', 'u_sara'];
 
 export const profile = (user: SeedUser, isFollowing?: boolean): UserProfile => ({
   ...summary(user),
+  isPrivate: user.isPrivate ?? false,
   bio: user.bio,
   coverUrl: user.role === 'user' ? null : img('photo-1557682250-33bd709cbe85', 1080),
   website: user.role === 'seller' ? `https://ezyify.app/store/${user.username}` : null,
@@ -194,10 +203,10 @@ const orderItem = (p: ProductDetail, quantity: number, variant: string | null = 
 const seller = (username: string) => u(username);
 const buyerBits = { buyer: summary(byUsername('buyer')!), shippingTo: { recipient: 'Test Buyer', city: 'Jakarta', region: 'DKI Jakarta', country: 'ID' }, paymentMethod: 'wallet' as const, note: null };
 export const orders: Order[] = [
-  { id: 'o1', orderNumber: 'EZ-10422', status: 'out_for_delivery', escrow: { status: 'held', autoReleaseAt: ahead(6) }, seller: seller('fashion'), ...buyerBits, items: [orderItem(products[3], 1, 'Midnight / M')], subtotal: usd(89.99), shipping: usd(0), total: usd(89.99), tracking: { carrier: 'J&T Express', number: 'JT8842019921', url: null }, placedAt: ago(52), deliveredAt: null },
-  { id: 'o2', orderNumber: 'EZ-10391', status: 'processing', escrow: { status: 'held', autoReleaseAt: ahead(7) }, seller: seller('techstore'), ...buyerBits, items: [orderItem(products[0], 1)], subtotal: usd(79.99), shipping: usd(0), total: usd(79.99), tracking: null, placedAt: ago(20), deliveredAt: null },
-  { id: 'o3', orderNumber: 'EZ-10240', status: 'completed', escrow: { status: 'released', autoReleaseAt: null }, seller: seller('glowcare'), ...buyerBits, items: [orderItem(products[5], 2)], subtotal: usd(69.98), shipping: usd(0), total: usd(69.98), tracking: { carrier: 'DHL', number: 'DHL77120931', url: null }, placedAt: ago(24 * 12), deliveredAt: ago(24 * 8) },
-  { id: 'o4', orderNumber: 'EZ-10188', status: 'refund_requested', escrow: { status: 'disputed', autoReleaseAt: null }, seller: seller('workspace'), ...buyerBits, items: [orderItem(products[2], 1)], subtotal: usd(45.99), shipping: usd(4.99), total: usd(50.98), tracking: null, placedAt: ago(24 * 18), deliveredAt: ago(24 * 14) },
+  { id: 'o1', orderNumber: 'EZ-10422', status: 'out_for_delivery', escrow: { status: 'held', autoReleaseAt: ahead(6) }, seller: seller('fashion'), ...buyerBits, items: [orderItem(products[3], 1, 'Midnight / M')], subtotal: usd(89.99), shipping: usd(0), total: usd(89.99), tracking: { carrier: 'J&T Express', number: 'JT8842019921', url: null }, refund: null, placedAt: ago(52), deliveredAt: null },
+  { id: 'o2', orderNumber: 'EZ-10391', status: 'processing', escrow: { status: 'held', autoReleaseAt: ahead(7) }, seller: seller('techstore'), ...buyerBits, items: [orderItem(products[0], 1)], subtotal: usd(79.99), shipping: usd(0), total: usd(79.99), tracking: null, refund: null, placedAt: ago(20), deliveredAt: null },
+  { id: 'o3', orderNumber: 'EZ-10240', status: 'completed', escrow: { status: 'released', autoReleaseAt: null }, seller: seller('glowcare'), ...buyerBits, items: [orderItem(products[5], 2)], subtotal: usd(69.98), shipping: usd(0), total: usd(69.98), tracking: { carrier: 'DHL', number: 'DHL77120931', url: null }, refund: null, placedAt: ago(24 * 12), deliveredAt: ago(24 * 8) },
+  { id: 'o4', orderNumber: 'EZ-10188', status: 'refund_requested', escrow: { status: 'disputed', autoReleaseAt: null }, seller: seller('workspace'), ...buyerBits, items: [orderItem(products[2], 1)], subtotal: usd(45.99), shipping: usd(4.99), total: usd(50.98), tracking: null, refund: { id: 'rf_o4', status: 'requested', reason: 'Arrived damaged — the lamp base is cracked', itemIds: [], sellerResponse: null, disputeReason: null, resolution: null, requestedAt: ago(20), resolvedAt: null }, placedAt: ago(24 * 18), deliveredAt: ago(24 * 14) },
 ];
 
 export const reviews: Review[] = [

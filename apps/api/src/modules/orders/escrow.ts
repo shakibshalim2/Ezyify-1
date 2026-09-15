@@ -13,7 +13,8 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   out_for_delivery: ['delivered', 'refund_requested'],
   delivered: ['completed', 'refund_requested', 'disputed'],
   completed: ['refund_requested'],
-  refund_requested: ['refunded', 'disputed', 'processing', 'shipped', 'delivered', 'completed'],
+  // Resuming after a withdrawn/declined request goes back to wherever fulfilment was.
+  refund_requested: ['refunded', 'disputed', 'paid', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'completed'],
   disputed: ['refunded', 'completed'],
   cancelled: [],
   refunded: [],

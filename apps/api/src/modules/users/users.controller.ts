@@ -17,6 +17,11 @@ export class UsersController {
     return this.users.profile('me', user.sub);
   }
 
+  @Get('me/account')
+  account(@CurrentUser() user: AccessClaims) {
+    return this.users.account(user.sub);
+  }
+
   @Patch('me')
   update(@CurrentUser() user: AccessClaims, @Body(zod(UpdateProfileSchema)) body: z.infer<typeof UpdateProfileSchema>) {
     return this.users.update(user.sub, body);
@@ -30,14 +35,14 @@ export class UsersController {
 
   @Get(':username/followers')
   @Public()
-  async followers(@Param('username') username: string) {
-    return (await this.users.followers(username, 'followers')).map(toUserSummary);
+  async followers(@Param('username') username: string, @CurrentUser() user?: AccessClaims) {
+    return (await this.users.followers(username, 'followers', user?.sub, user?.role)).map(toUserSummary);
   }
 
   @Get(':username/following')
   @Public()
-  async following(@Param('username') username: string) {
-    return (await this.users.followers(username, 'following')).map(toUserSummary);
+  async following(@Param('username') username: string, @CurrentUser() user?: AccessClaims) {
+    return (await this.users.followers(username, 'following', user?.sub, user?.role)).map(toUserSummary);
   }
 
   @Post(':username/follow')

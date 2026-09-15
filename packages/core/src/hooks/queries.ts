@@ -1,7 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type { z } from 'zod';
 import type { FeedQuery, ProductQuery, SellerProductQuery } from '../api/endpoints.js';
-import type { CreatePayoutMethodRequest, CreateReviewRequest, PayoutMethod, SellerReviewFilter, ShipOrderRequest } from '../schemas/index.js';
+import type { CreatePayoutMethodRequest, CreateReviewRequest, DeclineRefundRequest, DeleteProductResult, ResolveDisputeRequest, NotificationPreferences, PayoutMethod, ReviewKycRequest, SellerProductDetail, SellerReviewFilter, ShipOrderRequest, SubmitKycRequest, UpdateNotificationPreferencesRequest, UpdateProductRequest, UpsertProductRequest } from '../schemas/index.js';
 import type { SearchType } from '../schemas/index.js';
 import type { paginated } from '../schemas/common.js';
 import type { Cart, CheckoutRequest, CreateAddressRequest, CreatePostRequest, Post, UpdateProfileRequest, UserProfile } from '../schemas/index.js';
@@ -19,6 +19,7 @@ export const queryKeys = {
   product: (id: string) => ['product', id] as const,
   categories: ['categories'] as const,
   sellerProducts: (params: Record<string, unknown> = {}) => ['seller', 'products', params] as const,
+  sellerProduct: (id: string) => ['seller', 'product', id] as const,
   sellerDashboard: (params: Record<string, unknown> = {}) => ['seller', 'dashboard', params] as const,
   sellerAnalytics: (params: Record<string, unknown> = {}) => ['seller', 'analytics', params] as const,
   sellerCustomers: (params: Record<string, unknown> = {}) => ['seller', 'customers', params] as const,
@@ -47,6 +48,9 @@ export const queryKeys = {
   messages: (id: string) => ['conversations', id, 'messages'] as const,
   notifications: ['notifications'] as const,
   unreadCount: ['notifications', 'unread'] as const,
+  notificationPreferences: ['notifications', 'preferences'] as const,
+  kyc: ['kyc'] as const,
+  adminKyc: (q: object) => ['admin', 'kyc', q] as const,
   blocked: ['blocked'] as const,
   sessions: ['auth', 'sessions'] as const,
   mfa: ['auth', 'mfa'] as const,
@@ -96,6 +100,35 @@ export function useSellerProducts(query: SellerProductQuery = {}) {
   const api = useApi();
   const authed = useAuthed();
   return useQuery({ queryKey: queryKeys.sellerProducts(query), queryFn: () => api.seller.products(query), enabled: authed, placeholderData: keepPreviousData });
+}
+
+export function useSellerProduct(id: string | undefined) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sellerProduct(id ?? ''), queryFn: () => api.seller.product(id!), enabled: authed && !!id });
+}
+
+/** Create / update / delete a seller's product; refreshes the hub list, the owner detail and the public catalog caches. */
+export function useSellerProductMutation() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { action: 'create'; body: UpsertProductRequest } | { action: 'update'; id: string; body: UpdateProductRequest } | { action: 'delete'; id: string }): Promise<SellerProductDetail | DeleteProductResult> => {
+      if (v.action === 'create') return api.seller.createProduct(v.body);
+      if (v.action === 'update') return api.seller.updateProduct(v.id, v.body);
+      return api.seller.deleteProduct(v.id);
+    },
+    onSuccess: (_r, v) => {
+      qc.invalidateQueries({ queryKey: ['seller', 'products'] });
+      qc.invalidateQueries({ queryKey: ['seller', 'dashboard'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: queryKeys.categories });
+      if (v.action !== 'create') {
+        qc.invalidateQueries({ queryKey: queryKeys.sellerProduct(v.id) });
+        qc.invalidateQueries({ queryKey: queryKeys.product(v.id) });
+      }
+    },
+  });
 }
 
 export function useSellerDashboard(query: { days?: number } = {}) {
@@ -292,6 +325,12 @@ export function useCreatePost() {
 
 // ---------- Users ----------
 
+export function useAccount() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: ['users', 'me', 'account'] as const, queryFn: () => api.users.account(), enabled: authed, staleTime: 60_000 });
+}
+
 export function useMe(options: Pick<UseQueryOptions<UserProfile>, 'staleTime'> = {}) {
   const api = useApi();
   const authed = useAuthed();
@@ -324,7 +363,12 @@ export function useToggleFollow() {
       qc.invalidateQueries({ queryKey: queryKeys.profile(username) });
       qc.invalidateQueries({ queryKey: queryKeys.me });
       qc.invalidateQueries({ queryKey: queryKeys.stories });
-      if (me) qc.invalidateQueries({ queryKey: queryKeys.following(me.username) });
+      if (me) {
+        qc.invalidateQueries({ queryKey: queryKeys.following(me.username) });
+        // The viewer's own `following` count changed too.
+        qc.invalidateQueries({ queryKey: queryKeys.profile(me.username) });
+      }
+      qc.invalidateQueries({ queryKey: queryKeys.followers(username) });
     },
   });
 }
@@ -389,6 +433,12 @@ export function useAddresses() {
   return useQuery({ queryKey: queryKeys.addresses, queryFn: () => api.addresses.list(), enabled: authed });
 }
 
+export function useDeleteAddress() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => api.addresses.remove(id), onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.addresses }) });
+}
+
 export function useCreateAddress() {
   const api = useApi();
   const qc = useQueryClient();
@@ -435,9 +485,14 @@ export function useOrderAction() {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { id: string; action: 'confirm' | 'cancel' } | { id: string; action: 'refund'; reason: string; itemIds: string[] }) => {
-      if (v.action === 'refund') return api.orders.requestRefund(v.id, v.reason, v.itemIds);
-      return v.action === 'confirm' ? api.orders.confirmDelivery(v.id) : api.orders.cancel(v.id);
+    mutationFn: (v: { id: string; action: 'confirm' | 'cancel' | 'withdrawRefund' } | { id: string; action: 'refund'; reason: string; itemIds: string[] } | { id: string; action: 'dispute'; reason: string }) => {
+      switch (v.action) {
+        case 'refund': return api.orders.requestRefund(v.id, v.reason, v.itemIds);
+        case 'dispute': return api.orders.dispute(v.id, { reason: v.reason });
+        case 'withdrawRefund': return api.orders.withdrawRefund(v.id);
+        case 'confirm': return api.orders.confirmDelivery(v.id);
+        case 'cancel': return api.orders.cancel(v.id);
+      }
     },
     onSuccess: order => {
       qc.setQueryData(queryKeys.order(order.id), order);
@@ -469,7 +524,8 @@ export function useSellerOrdersSummary() {
 
 export type SellerOrderAction =
   | { id: string; action: 'accept' | 'deliver' | 'approveRefund' | 'cancel' }
-  | { id: string; action: 'ship'; body: ShipOrderRequest };
+  | { id: string; action: 'ship'; body: ShipOrderRequest }
+  | { id: string; action: 'declineRefund'; body: DeclineRefundRequest };
 
 export function useSellerOrderAction() {
   const api = useApi();
@@ -481,6 +537,7 @@ export function useSellerOrderAction() {
         case 'ship': return api.sellerOrders.ship(v.id, v.body);
         case 'deliver': return api.sellerOrders.deliver(v.id);
         case 'approveRefund': return api.sellerOrders.approveRefund(v.id);
+        case 'declineRefund': return api.sellerOrders.declineRefund(v.id, v.body);
         case 'cancel': return api.sellerOrders.cancel(v.id);
       }
     },
@@ -582,6 +639,88 @@ export function useUnreadCount() {
   const api = useApi();
   const authed = useAuthed();
   return useQuery({ queryKey: queryKeys.unreadCount, queryFn: () => api.notifications.unreadCount(), enabled: authed, refetchInterval: 30_000, select: d => d.count });
+}
+
+export function useNotificationPreferences() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.notificationPreferences, queryFn: () => api.notifications.preferences(), enabled: authed, staleTime: 5 * 60_000 });
+}
+
+/** Optimistic per-toggle update; the server returns the merged document. */
+export function useUpdateNotificationPreferences() {
+  const api = useApi();
+  const qc = useQueryClient();
+  const key = ['notifications', 'preferences', 'update'];
+  return useMutation({
+    mutationKey: key,
+    mutationFn: (body: UpdateNotificationPreferencesRequest) => api.notifications.updatePreferences(body),
+    onMutate: async body => {
+      await qc.cancelQueries({ queryKey: queryKeys.notificationPreferences });
+      const previous = qc.getQueryData<NotificationPreferences>(queryKeys.notificationPreferences);
+      if (previous) {
+        const next = { ...previous };
+        for (const k of Object.keys(body) as (keyof NotificationPreferences)[]) next[k] = { ...previous[k], ...body[k] };
+        qc.setQueryData(queryKeys.notificationPreferences, next);
+      }
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => { if (ctx?.previous) qc.setQueryData(queryKeys.notificationPreferences, ctx.previous); },
+    // Rapid toggles overlap: only the last in-flight response may replace the optimistic document.
+    onSuccess: data => { if (qc.isMutating({ mutationKey: key }) <= 1) qc.setQueryData(queryKeys.notificationPreferences, data); },
+  });
+}
+
+// ---------- KYC ----------
+
+export function useKycState() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.kyc, queryFn: () => api.kyc.state(), enabled: authed });
+}
+
+export function useSubmitKyc() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (body: SubmitKycRequest) => api.kyc.submit(body), onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.kyc }) });
+}
+
+export function useAdminKycQueue(query: PageQuery & { status?: string } = {}) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useInfiniteQuery({
+    queryKey: queryKeys.adminKyc(query),
+    queryFn: ({ pageParam }) => api.kyc.adminQueue({ ...query, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
+    enabled: authed,
+  });
+}
+
+export function useReviewKyc() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: ReviewKycRequest }) => api.kyc.adminReview(id, body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin', 'kyc'] }); qc.invalidateQueries({ queryKey: queryKeys.kyc }); },
+  });
+}
+
+// ---------- Disputes (admin) ----------
+
+export function useAdminDisputes(query: PageQuery = {}) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useInfiniteQuery({ queryKey: ['admin', 'disputes', query] as const, queryFn: ({ pageParam }) => api.disputes.list({ ...query, page: pageParam }), initialPageParam: 1, getNextPageParam: nextPage, enabled: authed });
+}
+
+export function useResolveDispute() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: ResolveDisputeRequest }) => api.disputes.resolve(id, body),
+    onSuccess: order => { qc.setQueryData(queryKeys.order(order.id), order); qc.invalidateQueries({ queryKey: ['admin', 'disputes'] }); qc.invalidateQueries({ queryKey: ['orders'] }); },
+  });
 }
 
 export function useMarkNotificationsRead() {
