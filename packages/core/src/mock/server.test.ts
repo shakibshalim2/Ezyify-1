@@ -124,6 +124,19 @@ describe('mock API server', () => {
     await expect(api.sellerOrders.accept('o1')).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
+  it('seller dashboard is role-gated and internally consistent in mock mode', async () => {
+    const { api, login } = harness();
+    await login();
+    await expect(api.seller.dashboard()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await login('techstore@ezyify.test');
+    const d = await api.seller.dashboard({ days: 30 });
+    expect(d.series).toHaveLength(14);
+    expect(d.gross.current.amount).toBeGreaterThan(0);
+    expect(d.averageOrder.current.amount).toBe(Math.round(d.gross.current.amount / d.orders.current));
+    expect(d.attention.toShip).toBe((await api.sellerOrders.summary()).toShip);
+    expect(d.rating.average).toBeGreaterThan(4);
+  });
+
   it('login → native refresh rotation → protected route; rejects bad credentials', async () => {
     const { api, login, tokens, setAccess } = harness();
     await expect(api.auth.login({ identifier: 'buyer@ezyify.test', password: 'nope' })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });

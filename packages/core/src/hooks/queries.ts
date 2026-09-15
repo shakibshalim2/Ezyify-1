@@ -19,6 +19,7 @@ export const queryKeys = {
   product: (id: string) => ['product', id] as const,
   categories: ['categories'] as const,
   sellerProducts: (params: Record<string, unknown> = {}) => ['seller', 'products', params] as const,
+  sellerDashboard: (params: Record<string, unknown> = {}) => ['seller', 'dashboard', params] as const,
   search: (q: string) => ['search', q] as const,
   unifiedSearch: (q: string, type: SearchType = 'all') => ['search', 'all', q, type] as const,
   cart: ['cart'] as const,
@@ -89,6 +90,12 @@ export function useSellerProducts(query: SellerProductQuery = {}) {
   const api = useApi();
   const authed = useAuthed();
   return useQuery({ queryKey: queryKeys.sellerProducts(query), queryFn: () => api.seller.products(query), enabled: authed, placeholderData: keepPreviousData });
+}
+
+export function useSellerDashboard(query: { days?: number } = {}) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sellerDashboard(query), queryFn: () => api.seller.dashboard(query), enabled: authed, placeholderData: keepPreviousData, staleTime: 60_000 });
 }
 
 // ---------- Social ----------
@@ -403,6 +410,7 @@ export function useSellerOrderAction() {
       qc.invalidateQueries({ queryKey: ['orders'] });
       qc.invalidateQueries({ queryKey: queryKeys.orderTimeline(order.id) });
       qc.invalidateQueries({ queryKey: queryKeys.wallet });
+      qc.invalidateQueries({ queryKey: ['seller'] });
     },
   });
 }

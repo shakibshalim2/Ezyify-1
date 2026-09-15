@@ -94,6 +94,21 @@ export const SellerOrdersSummarySchema = z.object({
 });
 export type SellerOrdersSummary = z.infer<typeof SellerOrdersSummarySchema>;
 
+/** Seller overview (`GET /seller/dashboard`): 30‑day window vs the previous 30 days, plus what needs attention today. */
+export const SellerDashboardSchema = z.object({
+  currency: MoneySchema.shape.currency,
+  window: z.object({ from: IsoDateSchema, to: IsoDateSchema, days: z.number().int().min(1) }),
+  gross: z.object({ current: MoneySchema, previous: MoneySchema }),
+  orders: z.object({ current: z.number().int().min(0), previous: z.number().int().min(0) }),
+  averageOrder: z.object({ current: MoneySchema, previous: MoneySchema }),
+  escrowHeld: MoneySchema,
+  paidOut: MoneySchema,
+  rating: z.object({ average: z.number().min(0).max(5), count: z.number().int().min(0) }),
+  series: z.array(z.object({ date: z.string(), gross: z.number().int().min(0), orders: z.number().int().min(0) })),
+  attention: z.object({ toShip: z.number().int().min(0), refundRequests: z.number().int().min(0), lowStock: z.number().int().min(0), outOfStock: z.number().int().min(0) }),
+});
+export type SellerDashboard = z.infer<typeof SellerDashboardSchema>;
+
 export const OrderEventSchema = z.object({
   status: OrderStatusSchema,
   at: IsoDateSchema,

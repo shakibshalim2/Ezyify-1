@@ -409,6 +409,61 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
     }],
 
     // ---- seller hub inventory (mirrors GET /seller/products): stock is derived deterministically from the fixture id
+    // ---- seller overview: derived from the seller's fixture products + live order state so the chart is never flat
+    ['GET', '/seller/dashboard', c => {
+      const u = requireUser(c);
+      if (u.role !== 'seller' && u.role !== 'admin') throw forbidden('Seller account required');
+      const days = Math.min(90, Math.max(7, Number(c.query.get('days') ?? 30)));
+      const DAY = 86_400_000;
+      const nowMs = now();
+      const mine = fx.products.filter(p => p.seller.username === u.username);
+      const SALES = ['paid', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'completed'];
+      const sales = state.orders.filter(o => o.seller.id === u.id && SALES.includes(o.status));
+      // Deterministic pseudo‑history per seller: spread lifetime soldCount across a year with a weekly rhythm.
+      const seed = [...u.id].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0, 7);
+      const daily = (dayIndex: number) => {
+        const base = mine.reduce((n, p) => n + (p.soldCount * p.price.amount) / 365, 0);
+        const wave = 1 + 0.35 * Math.sin((dayIndex + seed % 7) / 7 * Math.PI * 2) + ((seed >> (dayIndex % 13)) & 1) * 0.15;
+        return Math.round(base * wave);
+      };
+      const dailyOrders = (dayIndex: number) => Math.max(1, Math.round(daily(dayIndex) / Math.max(1, mine.reduce((n, p) => n + p.price.amount, 0) / Math.max(1, mine.length))));
+      const sumRange = (fromDays: number, toDays: number) => {
+        let gross = 0, orders = 0;
+        for (let d = fromDays; d < toDays; d++) { gross += daily(d); orders += dailyOrders(d); }
+        return { gross, orders };
+      };
+      const cur = sumRange(0, days);
+      const prev = sumRange(days, days * 2);
+      const liveGross = sales.filter(o => nowMs - +new Date(o.placedAt) < days * DAY).reduce((n, o) => n + o.total.amount, 0);
+      cur.gross += liveGross;
+      cur.orders += sales.filter(o => nowMs - +new Date(o.placedAt) < days * DAY).length;
+      const series = Array.from({ length: 14 }, (_, i) => {
+        const dayIndex = 13 - i;
+        const date = new Date(nowMs - dayIndex * DAY).toISOString().slice(0, 10);
+        const live = sales.filter(o => new Date(o.placedAt).toISOString().slice(0, 10) === date);
+        return { date, gross: daily(dayIndex) + live.reduce((n, o) => n + o.total.amount, 0), orders: dailyOrders(dayIndex) + live.length };
+      });
+      const ratingCount = mine.reduce((n, p) => n + p.reviewCount, 0);
+      const ratingSum = mine.reduce((n, p) => n + p.rating * p.reviewCount, 0);
+      const stockOf = (p: ProductDetail) => (p.variants.length ? p.variants.reduce((n, v) => n + v.stock, 0) : p.inStock ? 12 + (Number(p.id.replace(/\D/g, '')) * 37) % 140 : 0);
+      return {
+        currency: 'USD' as const,
+        window: { from: new Date(nowMs - days * DAY).toISOString(), to: iso(), days },
+        gross: { current: money(cur.gross), previous: money(prev.gross) },
+        orders: { current: cur.orders, previous: prev.orders },
+        averageOrder: { current: money(cur.orders ? Math.round(cur.gross / cur.orders) : 0), previous: money(prev.orders ? Math.round(prev.gross / prev.orders) : 0) },
+        escrowHeld: money(sales.filter(o => o.escrow.status === 'held').reduce((n, o) => n + o.total.amount, 0)),
+        paidOut: money(sales.filter(o => o.escrow.status === 'released').reduce((n, o) => n + Math.round(o.total.amount * 0.95), 0) + Math.round(sumRange(0, 365).gross * 0.95)),
+        rating: { average: ratingCount ? Math.round((ratingSum / ratingCount) * 10) / 10 : 0, count: ratingCount },
+        series,
+        attention: {
+          toShip: state.orders.filter(o => o.seller.id === u.id && (o.status === 'paid' || o.status === 'processing')).length,
+          refundRequests: state.orders.filter(o => o.seller.id === u.id && (o.status === 'refund_requested' || o.status === 'disputed')).length,
+          lowStock: mine.filter(p => { const s = stockOf(p); return s > 0 && s < 10; }).length,
+          outOfStock: mine.filter(p => stockOf(p) === 0).length,
+        },
+      };
+    }],
     ['GET', '/seller/products', c => {
       const u = requireUser(c);
       if (u.role !== 'seller' && u.role !== 'admin') throw forbidden('Seller account required');

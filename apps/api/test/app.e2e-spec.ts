@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApp } from '../src/bootstrap.js';
 import { loadEnv } from '../src/config.js';
-import { OrderSchema, ProductSummarySchema, SellerProductsResponseSchema, SessionSchema, paginated } from '@ezyify/core';
+import { OrderSchema, ProductSummarySchema, SellerDashboardSchema, SellerProductsResponseSchema, SessionSchema, paginated } from '@ezyify/core';
 
 let app: NestFastifyApplication;
 const inject = (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, opts: { token?: string; body?: unknown; headers?: Record<string, string> } = {}) =>
@@ -166,6 +166,24 @@ describe('commerce: cart → checkout → escrow → release', () => {
     expect(summary.refunds).toBe(summaryBefore.refunds + 1);
     expect(summary.toShip).toBe(summaryBefore.toShip - 1);
     expect(summary.completed).toBeGreaterThanOrEqual(1);
+  });
+
+  it('seller dashboard aggregates real sales, escrow, payouts and attention counts', async () => {
+    expect((await inject('GET', '/seller/dashboard', { token: buyer })).statusCode).toBe(403);
+    const d = json(await inject('GET', '/seller/dashboard?days=30', { token: seller })).data;
+    expect(SellerDashboardSchema.safeParse(d).success).toBe(true);
+    expect(d.window.days).toBe(30);
+    // The completed headphones order (7999) counts as gross; the cancelled watch order does not.
+    expect(d.gross.current.amount).toBe(7999);
+    expect(d.orders.current).toBe(1);
+    expect(d.averageOrder.current.amount).toBe(7999);
+    expect(d.paidOut.amount).toBe(7999 - Math.round(7999 * 0.05));
+    expect(d.escrowHeld.amount).toBe(0);
+    expect(d.series).toHaveLength(14);
+    expect(d.series.reduce((n: number, p: { gross: number }) => n + p.gross, 0)).toBe(7999);
+    expect(d.attention).toMatchObject({ toShip: 0, refundRequests: 0 });
+    expect(d.rating.count).toBeGreaterThan(0);
+    expect((await inject('GET', '/seller/dashboard?days=3', { token: seller })).statusCode).toBe(422);
   });
 
   it('timeline records every transition', async () => {

@@ -24,6 +24,7 @@ import { UploadsModule } from './modules/uploads/uploads.module.js';
 import { HealthController } from './modules/health/health.controller.js';
 import { SearchModule } from './modules/search/search.module.js';
 import { LiveModule } from './modules/live/live.module.js';
+import { SellerModule } from './modules/seller/seller.module.js';
 
 export function buildAppModule(env: Env = loadEnv()) {
   @Module({
@@ -47,6 +48,7 @@ export function buildAppModule(env: Env = loadEnv()) {
       CartModule,
       WalletModule,
       OrdersModule,
+      SellerModule,
       FeedModule,
       MessagingModule,
       NotificationsModule,

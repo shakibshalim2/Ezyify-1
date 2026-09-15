@@ -40,6 +40,7 @@ import {
   ReportRequestSchema,
   ResetPasswordRequestSchema,
   SearchResponseSchema,
+  SellerDashboardSchema,
   SellerOrdersSummarySchema,
   SellerProductsResponseSchema,
   ShipOrderRequestSchema,
@@ -131,6 +132,8 @@ export function createEndpoints(api: ApiClient) {
     seller: {
       /** Seller hub inventory: the caller's own products (incl. drafts) with stock, sales and revenue, plus status counts. */
       products: (query: SellerProductQuery = {}) => api.get('/seller/products', SellerProductsResponseSchema, { query }),
+      /** Overview KPIs, 14‑day series and attention counts; `days` widens the comparison window (7–90). */
+      dashboard: (query: { days?: number } = {}) => api.get('/seller/dashboard', SellerDashboardSchema, { query }),
     },
     search: {
       /** Unified products + users + posts search (Meilisearch or Postgres fallback server-side). */
