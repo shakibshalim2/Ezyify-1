@@ -109,6 +109,26 @@ export const SellerDashboardSchema = z.object({
 });
 export type SellerDashboard = z.infer<typeof SellerDashboardSchema>;
 
+/** Seller analytics (`GET /seller/analytics`): everything is computed from real order lines in the window. */
+export const SellerAnalyticsSchema = z.object({
+  currency: MoneySchema.shape.currency,
+  window: z.object({ from: IsoDateSchema, to: IsoDateSchema, days: z.number().int().min(1) }),
+  totals: z.object({ gross: MoneySchema, orders: z.number().int().min(0), units: z.number().int().min(0), averageOrder: MoneySchema }),
+  series: z.array(z.object({ date: z.string(), gross: z.number().int().min(0), orders: z.number().int().min(0), units: z.number().int().min(0) })),
+  topProducts: z.array(z.object({ id: IdSchema, name: z.string(), imageUrl: z.string().url(), units: z.number().int().min(0), orders: z.number().int().min(0), gross: MoneySchema, share: z.number().min(0).max(1) })),
+  categories: z.array(z.object({ name: z.string(), gross: MoneySchema, units: z.number().int().min(0), share: z.number().min(0).max(1) })),
+  customers: z.object({ unique: z.number().int().min(0), repeat: z.number().int().min(0), firstTime: z.number().int().min(0) }),
+  fulfillment: z.object({
+    /** Mean hours from payment to shipment for orders shipped in the window; null when nothing shipped. */
+    avgHoursToShip: z.number().min(0).nullable(),
+    completionRate: z.number().min(0).max(1),
+    refundRate: z.number().min(0).max(1),
+    cancelRate: z.number().min(0).max(1),
+  }),
+  paymentMix: z.array(z.object({ method: z.enum(['wallet', 'card', 'bank_transfer', 'cod']), orders: z.number().int().min(0), share: z.number().min(0).max(1) })),
+});
+export type SellerAnalytics = z.infer<typeof SellerAnalyticsSchema>;
+
 export const OrderEventSchema = z.object({
   status: OrderStatusSchema,
   at: IsoDateSchema,

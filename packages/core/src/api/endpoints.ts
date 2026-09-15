@@ -40,6 +40,7 @@ import {
   ReportRequestSchema,
   ResetPasswordRequestSchema,
   SearchResponseSchema,
+  SellerAnalyticsSchema,
   SellerDashboardSchema,
   SellerOrdersSummarySchema,
   SellerProductsResponseSchema,
@@ -134,6 +135,8 @@ export function createEndpoints(api: ApiClient) {
       products: (query: SellerProductQuery = {}) => api.get('/seller/products', SellerProductsResponseSchema, { query }),
       /** Overview KPIs, 14‑day series and attention counts; `days` widens the comparison window (7–90). */
       dashboard: (query: { days?: number } = {}) => api.get('/seller/dashboard', SellerDashboardSchema, { query }),
+      /** Top products, category mix, customers, fulfilment and payment mix for the window (7–90 days). */
+      analytics: (query: { days?: number } = {}) => api.get('/seller/analytics', SellerAnalyticsSchema, { query }),
     },
     search: {
       /** Unified products + users + posts search (Meilisearch or Postgres fallback server-side). */

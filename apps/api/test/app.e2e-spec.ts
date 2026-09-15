@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApp } from '../src/bootstrap.js';
 import { loadEnv } from '../src/config.js';
-import { OrderSchema, ProductSummarySchema, SellerDashboardSchema, SellerProductsResponseSchema, SessionSchema, paginated } from '@ezyify/core';
+import { OrderSchema, ProductSummarySchema, SellerAnalyticsSchema, SellerDashboardSchema, SellerProductsResponseSchema, SessionSchema, paginated } from '@ezyify/core';
 
 let app: NestFastifyApplication;
 const inject = (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, opts: { token?: string; body?: unknown; headers?: Record<string, string> } = {}) =>
@@ -184,6 +184,24 @@ describe('commerce: cart → checkout → escrow → release', () => {
     expect(d.attention).toMatchObject({ toShip: 0, refundRequests: 0 });
     expect(d.rating.count).toBeGreaterThan(0);
     expect((await inject('GET', '/seller/dashboard?days=3', { token: seller })).statusCode).toBe(422);
+  });
+
+  it('seller analytics reconciles top products, categories, customers and fulfilment with real orders', async () => {
+    expect((await inject('GET', '/seller/analytics', { token: buyer })).statusCode).toBe(403);
+    const a = json(await inject('GET', '/seller/analytics?days=30', { token: seller })).data;
+    expect(SellerAnalyticsSchema.safeParse(a).success).toBe(true);
+    expect(a.series).toHaveLength(30);
+    expect(a.totals).toMatchObject({ gross: { amount: 7999 }, orders: 1, units: 1, averageOrder: { amount: 7999 } });
+    expect(a.series.reduce((n: number, p: { gross: number }) => n + p.gross, 0)).toBe(a.totals.gross.amount);
+    expect(a.topProducts).toHaveLength(1);
+    expect(a.topProducts[0]).toMatchObject({ id: 'prod-001', units: 1, share: 1 });
+    expect(a.categories).toEqual([expect.objectContaining({ name: 'Tech', share: 1 })]);
+    expect(a.customers).toEqual({ unique: 1, repeat: 0, firstTime: 1 });
+    // One completed + one cancelled order in the window → 50% each; shipped 1 order so latency is a number.
+    expect(a.fulfillment.completionRate).toBe(0.5);
+    expect(a.fulfillment.cancelRate).toBe(0.5);
+    expect(typeof a.fulfillment.avgHoursToShip).toBe('number');
+    expect(a.paymentMix).toEqual([{ method: 'wallet', orders: 1, share: 1 }]);
   });
 
   it('timeline records every transition', async () => {

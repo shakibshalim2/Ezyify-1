@@ -137,6 +137,19 @@ describe('mock API server', () => {
     expect(d.rating.average).toBeGreaterThan(4);
   });
 
+  it('seller analytics is role-gated and its totals reconcile with the series in mock mode', async () => {
+    const { api, login } = harness();
+    await login();
+    await expect(api.seller.analytics()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await login('techstore@ezyify.test');
+    const a = await api.seller.analytics({ days: 7 });
+    expect(a.series).toHaveLength(7);
+    expect(a.series.reduce((n, d) => n + d.gross, 0)).toBe(a.totals.gross.amount);
+    expect(a.topProducts.every(p => p.id.startsWith('prod-'))).toBe(true);
+    expect(Math.round(a.categories.reduce((n, c) => n + c.share, 0) * 10) / 10).toBe(1);
+    expect(a.customers.firstTime + a.customers.repeat).toBe(a.customers.unique);
+  });
+
   it('login → native refresh rotation → protected route; rejects bad credentials', async () => {
     const { api, login, tokens, setAccess } = harness();
     await expect(api.auth.login({ identifier: 'buyer@ezyify.test', password: 'nope' })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });

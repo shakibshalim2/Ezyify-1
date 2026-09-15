@@ -464,6 +464,78 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
         },
       };
     }],
+    ['GET', '/seller/analytics', c => {
+      const u = requireUser(c);
+      if (u.role !== 'seller' && u.role !== 'admin') throw forbidden('Seller account required');
+      const days = Math.min(90, Math.max(7, Number(c.query.get('days') ?? 30)));
+      const DAY = 86_400_000;
+      const nowMs = now();
+      const mine = fx.products.filter(p => p.seller.username === u.username);
+      const SALES = ['paid', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'completed'];
+      const seed = [...u.id].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0, 7);
+      // Same deterministic per‑product history as /seller/dashboard so both screens reconcile.
+      const unitsOn = (p: ProductDetail, dayIndex: number) => {
+        const base = p.soldCount / 365;
+        const wave = 1 + 0.35 * Math.sin((dayIndex + seed % 7) / 7 * Math.PI * 2) + ((seed >> (dayIndex % 13)) & 1) * 0.15;
+        return Math.max(0, Math.round(base * wave));
+      };
+      const live = state.orders.filter(o => o.seller.id === u.id && SALES.includes(o.status) && nowMs - +new Date(o.placedAt) < days * DAY);
+      const all = state.orders.filter(o => o.seller.id === u.id && nowMs - +new Date(o.placedAt) < days * DAY);
+      const byProduct = new Map<string, { name: string; imageUrl: string; units: number; orders: number; gross: number }>();
+      const byCategory = new Map<string, { gross: number; units: number }>();
+      const series = Array.from({ length: days }, (_, i) => {
+        const dayIndex = days - 1 - i;
+        const date = new Date(nowMs - dayIndex * DAY).toISOString().slice(0, 10);
+        let gross = 0, units = 0, orders = 0;
+        for (const p of mine) {
+          const n = unitsOn(p, dayIndex);
+          if (!n) continue;
+          units += n; gross += n * p.price.amount; orders += Math.max(1, Math.round(n / 1.4));
+          const bp = byProduct.get(p.id) ?? { name: p.name, imageUrl: p.imageUrl, units: 0, orders: 0, gross: 0 };
+          bp.units += n; bp.gross += n * p.price.amount; bp.orders += Math.max(1, Math.round(n / 1.4)); byProduct.set(p.id, bp);
+          const bc = byCategory.get(p.category) ?? { gross: 0, units: 0 };
+          bc.gross += n * p.price.amount; bc.units += n; byCategory.set(p.category, bc);
+        }
+        for (const o of live.filter(o => new Date(o.placedAt).toISOString().slice(0, 10) === date)) {
+          gross += o.total.amount; orders += 1;
+          for (const it of o.items) {
+            units += it.quantity;
+            const bp = byProduct.get(it.productId) ?? { name: it.name, imageUrl: it.imageUrl, units: 0, orders: 0, gross: 0 };
+            bp.units += it.quantity; bp.orders += 1; bp.gross += it.unitPrice.amount * it.quantity; byProduct.set(it.productId, bp);
+            const cat = fx.findProduct(it.productId)?.category ?? 'other';
+            const bc = byCategory.get(cat) ?? { gross: 0, units: 0 };
+            bc.gross += it.unitPrice.amount * it.quantity; bc.units += it.quantity; byCategory.set(cat, bc);
+          }
+        }
+        return { date, gross, orders, units };
+      });
+      const gross = series.reduce((n, d) => n + d.gross, 0);
+      const orders = series.reduce((n, d) => n + d.orders, 0);
+      const units = series.reduce((n, d) => n + d.units, 0);
+      const lineGross = [...byProduct.values()].reduce((n, p) => n + p.gross, 0);
+      const share = (part: number, whole: number) => (whole ? Math.round((part / whole) * 1000) / 1000 : 0);
+      const unique = Math.max(live.length, Math.round(orders * 0.62));
+      const repeat = Math.round(unique * 0.31);
+      const catName = (slug: string) => fx.categories.find(c => c.slug === slug)?.name ?? slug;
+      const decided = all.filter(o => o.status !== 'pending_payment').length;
+      return {
+        currency: 'USD' as const,
+        window: { from: new Date(nowMs - (days - 1) * DAY).toISOString(), to: iso(), days },
+        totals: { gross: money(gross), orders, units, averageOrder: money(orders ? Math.round(gross / orders) : 0) },
+        series,
+        topProducts: [...byProduct.entries()].sort((a, b) => b[1].gross - a[1].gross).slice(0, 8).map(([id, p]) => ({ id, name: p.name, imageUrl: p.imageUrl, units: p.units, orders: p.orders, gross: money(p.gross), share: share(p.gross, lineGross) })),
+        categories: [...byCategory.entries()].sort((a, b) => b[1].gross - a[1].gross).map(([slug, c]) => ({ name: catName(slug), gross: money(c.gross), units: c.units, share: share(c.gross, lineGross) })),
+        customers: { unique, repeat, firstTime: unique - repeat },
+        // Blend live order outcomes into the synthetic history so rates move when the seller acts on real orders.
+        fulfillment: {
+          avgHoursToShip: 18.5 + (seed % 9),
+          completionRate: share(Math.round(orders * 0.94) + all.filter(o => o.status === 'completed').length, orders + decided),
+          refundRate: share(Math.round(orders * 0.02) + all.filter(o => ['refund_requested', 'refunded', 'disputed'].includes(o.status)).length, orders + decided),
+          cancelRate: share(Math.round(orders * 0.01) + all.filter(o => o.status === 'cancelled').length, orders + decided),
+        },
+        paymentMix: (['wallet', 'card', 'bank_transfer', 'cod'] as const).map((method, i) => ({ method, orders: Math.round(orders * [0.46, 0.34, 0.12, 0.08][i]), share: [0.46, 0.34, 0.12, 0.08][i] })),
+      };
+    }],
     ['GET', '/seller/products', c => {
       const u = requireUser(c);
       if (u.role !== 'seller' && u.role !== 'admin') throw forbidden('Seller account required');
