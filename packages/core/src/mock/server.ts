@@ -1,4 +1,5 @@
-import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, Post, UserProfile } from '../schemas/index.js';
+import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, Post, ProductDetail, SellerProduct, UserProfile } from '../schemas/index.js';
+import { sellerProductStatus } from '../schemas/index.js';
 import * as fx from './fixtures.js';
 
 /**
@@ -405,6 +406,27 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       const section = <T>(items: T[]) => ({ items: items.slice(0, limit), nextCursor: null, total: items.length });
       // Legacy `items`/`pagination` keeps the older `api.catalog.search` contract valid alongside the sectioned shape.
       return { products: section(products), users: section(users), posts: section(posts), ...paginate(products, c.query) };
+    }],
+
+    // ---- seller hub inventory (mirrors GET /seller/products): stock is derived deterministically from the fixture id
+    ['GET', '/seller/products', c => {
+      const u = requireUser(c);
+      if (u.role !== 'seller' && u.role !== 'admin') throw forbidden('Seller account required');
+      const stockOf = (p: ProductDetail) => (p.variants.length ? p.variants.reduce((n, v) => n + v.stock, 0) : p.inStock ? 12 + (Number(p.id.replace(/\D/g, '')) * 37) % 140 : 0);
+      const all: SellerProduct[] = fx.products
+        .filter(p => p.seller.username === u.username)
+        .map(p => {
+          const sold = state.orders.filter(o => o.status !== 'cancelled' && o.status !== 'refunded').flatMap(o => o.items).filter(i => i.productId === p.id);
+          const revenue = sold.reduce((n, i) => n + i.unitPrice.amount * i.quantity, 0) + p.soldCount * p.price.amount;
+          return { ...fx.productSummary(p), stock: stockOf(p), soldCount: p.soldCount + sold.reduce((n, i) => n + i.quantity, 0), revenue: money(revenue), published: true, updatedAt: p.createdAt };
+        });
+      const q = c.query.get('q')?.toLowerCase();
+      const status = c.query.get('status');
+      let list = all;
+      if (q) list = list.filter(p => p.name.toLowerCase().includes(q));
+      if (status) list = list.filter(p => sellerProductStatus(p) === status);
+      const count = (st: string) => all.filter(p => sellerProductStatus(p) === st).length;
+      return { ...paginate(list, c.query), summary: { total: all.length, active: count('active'), lowStock: count('low_stock'), outOfStock: count('out_of_stock'), draft: count('draft') } };
     }],
 
     // ---- live (LiveKit tokens) — demo builds mint an unsigned placeholder so the UI can render the player chrome

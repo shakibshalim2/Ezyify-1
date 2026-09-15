@@ -40,6 +40,7 @@ import {
   ReportRequestSchema,
   ResetPasswordRequestSchema,
   SearchResponseSchema,
+  SellerProductsResponseSchema,
   SendMessageRequestSchema,
   SignUploadRequestSchema,
   SignedUploadSchema,
@@ -62,6 +63,7 @@ import {
   type PinLiveSessionRequest,
   type LiveTokenRequest,
   type LoginRequest,
+  type SellerProductStatus,
   type LoginResult,
   type MfaVerifyRequest,
   type RegisterDeviceRequest,
@@ -79,6 +81,7 @@ const Count = z.object({ count: z.number().int().min(0) });
 type PageQuery = { page?: number; pageSize?: number };
 export type FeedQuery = PageQuery & { kind?: 'post' | 'loop' | 'story'; author?: string; hashtag?: string };
 export type ProductQuery = PageQuery & { category?: string; q?: string; sort?: 'popular' | 'newest' | 'price_asc' | 'price_desc' | 'rating'; seller?: string; onSale?: boolean };
+export type SellerProductQuery = PageQuery & { q?: string; status?: SellerProductStatus };
 
 const enc = encodeURIComponent;
 
@@ -121,6 +124,10 @@ export function createEndpoints(api: ApiClient) {
       product: (id: string) => api.get(`/products/${enc(id)}`, ProductDetailSchema, { auth: false }),
       categories: () => api.get('/categories', z.array(CategorySchema), { auth: false }),
       search: (q: string, query: PageQuery = {}) => api.get('/search', paginated(ProductSummarySchema), { query: { q, ...query }, auth: false }),
+    },
+    seller: {
+      /** Seller hub inventory: the caller's own products (incl. drafts) with stock, sales and revenue, plus status counts. */
+      products: (query: SellerProductQuery = {}) => api.get('/seller/products', SellerProductsResponseSchema, { query }),
     },
     search: {
       /** Unified products + users + posts search (Meilisearch or Postgres fallback server-side). */

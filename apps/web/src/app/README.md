@@ -432,9 +432,6 @@ ezyify/
 │   └── browser.ts               # MSW setup
 │
 ├── data/                        # Mock data
-│   ├── posts.ts
-│   ├── products.ts
-│   ├── users.ts
 │   └── ...
 │
 ├── contexts/                    # React contexts

@@ -86,6 +86,20 @@ describe('mock API server', () => {
     expect((await api.live.end(scheduled.id)).status).toBe('ended');
   });
 
+  it('seller hub inventory is scoped to the signed-in seller with status counts and filters', async () => {
+    const { api, login } = harness();
+    await expect(api.seller.products()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await login();
+    await expect(api.seller.products()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await login('techstore@ezyify.test');
+    const r = await api.seller.products();
+    expect(r.items.length).toBeGreaterThan(0);
+    expect(r.items.every(p => p.seller.username === 'techstore')).toBe(true);
+    expect(r.summary.total).toBe(r.items.length);
+    const q = await api.seller.products({ q: 'watch' });
+    expect(q.items.map(p => p.id)).toEqual(['prod-002']);
+  });
+
   it('login → native refresh rotation → protected route; rejects bad credentials', async () => {
     const { api, login, tokens, setAccess } = harness();
     await expect(api.auth.login({ identifier: 'buyer@ezyify.test', password: 'nope' })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });

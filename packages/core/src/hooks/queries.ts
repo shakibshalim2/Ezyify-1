@@ -1,6 +1,6 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type { z } from 'zod';
-import type { FeedQuery, ProductQuery } from '../api/endpoints.js';
+import type { FeedQuery, ProductQuery, SellerProductQuery } from '../api/endpoints.js';
 import type { SearchType } from '../schemas/index.js';
 import type { paginated } from '../schemas/common.js';
 import type { Cart, CheckoutRequest, CreateAddressRequest, CreatePostRequest, Post, UpdateProfileRequest, UserProfile } from '../schemas/index.js';
@@ -17,6 +17,7 @@ export const queryKeys = {
   products: (params: Record<string, unknown> = {}) => ['products', params] as const,
   product: (id: string) => ['product', id] as const,
   categories: ['categories'] as const,
+  sellerProducts: (params: Record<string, unknown> = {}) => ['seller', 'products', params] as const,
   search: (q: string) => ['search', q] as const,
   unifiedSearch: (q: string, type: SearchType = 'all') => ['search', 'all', q, type] as const,
   cart: ['cart'] as const,
@@ -78,6 +79,13 @@ export function useSearch(q: string, query: PageQuery = {}) {
 export function useUnifiedSearch(q: string, type: SearchType = 'all') {
   const api = useApi();
   return useQuery({ queryKey: queryKeys.unifiedSearch(q, type), queryFn: () => api.search.all(q, { type }), enabled: q.trim().length > 0 });
+}
+
+/** Seller hub inventory (role seller/admin); keeps previous page while filters change so counts don't flicker. */
+export function useSellerProducts(query: SellerProductQuery = {}) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sellerProducts(query), queryFn: () => api.seller.products(query), enabled: authed, placeholderData: keepPreviousData });
 }
 
 // ---------- Social ----------

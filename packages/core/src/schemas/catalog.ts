@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IdSchema, IsoDateSchema, MoneySchema } from './common.js';
+import { IdSchema, IsoDateSchema, MoneySchema, PaginationSchema } from './common.js';
 import { UserSummarySchema } from './user.js';
 
 export const ProductBadgeSchema = z.enum(['new', 'sale', 'bestseller', 'limited', 'live']);
@@ -49,3 +49,35 @@ export const CategorySchema = z.object({
   productCount: z.number().int().min(0),
 });
 export type Category = z.infer<typeof CategorySchema>;
+
+/** Seller hub row (`GET /seller/products`): the summary plus inventory + performance the buyer API never exposes. */
+export const SellerProductSchema = ProductSummarySchema.extend({
+  stock: z.number().int().min(0),
+  soldCount: z.number().int().min(0),
+  revenue: MoneySchema,
+  published: z.boolean(),
+  updatedAt: IsoDateSchema,
+});
+export type SellerProduct = z.infer<typeof SellerProductSchema>;
+
+export const SellerProductStatusSchema = z.enum(['active', 'low_stock', 'out_of_stock', 'draft']);
+export type SellerProductStatus = z.infer<typeof SellerProductStatusSchema>;
+
+/** Shared with the API so the "Low stock" threshold means the same thing everywhere. */
+export const LOW_STOCK_THRESHOLD = 10;
+export const sellerProductStatus = (p: Pick<SellerProduct, 'stock' | 'published'>): SellerProductStatus =>
+  !p.published ? 'draft' : p.stock === 0 ? 'out_of_stock' : p.stock < LOW_STOCK_THRESHOLD ? 'low_stock' : 'active';
+
+export const SellerProductsSummarySchema = z.object({
+  total: z.number().int().min(0),
+  active: z.number().int().min(0),
+  lowStock: z.number().int().min(0),
+  outOfStock: z.number().int().min(0),
+  draft: z.number().int().min(0),
+});
+export const SellerProductsResponseSchema = z.object({
+  items: z.array(SellerProductSchema),
+  pagination: PaginationSchema,
+  summary: SellerProductsSummarySchema,
+});
+export type SellerProductsResponse = z.infer<typeof SellerProductsResponseSchema>;

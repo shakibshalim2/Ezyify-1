@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApp } from '../src/bootstrap.js';
 import { loadEnv } from '../src/config.js';
-import { OrderSchema, ProductSummarySchema, SessionSchema, paginated } from '@ezyify/core';
+import { OrderSchema, ProductSummarySchema, SellerProductsResponseSchema, SessionSchema, paginated } from '@ezyify/core';
 
 let app: NestFastifyApplication;
 const inject = (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, opts: { token?: string; body?: unknown; headers?: Record<string, string> } = {}) =>
@@ -136,6 +136,18 @@ describe('commerce: cart → checkout → escrow → release', () => {
   it('timeline records every transition', async () => {
     const t = json(await inject('GET', `/orders/${orderId}/timeline`, { token: buyer })).data.map((e: { status: string }) => e.status);
     expect(t).toEqual(['pending_payment', 'paid', 'processing', 'shipped', 'delivered', 'completed']);
+  });
+
+  it('seller hub inventory is seller-scoped, role-gated and reflects real order revenue', async () => {
+    expect((await inject('GET', '/seller/products', { token: buyer })).statusCode).toBe(403);
+    const r = json(await inject('GET', '/seller/products', { token: seller })).data;
+    expect(SellerProductsResponseSchema.safeParse(r).success).toBe(true);
+    expect(r.items.every((p: { seller: { username: string } }) => p.seller.username === 'techstore')).toBe(true);
+    expect(r.summary.total).toBe(r.summary.active + r.summary.lowStock + r.summary.outOfStock + r.summary.draft);
+    const sold = r.items.find((p: { id: string }) => p.id === 'prod-001');
+    expect(sold.revenue.amount).toBeGreaterThanOrEqual(7999);
+    const filtered = json(await inject('GET', '/seller/products?q=headphones&status=active', { token: seller })).data;
+    expect(filtered.items.map((p: { id: string }) => p.id)).toEqual(['prod-001']);
   });
 });
 
