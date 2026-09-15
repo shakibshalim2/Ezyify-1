@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useEffect, useState, memo } from 'react';
-import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from 'react-router';
+import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation, useParams } from 'react-router';
 import { AuthProvider } from './contexts/AuthContext';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { EzyifyContext } from '@ezyify/core';
@@ -107,6 +107,11 @@ const WalletPage = createLazyComponent(() => import('./pages/user/index').then(m
 const OrdersPage = createLazyComponent(() => import('./pages/user/index').then(m => ({ default: m.OrdersPage })));
 const OrderSuccessPage = createLazyComponent(() => import('./pages/OrderSuccessPage'));
 const OrderTrackingPage = createLazyComponent(() => import('./pages/user/OrderTrackingPage'));
+/** Figma-era `/user/order-tracking/:orderId` → canonical `/orders/:orderId`. */
+function LegacyOrderRedirect() {
+  const { orderId } = useParams();
+  return <Navigate to={`/orders/${orderId ?? ''}`} replace />;
+}
 
 // Batch 3
 const CreatorDashboardPage = createLazyComponent(() => import('./pages/creator/index').then(m => ({ default: m.DashboardPage })));
@@ -187,7 +192,6 @@ const DisputeResolutionDashboard = createLazyComponent(() => import('./pages/adm
 const AffiliateRulesPage = createLazyComponent(() => import('./pages/AffiliateRulesPage'));
 const ReferralTrackingPage = createLazyComponent(() => import('./pages/ReferralTrackingPage'));
 const VerificationStatusPage = createLazyComponent(() => import('./pages/VerificationStatusPage'));
-const MultiSellerOrderTrackingPage = createLazyComponent(() => import('./pages/user/MultiSellerOrderTrackingPage'));
 const UserManagementDashboard = createLazyComponent(() => import('./pages/admin/users/UserManagementDashboard'));
 const ContentModerationQueue = createLazyComponent(() => import('./pages/admin/moderation/ContentModerationQueue'));
 const FraudDetectionDashboard = createLazyComponent(() => import('./pages/admin/fraud/FraudDetectionDashboard'));
@@ -340,7 +344,8 @@ export default function App() {
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/order/:orderId" element={<OrderSuccessPage />} />
                 <Route path="/order-success" element={<OrderSuccessPage />} />
-                <Route path="/user/order-tracking/:orderId" element={<OrderTrackingPage />} />
+                <Route path="/orders/:orderId" element={<OrderTrackingPage />} />
+                <Route path="/user/order-tracking/:orderId" element={<LegacyOrderRedirect />} />
                 <Route path="/creator-dashboard" element={<CreatorDashboardPage />} />
                 <Route path="/live-schedule" element={<LiveSchedulePage />} />
                 <Route path="/affiliate-manager" element={<AffiliateManagerPage />} />
@@ -377,7 +382,7 @@ export default function App() {
                 <Route path="/settings/notifications" element={<NotificationSettingsPage />} />
                 <Route path="/settings/account-management" element={<AccountManagementPage />} />
                 <Route path="/seller/kyc-verification" element={<KYCVerificationPage />} />
-                <Route path="/user/order-tracking" element={<OrderTrackingPage />} />
+                <Route path="/user/order-tracking" element={<Navigate to="/orders" replace />} />
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/contact" element={<ContactPage />} />
                 <Route path="/careers" element={<CareersPage />} />
@@ -417,7 +422,7 @@ export default function App() {
                 <Route path="/verification-status" element={<VerificationStatusPage />} />
                 <Route path="/transparency" element={<TransparencyPage />} />
                 <Route path="/commission-policy" element={<CommissionPolicyPage />} />
-                <Route path="/user/multi-seller-order-tracking" element={<MultiSellerOrderTrackingPage />} />
+                <Route path="/user/multi-seller-order-tracking" element={<Navigate to="/orders" replace />} />
                 <Route path="/admin/users" element={<UserManagementDashboard />} />
                 <Route path="/admin/moderation" element={<ContentModerationQueue />} />
                 <Route path="/admin/fraud" element={<FraudDetectionDashboard />} />

@@ -86,7 +86,7 @@ function OrderCard({ order, onConfirmRequest }: { order: Order; onConfirmRequest
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <p className="font-display font-semibold text-foreground">{order.orderNumber}</p>
+              <Link to={`/orders/${order.id}`} className="font-display font-semibold text-foreground hover:underline" data-testid={`order-link-${order.id}`}>{order.orderNumber}</Link>
               <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium', cfg.className)}>
                 <Icon className="size-3.5" />
                 {cfg.label}
@@ -128,9 +128,9 @@ function OrderCard({ order, onConfirmRequest }: { order: Order; onConfirmRequest
           {order.escrow.status === 'refunded' && <span>Refunded to your wallet</span>}
           {order.escrow.status === 'disputed' && <span>Under review — funds stay in escrow</span>}
           {order.tracking && (
-            <a href={order.tracking.url ?? undefined} target="_blank" rel="noreferrer" className="ml-auto font-medium text-primary hover:underline">
+            <Link to={`/orders/${order.id}`} className="ml-auto font-medium text-primary hover:underline">
               {order.tracking.carrier} {order.tracking.number}
-            </a>
+            </Link>
           )}
         </div>
 

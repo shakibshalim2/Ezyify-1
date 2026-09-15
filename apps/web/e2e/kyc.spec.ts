@@ -16,6 +16,8 @@ const signIn = async (page: Page, email: string) => {
 };
 
 test.describe('identity verification (KYC) on /kyc + /admin/kyc', () => {
+  // Four sign-ins across two roles in one tab; give it headroom over the 30s default.
+  test.setTimeout(60_000);
   test('seller submits with uploaded documents, admin rejects then approves, verified badge appears', async ({ page }) => {
     // workspace is the only unverified seller fixture.
     await signIn(page, 'workspace@ezyify.test');

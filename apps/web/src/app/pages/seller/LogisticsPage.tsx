@@ -18,6 +18,7 @@ import { useInfiniteList } from '../../lib/data';
 import { formErrors } from '../../lib/apiErrors';
 import { fadeUp, staggerContainer } from '../../lib/motion';
 import { cn } from '../../components/ui/utils';
+import { trackingUrl } from '../../lib/tracking';
 
 /** Logistics lens over the seller's orders: what still has to leave, what's on the road, what has landed. */
 type Lane = 'to_ship' | 'in_transit' | 'delivered' | 'all';
@@ -27,22 +28,6 @@ const LANES: { key: Lane; label: string; statuses: OrderStatus[] | null }[] = [
   { key: 'delivered', label: 'Delivered', statuses: ['delivered', 'completed'] },
   { key: 'all', label: 'All', statuses: null },
 ];
-
-/** Carrier tracking pages for the couriers sellers type most; unknown carriers fall back to the stored URL or a web search. */
-const CARRIER_URLS: [RegExp, (n: string) => string][] = [
-  [/j&t|jnt/i, n => `https://www.jet.co.id/track?awb=${encodeURIComponent(n)}`],
-  [/jne/i, n => `https://www.jne.co.id/tracking-package?awb=${encodeURIComponent(n)}`],
-  [/sicepat/i, n => `https://www.sicepat.com/checkAwb/${encodeURIComponent(n)}`],
-  [/dhl/i, n => `https://www.dhl.com/track?tracking-id=${encodeURIComponent(n)}`],
-  [/fedex/i, n => `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(n)}`],
-  [/ups/i, n => `https://www.ups.com/track?tracknum=${encodeURIComponent(n)}`],
-  [/usps/i, n => `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(n)}`],
-];
-export function trackingUrl(t: NonNullable<Order['tracking']>): string {
-  if (t.url) return t.url;
-  const hit = CARRIER_URLS.find(([re]) => re.test(t.carrier));
-  return hit ? hit[1](t.number) : `https://www.google.com/search?q=${encodeURIComponent(`${t.carrier} ${t.number}`)}`;
-}
 
 function LogisticsSkeleton() {
   return (

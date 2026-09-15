@@ -15,6 +15,8 @@ const switchUser = async (page: Page, email: string) => {
 };
 
 test.describe('refund cases on /orders/:id/refund + /admin/disputes', () => {
+  // Five sign-ins across three roles in one tab; give it headroom over the 30s default.
+  test.setTimeout(60_000);
   test('buyer requests → seller declines → buyer escalates → admin refunds; wallet and statuses follow', async ({ page }) => {
     // Fixture o1 (EZ-10422, fashion, out_for_delivery) belongs to the buyer.
     await signIn(page, 'buyer@ezyify.test');
