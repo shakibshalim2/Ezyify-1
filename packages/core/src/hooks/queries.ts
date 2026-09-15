@@ -1,7 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type { z } from 'zod';
 import type { FeedQuery, ProductQuery, SellerProductQuery } from '../api/endpoints.js';
-import type { CreatePayoutMethodRequest, CreateReviewRequest, PayoutMethod, SellerReviewFilter, ShipOrderRequest } from '../schemas/index.js';
+import type { CreatePayoutMethodRequest, CreateReviewRequest, DeleteProductResult, PayoutMethod, SellerProductDetail, SellerReviewFilter, ShipOrderRequest, UpdateProductRequest, UpsertProductRequest } from '../schemas/index.js';
 import type { SearchType } from '../schemas/index.js';
 import type { paginated } from '../schemas/common.js';
 import type { Cart, CheckoutRequest, CreateAddressRequest, CreatePostRequest, Post, UpdateProfileRequest, UserProfile } from '../schemas/index.js';
@@ -19,6 +19,7 @@ export const queryKeys = {
   product: (id: string) => ['product', id] as const,
   categories: ['categories'] as const,
   sellerProducts: (params: Record<string, unknown> = {}) => ['seller', 'products', params] as const,
+  sellerProduct: (id: string) => ['seller', 'product', id] as const,
   sellerDashboard: (params: Record<string, unknown> = {}) => ['seller', 'dashboard', params] as const,
   sellerAnalytics: (params: Record<string, unknown> = {}) => ['seller', 'analytics', params] as const,
   sellerCustomers: (params: Record<string, unknown> = {}) => ['seller', 'customers', params] as const,
@@ -96,6 +97,35 @@ export function useSellerProducts(query: SellerProductQuery = {}) {
   const api = useApi();
   const authed = useAuthed();
   return useQuery({ queryKey: queryKeys.sellerProducts(query), queryFn: () => api.seller.products(query), enabled: authed, placeholderData: keepPreviousData });
+}
+
+export function useSellerProduct(id: string | undefined) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sellerProduct(id ?? ''), queryFn: () => api.seller.product(id!), enabled: authed && !!id });
+}
+
+/** Create / update / delete a seller's product; refreshes the hub list, the owner detail and the public catalog caches. */
+export function useSellerProductMutation() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { action: 'create'; body: UpsertProductRequest } | { action: 'update'; id: string; body: UpdateProductRequest } | { action: 'delete'; id: string }): Promise<SellerProductDetail | DeleteProductResult> => {
+      if (v.action === 'create') return api.seller.createProduct(v.body);
+      if (v.action === 'update') return api.seller.updateProduct(v.id, v.body);
+      return api.seller.deleteProduct(v.id);
+    },
+    onSuccess: (_r, v) => {
+      qc.invalidateQueries({ queryKey: ['seller', 'products'] });
+      qc.invalidateQueries({ queryKey: ['seller', 'dashboard'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: queryKeys.categories });
+      if (v.action !== 'create') {
+        qc.invalidateQueries({ queryKey: queryKeys.sellerProduct(v.id) });
+        qc.invalidateQueries({ queryKey: queryKeys.product(v.id) });
+      }
+    },
+  });
 }
 
 export function useSellerDashboard(query: { days?: number } = {}) {

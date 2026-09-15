@@ -98,6 +98,8 @@ export const products: ProductDetail[] = seeds.map(s => ({
 }));
 export const productSummary = (p: ProductDetail): ProductSummary => ({ id: p.id, slug: p.slug, name: p.name, imageUrl: p.imageUrl, price: p.price, compareAtPrice: p.compareAtPrice, rating: p.rating, reviewCount: p.reviewCount, seller: p.seller, badge: p.badge, inStock: p.inStock });
 export const findProduct = (id: string | undefined) => products.find(p => p.id === id || p.slug === id);
+/** Base stock for a fixture product (variants carry their own); deterministic so demo builds match the seeded DB shape. */
+export const fixtureStock = (p: ProductDetail) => (p.variants.length ? 0 : p.inStock ? 12 + (Number(p.id.replace(/\D/g, '')) * 37) % 140 : 0);
 
 /** Live shopping fixtures mirror the seeded API sessions so mock-mode screens never need hard-coded streams. */
 export const liveSessions: LiveSession[] = [

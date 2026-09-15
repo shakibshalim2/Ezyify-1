@@ -53,6 +53,10 @@ import {
   SellerDashboardSchema,
   SellerOrdersSummarySchema,
   SellerProductsResponseSchema,
+  SellerProductDetailSchema,
+  UpsertProductRequestSchema,
+  UpdateProductRequestSchema,
+  DeleteProductResultSchema,
   ShipOrderRequestSchema,
   SendMessageRequestSchema,
   SignUploadRequestSchema,
@@ -77,6 +81,8 @@ import {
   type LiveTokenRequest,
   type LoginRequest,
   type SellerProductStatus,
+  type UpsertProductRequest,
+  type UpdateProductRequest,
   type SellerCustomerSort,
   type SellerReviewFilter,
   type CreateReviewRequest,
@@ -150,6 +156,12 @@ export function createEndpoints(api: ApiClient) {
     seller: {
       /** Seller hub inventory: the caller's own products (incl. drafts) with stock, sales and revenue, plus status counts. */
       products: (query: SellerProductQuery = {}) => api.get('/seller/products', SellerProductsResponseSchema, { query }),
+      /** Owner view of one product (drafts included) for the edit form. */
+      product: (id: string) => api.get(`/seller/products/${enc(id)}`, SellerProductDetailSchema),
+      createProduct: (body: UpsertProductRequest) => api.post('/seller/products', UpsertProductRequestSchema.parse(body), SellerProductDetailSchema),
+      updateProduct: (id: string, body: UpdateProductRequest) => api.patch(`/seller/products/${enc(id)}`, UpdateProductRequestSchema.parse(body), SellerProductDetailSchema),
+      /** Deletes, or archives (unpublishes) when the product already has order lines. */
+      deleteProduct: (id: string) => api.delete(`/seller/products/${enc(id)}`, DeleteProductResultSchema),
       /** Overview KPIs, 14‑day series and attention counts; `days` widens the comparison window (7–90). */
       dashboard: (query: { days?: number } = {}) => api.get('/seller/dashboard', SellerDashboardSchema, { query }),
       /** Top products, category mix, customers, fulfilment and payment mix for the window (7–90 days). */

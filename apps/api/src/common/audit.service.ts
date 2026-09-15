@@ -16,6 +16,9 @@ export type AuditEvent =
   | 'account.exported'
   | 'admin.report_reviewed'
   | 'moderation.child_safety_report'
+  | 'seller.product_created'
+  | 'seller.product_archived'
+  | 'seller.product_deleted'
   | 'payment.webhook'
   | 'payment.webhook_rejected';
 

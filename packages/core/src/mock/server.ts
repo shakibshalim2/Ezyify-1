@@ -1,4 +1,5 @@
-import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, PayoutMethod, Post, ProductDetail, Review, SellerCustomer, SellerProduct, SellerReview, UserProfile } from '../schemas/index.js';
+import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, PayoutMethod, Post, ProductDetail, Review, SellerCustomer, SellerProduct, SellerProductDetail, SellerReview, UserProfile } from '../schemas/index.js';
+import { UpsertProductRequestSchema, UpdateProductRequestSchema } from '../schemas/index.js';
 import { sellerProductStatus } from '../schemas/index.js';
 import * as fx from './fixtures.js';
 
@@ -80,6 +81,8 @@ export function createMockState() {
   const pendingOtp = new Map<string, string>(); // userId → purpose
   const mfa = new Map<string, { secret: string; enabled: boolean; recoveryCodes: string[] }>(); // userId → TOTP state (no seed user has it on)
   const mfaChallenges = new Map<string, { userId: string; attempts: number }>(); // challengeToken → pending login
+  // Catalog is mutable in demo mode so seller CRUD round-trips; the deterministic stock mirrors the seeded DB.
+  const products: SellerProductDetail[] = fx.products.map(p => ({ ...p, images: [...p.images], tags: [...p.tags], variants: p.variants.map(v => ({ ...v })), published: true, stock: fx.fixtureStock(p), categoryId: fx.categories.find(c => c.slug === p.category)?.id ?? 'cat_tech', updatedAt: p.createdAt }));
   const posts: Post[] = [...fx.posts, ...fx.loops, ...fx.stories].map(p => ({ ...p, engagement: { ...p.engagement } }));
   const likes = new Map<string, Set<string>>(); // userId → postIds
   const saves = new Map<string, Set<string>>();
@@ -102,7 +105,7 @@ export function createMockState() {
   const comments = new Map<string, Comment[]>();
   const uploads = new Map<string, { contentType: string; sizeBytes: number }>();
   const liveSessions = fx.liveSessions.map(session => ({ ...session, host: { ...session.host }, productIds: [...session.productIds] }));
-  return { users, passwords, sessions, refreshTokens, revoked, pendingOtp, mfa, mfaChallenges, posts, likes, saves, follows, blocks, carts, orders, reviews, addresses, wallets, payoutMethods, transactions, conversations, messages, notifications, comments, uploads, liveSessions, counter: 1000 };
+  return { users, passwords, sessions, refreshTokens, revoked, pendingOtp, mfa, mfaChallenges, products, posts, likes, saves, follows, blocks, carts, orders, reviews, addresses, wallets, payoutMethods, transactions, conversations, messages, notifications, comments, uploads, liveSessions, counter: 1000 };
 }
 export type MockState = ReturnType<typeof createMockState>;
 
@@ -131,6 +134,20 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
     if (!c.user) throw unauthorized();
     return c.user;
   };
+  const requireSeller = (c: Ctx) => {
+    const u = requireUser(c);
+    if (u.role !== 'seller' && u.role !== 'admin') throw forbidden('Seller account required');
+    return u;
+  };
+  const findProduct = (id: string | undefined) => state.products.find(p => p.id === id || p.slug === id);
+  /** Buyer-facing view: hides drafts and owner-only fields. */
+  const publicProduct = (p: SellerProductDetail): ProductDetail => ({
+    id: p.id, slug: p.slug, name: p.name, imageUrl: p.imageUrl, price: p.price, compareAtPrice: p.compareAtPrice, rating: p.rating, reviewCount: p.reviewCount, seller: p.seller, badge: p.badge,
+    inStock: p.variants.length ? p.variants.some(v => v.stock > 0) : p.stock > 0,
+    description: p.description, images: p.images, category: p.category, tags: p.tags, variants: p.variants, shipping: p.shipping, escrowProtected: p.escrowProtected, soldCount: p.soldCount, createdAt: p.createdAt,
+  });
+  const publicProducts = () => state.products.filter(p => p.published).map(publicProduct);
+  const totalStock = (p: SellerProductDetail) => p.stock + p.variants.reduce((n, v) => n + v.stock, 0);
 
   const viewerPost = (p: Post, viewer: fx.SeedUser | null): Post => ({
     ...p,
@@ -171,8 +188,8 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
   const cartOf = (userId: string): Cart => {
     const c = state.carts.get(userId) ?? { lines: [], coupon: null };
     const items: CartItem[] = c.lines.flatMap(l => {
-      const p = fx.findProduct(l.productId);
-      return p ? [{ productId: p.id, variantId: l.variantId, quantity: l.quantity, product: fx.productSummary(p) }] : [];
+      const p = findProduct(l.productId);
+      return p && p.published ? [{ productId: p.id, variantId: l.variantId, quantity: l.quantity, product: fx.productSummary(publicProduct(p)) }] : [];
     });
     const subtotal = items.reduce((n, i) => n + i.product.price.amount * i.quantity, 0);
     const shipping = subtotal === 0 || subtotal >= 5000 ? 0 : 499;
@@ -384,14 +401,14 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
 
     // ---- catalog
     ['GET', '/products', c => {
-      let list = fx.products.map(fx.productSummary);
+      let list = publicProducts().map(fx.productSummary);
       const cat = c.query.get('category');
       const q = c.query.get('q')?.toLowerCase();
-      if (cat) list = list.filter(p => fx.findProduct(p.id)!.category === cat);
+      if (cat) list = list.filter(p => findProduct(p.id)!.category === cat);
       const seller = c.query.get('seller');
       if (seller) list = list.filter(p => p.seller.username === seller);
       if (c.query.get('onSale') === 'true') list = list.filter(p => p.compareAtPrice && p.compareAtPrice.amount > p.price.amount);
-      if (q) list = list.filter(p => p.name.toLowerCase().includes(q) || fx.findProduct(p.id)!.tags.some(t => t.includes(q)));
+      if (q) list = list.filter(p => p.name.toLowerCase().includes(q) || findProduct(p.id)!.tags.some(t => t.includes(q)));
       const sort = c.query.get('sort');
       if (sort === 'price_asc') list.sort((a, b) => a.price.amount - b.price.amount);
       if (sort === 'price_desc') list.sort((a, b) => b.price.amount - a.price.amount);
@@ -401,19 +418,19 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       return paginate(list, c.query);
     }],
     ['GET', '/products/:id', c => {
-      const p = fx.findProduct(c.params.id);
-      if (!p) throw notFound('Product');
-      return p;
+      const p = findProduct(c.params.id);
+      if (!p || !p.published) throw notFound('Product');
+      return publicProduct(p);
     }],
     ['GET', '/products/:id/reviews', c => {
-      const p = fx.findProduct(c.params.id);
+      const p = findProduct(c.params.id);
       if (!p) throw notFound('Product');
       const list = state.reviews.filter(r => r.productId === p.id).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
       return { ...paginate(list, c.query), stats: reviewStats(list) };
     }],
     ['POST', '/products/:id/reviews', c => {
       const u = requireUser(c);
-      const p = fx.findProduct(c.params.id);
+      const p = findProduct(c.params.id);
       if (!p) throw notFound('Product');
       if (p.seller.id === u.id) throw forbidden('You cannot review your own product');
       if (state.reviews.some(r => r.productId === p.id && r.user.id === u.id)) throw new MockApiError(409, 'CONFLICT', 'You have already reviewed this product');
@@ -428,12 +445,12 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
     ['GET', '/seller/reviews', c => {
       const u = requireUser(c);
       if (u.role !== 'seller' && u.role !== 'admin') throw forbidden('Seller account required');
-      const mineIds = new Set(fx.products.filter(p => p.seller.id === u.id).map(p => p.id));
+      const mineIds = new Set(state.products.filter(p => p.seller.id === u.id).map(p => p.id));
       const productId = c.query.get('productId');
       const base = state.reviews.filter(r => mineIds.has(r.productId) && (!productId || r.productId === productId));
       const filter = c.query.get('filter') ?? 'all';
       const list = (filter === 'unreplied' ? base.filter(r => !r.reply) : filter === 'low' ? base.filter(r => r.rating <= 3) : base).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-      const rows: SellerReview[] = list.map(r => { const p = fx.findProduct(r.productId)!; return { ...r, product: { id: p.id, name: p.name, imageUrl: p.imageUrl } }; });
+      const rows: SellerReview[] = list.map(r => { const p = findProduct(r.productId)!; return { ...r, product: { id: p.id, name: p.name, imageUrl: p.imageUrl } }; });
       const awaiting = base.filter(r => !r.reply).length;
       return { ...paginate(rows, c.query), stats: { ...reviewStats(base), awaitingReply: awaiting, replyRate: base.length ? Math.round(((base.length - awaiting) / base.length) * 1000) / 1000 : 0 } };
     }],
@@ -442,22 +459,22 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       if (u.role !== 'seller' && u.role !== 'admin') throw forbidden('Seller account required');
       const r = state.reviews.find(x => x.id === c.params.id);
       if (!r) throw notFound('Review');
-      if (fx.findProduct(r.productId)?.seller.id !== u.id && u.role !== 'admin') throw forbidden();
+      if (findProduct(r.productId)?.seller.id !== u.id && u.role !== 'admin') throw forbidden();
       const text = typeof c.body.text === 'string' ? c.body.text.trim() : '';
       if (text.length < 2) throw validation({ text: 'Write a short reply' });
       r.reply = { text, at: iso() };
       const notes = state.notifications.get(r.user.id) ?? [];
-      notes.unshift({ id: nextId('n'), type: 'system', actor: fx.summary(u), message: `${fx.findProduct(r.productId)?.name ?? 'Product'} · the seller replied to your review`, href: `/product/${r.productId}`, thumbnailUrl: null, read: false, createdAt: iso() });
+      notes.unshift({ id: nextId('n'), type: 'system', actor: fx.summary(u), message: `${findProduct(r.productId)?.name ?? 'Product'} · the seller replied to your review`, href: `/product/${r.productId}`, thumbnailUrl: null, read: false, createdAt: iso() });
       state.notifications.set(r.user.id, notes);
       return r;
     }],
-    ['GET', '/categories', () => fx.categories],
+    ['GET', '/categories', () => fx.categories.map(c => ({ ...c, productCount: state.products.filter(p => p.published && p.category === c.slug).length }))],
     ['GET', '/search', c => {
       const q = (c.query.get('q') ?? '').toLowerCase().trim();
       const type = c.query.get('type') ?? 'all';
       const limit = Math.min(50, Math.max(1, Number(c.query.get('limit') ?? c.query.get('pageSize') ?? 20)));
       const wants = (t: string) => type === 'all' || type === t;
-      const products = wants('products') && q ? fx.products.filter(p => p.name.toLowerCase().includes(q) || p.tags.some(t => t.includes(q)) || p.category.includes(q)).map(fx.productSummary) : [];
+      const products = wants('products') && q ? publicProducts().filter(p => p.name.toLowerCase().includes(q) || p.tags.some(t => t.includes(q)) || p.category.includes(q)).map(fx.productSummary) : [];
       const users = wants('users') && q ? state.users.filter(u => u.username.includes(q) || u.name.toLowerCase().includes(q)).filter(u => !c.user || !set(state.blocks, c.user.id).has(u.id)).map(fx.summary) : [];
       const posts = wants('posts') && q ? visiblePosts(c.user).filter(p => p.caption.toLowerCase().includes(q) || p.hashtags.some(h => h.toLowerCase().includes(q))) : [];
       const section = <T>(items: T[]) => ({ items: items.slice(0, limit), nextCursor: null, total: items.length });
@@ -473,7 +490,7 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       const days = Math.min(90, Math.max(7, Number(c.query.get('days') ?? 30)));
       const DAY = 86_400_000;
       const nowMs = now();
-      const mine = fx.products.filter(p => p.seller.username === u.username);
+      const mine = state.products.filter(p => p.seller.username === u.username);
       const SALES = ['paid', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'completed'];
       const sales = state.orders.filter(o => o.seller.id === u.id && SALES.includes(o.status));
       // Deterministic pseudo‑history per seller: spread lifetime soldCount across a year with a weekly rhythm.
@@ -502,7 +519,7 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       });
       const ratingCount = mine.reduce((n, p) => n + p.reviewCount, 0);
       const ratingSum = mine.reduce((n, p) => n + p.rating * p.reviewCount, 0);
-      const stockOf = (p: ProductDetail) => (p.variants.length ? p.variants.reduce((n, v) => n + v.stock, 0) : p.inStock ? 12 + (Number(p.id.replace(/\D/g, '')) * 37) % 140 : 0);
+      const stockOf = (p: SellerProductDetail) => (p.published ? totalStock(p) : -1);
       return {
         currency: 'USD' as const,
         window: { from: new Date(nowMs - days * DAY).toISOString(), to: iso(), days },
@@ -527,7 +544,7 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       const days = Math.min(90, Math.max(7, Number(c.query.get('days') ?? 30)));
       const DAY = 86_400_000;
       const nowMs = now();
-      const mine = fx.products.filter(p => p.seller.username === u.username);
+      const mine = state.products.filter(p => p.seller.username === u.username);
       const SALES = ['paid', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'completed'];
       const seed = [...u.id].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0, 7);
       // Same deterministic per‑product history as /seller/dashboard so both screens reconcile.
@@ -559,7 +576,7 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
             units += it.quantity;
             const bp = byProduct.get(it.productId) ?? { name: it.name, imageUrl: it.imageUrl, units: 0, orders: 0, gross: 0 };
             bp.units += it.quantity; bp.orders += 1; bp.gross += it.unitPrice.amount * it.quantity; byProduct.set(it.productId, bp);
-            const cat = fx.findProduct(it.productId)?.category ?? 'other';
+            const cat = findProduct(it.productId)?.category ?? 'other';
             const bc = byCategory.get(cat) ?? { gross: 0, units: 0 };
             bc.gross += it.unitPrice.amount * it.quantity; bc.units += it.quantity; byCategory.set(cat, bc);
           }
@@ -636,7 +653,7 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       const mineOrders = state.orders.filter(o => o.seller.id === u.id);
       const held = mineOrders.filter(o => SALES.includes(o.status) && o.escrow.status === 'held').reduce((n, o) => n + o.total.amount, 0);
       const seed = [...u.id].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0, 7);
-      const mine = fx.products.filter(p => p.seller.username === u.username);
+      const mine = state.products.filter(p => p.seller.username === u.username);
       const dailyGross = (d: number) => Math.round(mine.reduce((n, p) => n + (p.soldCount * p.price.amount) / 365, 0) * (1 + 0.35 * Math.sin((d + seed % 7) / 7 * Math.PI * 2)));
       const dailyReleased = (d: number) => Math.round(dailyGross(d) * 0.95);
       const monthDay = new Date(nowMs).getUTCDate();
@@ -710,16 +727,16 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       state.payoutMethods.set(u.id, rest);
       return { ok: true as const };
     }],
+    // ---- seller hub inventory CRUD (mirrors /seller/products*)
     ['GET', '/seller/products', c => {
-      const u = requireUser(c);
-      if (u.role !== 'seller' && u.role !== 'admin') throw forbidden('Seller account required');
-      const stockOf = (p: ProductDetail) => (p.variants.length ? p.variants.reduce((n, v) => n + v.stock, 0) : p.inStock ? 12 + (Number(p.id.replace(/\D/g, '')) * 37) % 140 : 0);
-      const all: SellerProduct[] = fx.products
-        .filter(p => p.seller.username === u.username)
+      const u = requireSeller(c);
+      const all: SellerProduct[] = state.products
+        .filter(p => p.seller.id === u.id)
+        .sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))
         .map(p => {
           const sold = state.orders.filter(o => o.status !== 'cancelled' && o.status !== 'refunded').flatMap(o => o.items).filter(i => i.productId === p.id);
           const revenue = sold.reduce((n, i) => n + i.unitPrice.amount * i.quantity, 0) + p.soldCount * p.price.amount;
-          return { ...fx.productSummary(p), stock: stockOf(p), soldCount: p.soldCount + sold.reduce((n, i) => n + i.quantity, 0), revenue: money(revenue), published: true, updatedAt: p.createdAt };
+          return { ...fx.productSummary(publicProduct(p)), stock: totalStock(p), soldCount: p.soldCount + sold.reduce((n, i) => n + i.quantity, 0), revenue: money(revenue), published: p.published, updatedAt: p.updatedAt };
         });
       const q = c.query.get('q')?.toLowerCase();
       const status = c.query.get('status');
@@ -728,6 +745,76 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       if (status) list = list.filter(p => sellerProductStatus(p) === status);
       const count = (st: string) => all.filter(p => sellerProductStatus(p) === st).length;
       return { ...paginate(list, c.query), summary: { total: all.length, active: count('active'), lowStock: count('low_stock'), outOfStock: count('out_of_stock'), draft: count('draft') } };
+    }],
+    ['GET', '/seller/products/:id', c => {
+      const u = requireSeller(c);
+      const p = findProduct(c.params.id);
+      if (!p || (p.seller.id !== u.id && u.role !== 'admin')) throw notFound('Product');
+      return p;
+    }],
+    ['POST', '/seller/products', c => {
+      const u = requireSeller(c);
+      const parsed = UpsertProductRequestSchema.safeParse(c.body);
+      if (!parsed.success) throw validation(Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.') || '_', i.message])));
+      const b = parsed.data;
+      const cat = fx.categories.find(x => x.id === b.categoryId || x.slug === b.categoryId);
+      if (!cat) throw validation({ categoryId: 'Unknown category' });
+      const base = b.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 60) || 'product';
+      let slug = base;
+      for (let n = 2; state.products.some(p => p.slug === slug); n++) slug = `${base}-${n}`;
+      const product: SellerProductDetail = {
+        id: nextId('prod'), slug, name: b.name, imageUrl: b.images[0], price: money(b.price), compareAtPrice: b.compareAtPrice != null ? money(b.compareAtPrice) : null,
+        rating: 0, reviewCount: 0, seller: { id: u.id, username: u.username, name: u.name, verified: u.verified }, badge: b.badge ?? null, inStock: b.stock > 0,
+        description: b.description, images: b.images, category: cat.slug, tags: b.tags, variants: [], shipping: { freeOver: b.freeShipOver != null ? money(b.freeShipOver) : null, etaDays: b.etaDays ?? [3, 5] },
+        escrowProtected: true, soldCount: 0, createdAt: iso(), published: b.published, stock: b.stock, categoryId: cat.id, updatedAt: iso(),
+      };
+      state.products.unshift(product);
+      c.status(201);
+      return product;
+    }],
+    ['PATCH', '/seller/products/:id', c => {
+      const u = requireSeller(c);
+      const p = findProduct(c.params.id);
+      if (!p || (p.seller.id !== u.id && u.role !== 'admin')) throw notFound('Product');
+      const parsed = UpdateProductRequestSchema.safeParse(c.body);
+      if (!parsed.success) throw validation(Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.') || '_', i.message])));
+      const b = parsed.data;
+      if (b.compareAtPrice != null && b.price == null && b.compareAtPrice <= p.price.amount) throw validation({ compareAtPrice: 'Compare-at price must be higher than the selling price' });
+      if (b.price != null && b.compareAtPrice === undefined && p.compareAtPrice && p.compareAtPrice.amount <= b.price) throw validation({ price: 'Selling price must be lower than the compare-at price' });
+      if (b.categoryId !== undefined) {
+        const cat = fx.categories.find(x => x.id === b.categoryId || x.slug === b.categoryId);
+        if (!cat) throw validation({ categoryId: 'Unknown category' });
+        p.category = cat.slug;
+        p.categoryId = cat.id;
+      }
+      if (b.name !== undefined) p.name = b.name;
+      if (b.description !== undefined) p.description = b.description;
+      if (b.price !== undefined) p.price = money(b.price);
+      if (b.compareAtPrice !== undefined) p.compareAtPrice = b.compareAtPrice == null ? null : money(b.compareAtPrice);
+      if (b.stock !== undefined) p.stock = b.stock;
+      if (b.images !== undefined) { p.images = b.images; p.imageUrl = b.images[0]; }
+      if (b.tags !== undefined) p.tags = b.tags;
+      if (b.badge !== undefined) p.badge = b.badge ?? null;
+      if (b.published !== undefined) p.published = b.published;
+      if (b.freeShipOver !== undefined) p.shipping = { ...p.shipping, freeOver: b.freeShipOver == null ? null : money(b.freeShipOver) };
+      if (b.etaDays !== undefined) p.shipping = { ...p.shipping, etaDays: b.etaDays };
+      p.inStock = totalStock(p) > 0;
+      p.updatedAt = iso();
+      return p;
+    }],
+    ['DELETE', '/seller/products/:id', c => {
+      const u = requireSeller(c);
+      const p = findProduct(c.params.id);
+      if (!p || (p.seller.id !== u.id && u.role !== 'admin')) throw notFound('Product');
+      const hasOrders = p.soldCount > 0 || state.orders.some(o => o.items.some(i => i.productId === p.id));
+      if (hasOrders) {
+        p.published = false;
+        p.updatedAt = iso();
+        return { ok: true as const, mode: 'archived' as const };
+      }
+      state.products.splice(state.products.indexOf(p), 1);
+      for (const cart of state.carts.values()) cart.lines = cart.lines.filter(l => l.productId !== p.id);
+      return { ok: true as const, mode: 'deleted' as const };
     }],
 
     // ---- live (LiveKit tokens) — demo builds mint an unsigned placeholder so the UI can render the player chrome
@@ -771,7 +858,7 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       const title = String(c.body.title ?? '').trim();
       if (!title || title.length > 120) throw validation({ title: 'Title must be 1–120 characters' });
       const productIds = Array.isArray(c.body.productIds) ? c.body.productIds.map(String) : [];
-      if (productIds.some(id => !fx.findProduct(id))) throw validation({ productIds: 'One or more products do not exist' });
+      if (productIds.some(id => !findProduct(id)?.published)) throw validation({ productIds: 'One or more products do not exist' });
       const scheduledFor = typeof c.body.scheduledFor === 'string' ? c.body.scheduledFor : null;
       if (scheduledFor && Number.isNaN(+new Date(scheduledFor))) throw validation({ scheduledFor: 'Invalid scheduled time' });
       const session: LiveSession = { id: nextId('live'), room: '', title, host: fx.summary(u), status: scheduledFor ? 'scheduled' : 'live', category: typeof c.body.category === 'string' ? c.body.category : null, coverUrl: typeof c.body.coverUrl === 'string' ? c.body.coverUrl : null, productIds, pinnedProductId: null, viewers: 0, peakViewers: 0, likes: 0, scheduledFor, startedAt: scheduledFor ? null : iso(), endedAt: null, createdAt: iso() };
@@ -826,7 +913,8 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
     ['GET', '/cart', c => cartOf(requireUser(c).id)],
     ['POST', '/cart/items', c => {
       const u = requireUser(c);
-      const p = fx.findProduct(String(c.body.productId));
+      const p = findProduct(String(c.body.productId));
+      if (p && !p.published) throw notFound('Product');
       if (!p) throw notFound('Product');
       const cart = state.carts.get(u.id) ?? { lines: [], coupon: null };
       const variantId = typeof c.body.variantId === 'string' ? c.body.variantId : null;
@@ -913,7 +1001,7 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
           shippingTo: { recipient: address.recipient, city: address.city, region: address.region ?? null, country: address.country },
           paymentMethod: c.body.paymentMethod as Order['paymentMethod'],
           note: typeof c.body.note === 'string' ? c.body.note : null,
-          items: items.map(i => ({ id: nextId('oi'), productId: i.productId, name: i.product.name, imageUrl: i.product.imageUrl, variant: i.variantId ? (fx.findProduct(i.productId)?.variants.find(v => v.id === i.variantId)?.name ?? null) : null, quantity: i.quantity, unitPrice: i.product.price })),
+          items: items.map(i => ({ id: nextId('oi'), productId: i.productId, name: i.product.name, imageUrl: i.product.imageUrl, variant: i.variantId ? (findProduct(i.productId)?.variants.find(v => v.id === i.variantId)?.name ?? null) : null, quantity: i.quantity, unitPrice: i.product.price })),
           subtotal: money(subtotal),
           shipping: money(shipping),
           total: money(subtotal + shipping - discount),

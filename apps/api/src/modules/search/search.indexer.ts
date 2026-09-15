@@ -31,6 +31,11 @@ export class SearchIndexer implements OnModuleInit {
     });
   }
 
+  /** Hard deletes drop the document; soft deletes (unpublish) go through `product()` and the `published` flag. */
+  removeProduct(id: string) {
+    return this.safe(() => this.index.remove('products', [id]));
+  }
+
   user(id: string) {
     return this.safe(async () => {
       const u = await this.prisma.user.findUnique({ where: { id } });

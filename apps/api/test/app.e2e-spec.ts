@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApp } from '../src/bootstrap.js';
 import { loadEnv } from '../src/config.js';
-import { OrderSchema, ProductReviewsResponseSchema, ProductSummarySchema, SellerReviewsResponseSchema, SellerAnalyticsSchema, SellerCustomersResponseSchema, SellerDashboardSchema, SellerEarningsSchema, SellerProductsResponseSchema, SessionSchema, paginated } from '@ezyify/core';
+import { OrderSchema, ProductReviewsResponseSchema, ProductSummarySchema, SellerReviewsResponseSchema, SellerAnalyticsSchema, SellerCustomersResponseSchema, SellerDashboardSchema, SellerEarningsSchema, SellerProductDetailSchema, SellerProductsResponseSchema, SessionSchema, paginated } from '@ezyify/core';
 
 let app: NestFastifyApplication;
 const inject = (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, opts: { token?: string; body?: unknown; headers?: Record<string, string> } = {}) =>
@@ -302,6 +302,53 @@ describe('commerce: cart → checkout → escrow → release', () => {
     expect(sold.revenue.amount).toBeGreaterThanOrEqual(7999);
     const filtered = json(await inject('GET', '/seller/products?q=headphones&status=active', { token: seller })).data;
     expect(filtered.items.map((p: { id: string }) => p.id)).toEqual(['prod-001']);
+  });
+
+  it('seller product CRUD: drafts are owner-only, cross-field validation, ownership 404s, sold products archive', async () => {
+    // Unique per run: the test DB is migrated + seeded, not dropped, between local runs.
+    const suffix = Date.now().toString(36);
+    const body = { name: `Studio Monitor Speakers ${suffix}`, description: 'Bi-amped nearfield monitors with a flat response.', categoryId: 'tech', price: 24900, compareAtPrice: 29900, stock: 8, images: ['https://images.unsplash.com/photo-1545454675-3531b543be5d?w=800'], tags: ['Audio', 'studio'], published: false };
+    expect((await inject('POST', '/seller/products', { token: buyer, body })).statusCode).toBe(403);
+    const bad = await inject('POST', '/seller/products', { token: seller, body: { ...body, compareAtPrice: 100 } });
+    expect(bad.statusCode).toBe(422);
+    expect(json(bad).error.details.compareAtPrice).toBeDefined();
+    expect(json(await inject('POST', '/seller/products', { token: seller, body: { ...body, categoryId: 'nope' } })).error.details.categoryId).toBeDefined();
+
+    const c = await inject('POST', '/seller/products', { token: seller, body });
+    expect(c.statusCode).toBe(201);
+    const created = json(c).data;
+    expect(SellerProductDetailSchema.safeParse(created).success).toBe(true);
+    expect(created).toMatchObject({ slug: `studio-monitor-speakers-${suffix}`, published: false, stock: 8, category: 'Tech', categoryId: 'cat_tech', tags: ['audio', 'studio'], seller: { username: 'techstore' } });
+    // Same name again gets a de-duplicated slug.
+    expect(json(await inject('POST', '/seller/products', { token: seller, body })).data.slug).toBe(`studio-monitor-speakers-${suffix}-2`);
+
+    // Draft: owner list + detail see it, the public catalog and search do not.
+    expect(json(await inject('GET', '/seller/products?status=draft', { token: seller })).data.items.map((p: { id: string }) => p.id)).toContain(created.id);
+    expect(json(await inject('GET', `/seller/products/${created.id}`, { token: seller })).data.id).toBe(created.id);
+    expect((await inject('GET', `/products/${created.id}`)).statusCode).toBe(404);
+    expect(json(await inject('GET', `/products?q=${encodeURIComponent(body.name)}`)).data.items).toHaveLength(0);
+
+    // Publish + restock; partial update keeps the stored compare-at price in the rule.
+    const u = json(await inject('PATCH', `/seller/products/${created.id}`, { token: seller, body: { published: true, stock: 3, price: 25900 } })).data;
+    expect(u).toMatchObject({ published: true, stock: 3, price: { amount: 25900 }, inStock: true });
+    expect(json(await inject('GET', `/products/${created.slug}`)).data.name).toBe(body.name);
+    expect(json(await inject('GET', '/seller/products?status=low_stock', { token: seller })).data.items.map((p: { id: string }) => p.id)).toContain(created.id);
+    expect(json(await inject('PATCH', `/seller/products/${created.id}`, { token: seller, body: { price: 30000 } })).error.details.price).toBeDefined();
+
+    // Other sellers get 404 (no id probing), admins may manage anything.
+    const other = (await login('fashion@ezyify.test')).accessToken;
+    expect((await inject('GET', `/seller/products/${created.id}`, { token: other })).statusCode).toBe(404);
+    expect((await inject('PATCH', `/seller/products/${created.id}`, { token: other, body: { stock: 0 } })).statusCode).toBe(404);
+    expect((await inject('DELETE', `/seller/products/${created.id}`, { token: other })).statusCode).toBe(404);
+
+    expect(json(await inject('DELETE', `/seller/products/${created.id}`, { token: seller })).data).toEqual({ ok: true, mode: 'deleted' });
+    expect((await inject('GET', `/seller/products/${created.id}`, { token: seller })).statusCode).toBe(404);
+    // prod-002 has order lines from the cancel test above → archived, not deleted.
+    expect(json(await inject('DELETE', '/seller/products/prod-002', { token: seller })).data).toEqual({ ok: true, mode: 'archived' });
+    expect(json(await inject('GET', '/seller/products/prod-002', { token: seller })).data.published).toBe(false);
+    expect((await inject('GET', '/products/prod-002')).statusCode).toBe(404);
+    // Restore it so later suites keep their fixture.
+    expect(json(await inject('PATCH', '/seller/products/prod-002', { token: seller, body: { published: true } })).data.published).toBe(true);
   });
 });
 

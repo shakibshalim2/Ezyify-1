@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { ZodError } from 'zod';
 import { createApiClient } from '../api/client.js';
 import { createEndpoints } from '../api/endpoints.js';
 import { createMockFetch, MOCK_CREDENTIALS } from './server.js';
@@ -98,6 +99,44 @@ describe('mock API server', () => {
     expect(r.summary.total).toBe(r.items.length);
     const q = await api.seller.products({ q: 'watch' });
     expect(q.items.map(p => p.id)).toEqual(['prod-002']);
+  });
+
+  it('seller product CRUD: drafts stay out of the public catalog, ownership is enforced, sold products archive instead of deleting', async () => {
+    const { api, login } = harness();
+    await login('techstore@ezyify.test');
+    const body = { name: 'Studio Monitor Speakers', description: 'Bi-amped 5" nearfield monitors with a flat response.', categoryId: 'tech', price: 24900, compareAtPrice: 29900, stock: 8, images: ['https://images.unsplash.com/photo-1545454675-3531b543be5d?w=800'], tags: ['Audio', 'studio'], published: false };
+    // Cross-field rules fail client-side (shared schema) before a request is made; unknown categories are a server error.
+    expect(() => api.seller.createProduct({ ...body, compareAtPrice: 100 })).toThrow(ZodError);
+    await expect(api.seller.createProduct({ ...body, categoryId: 'nope' })).rejects.toMatchObject({ code: 'VALIDATION_ERROR', details: { categoryId: expect.any(String) } });
+    const created = await api.seller.createProduct(body);
+    expect(created).toMatchObject({ published: false, stock: 8, category: 'tech', categoryId: 'cat_tech', tags: ['audio', 'studio'], seller: { username: 'techstore' }, price: { amount: 24900 } });
+    expect(created.slug).toBe('studio-monitor-speakers');
+
+    // Draft: owner sees it (drafts tab + detail), shoppers don't.
+    expect((await api.seller.products({ status: 'draft' })).items.map(p => p.id)).toContain(created.id);
+    expect((await api.seller.product(created.id)).id).toBe(created.id);
+    await expect(api.catalog.product(created.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect((await api.catalog.products({ q: 'studio monitor' })).items).toHaveLength(0);
+
+    // Publish + restock → visible publicly, low-stock bucket reflects the new stock.
+    const updated = await api.seller.updateProduct(created.id, { published: true, stock: 3, price: 25900 });
+    expect(updated).toMatchObject({ published: true, stock: 3, price: { amount: 25900 }, inStock: true });
+    expect((await api.catalog.product(created.slug)).name).toBe('Studio Monitor Speakers');
+    expect((await api.seller.products({ status: 'low_stock' })).items.map(p => p.id)).toContain(created.id);
+    await expect(api.seller.updateProduct(created.id, { price: 30000 })).rejects.toMatchObject({ code: 'VALIDATION_ERROR', details: { price: expect.any(String) } });
+
+    // Another seller can neither read nor edit it.
+    await login('fashion@ezyify.test');
+    await expect(api.seller.product(created.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(api.seller.updateProduct(created.id, { stock: 0 })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+
+    await login('techstore@ezyify.test');
+    expect(await api.seller.deleteProduct(created.id)).toEqual({ ok: true, mode: 'deleted' });
+    await expect(api.seller.product(created.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    // prod-001 has sales → archived (unpublished), still in the seller's list as a draft, gone from the shop.
+    expect(await api.seller.deleteProduct('prod-001')).toEqual({ ok: true, mode: 'archived' });
+    expect((await api.seller.product('prod-001')).published).toBe(false);
+    await expect(api.catalog.product('prod-001')).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
   it('seller order routes are scoped and follow the escrow state machine in mock mode', async () => {
