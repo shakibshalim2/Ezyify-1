@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { motion, useReducedMotion } from 'motion/react';
 import { ArrowLeft, Camera, MapPin, Save, UserRound, Globe2, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { UpdateProfileRequestSchema, avatarUrlFor, useAuth, useMe, useRuntime, useUpdateProfile, type UpdateProfileRequest, type UserProfile } from '@ezyify/core';
+import { UpdateProfileRequestSchema, avatarUrlFor, useAuth, useMe, useRuntime, useUpdateProfile, type UserProfile } from '@ezyify/core';
 import { SEO } from '../../components/SEO';
 import { Button } from '../../components/primitives/Button';
 import { Card } from '../../components/primitives/Card';
@@ -15,37 +15,12 @@ import { Textarea } from '../../components/ui/textarea';
 import { uploadFile } from '../../lib/uploads';
 import { formErrors } from '../../lib/apiErrors';
 import { fadeUp, staggerContainer } from '../../lib/motion';
+import { diffProfile, profileToForm, type ProfileFormValues } from '../../lib/profileForm';
 import { cn } from '../../components/ui/utils';
 import type { WebRuntime } from '../../runtime';
 
 const BIO_MAX = 160;
 const ACCEPT = 'image/jpeg,image/png,image/webp';
-
-interface FormValues {
-  name: string;
-  username: string;
-  bio: string;
-  location: string;
-  website: string;
-  avatarUrl: string | null;
-  coverUrl: string | null;
-}
-const fromProfile = (p: UserProfile): FormValues => ({ name: p.name, username: p.username, bio: p.bio ?? '', location: p.location ?? '', website: p.website ?? '', avatarUrl: p.avatarUrl, coverUrl: p.coverUrl });
-
-/** Only fields that changed are sent; empty strings clear nullable fields; a bare domain is promoted to https. */
-export function diffProfile(initial: FormValues, current: FormValues): UpdateProfileRequest {
-  const body: UpdateProfileRequest = {};
-  const trim = (s: string) => s.trim();
-  if (trim(current.name) !== initial.name) body.name = trim(current.name);
-  if (trim(current.username).toLowerCase() !== initial.username) body.username = trim(current.username).toLowerCase();
-  if (trim(current.bio) !== (initial.bio ?? '')) body.bio = trim(current.bio) || null;
-  if (trim(current.location) !== (initial.location ?? '')) body.location = trim(current.location) || null;
-  const site = trim(current.website);
-  if (site !== (initial.website ?? '')) body.website = site ? (/^https?:\/\//i.test(site) ? site : `https://${site}`) : null;
-  if (current.avatarUrl !== initial.avatarUrl) body.avatarUrl = current.avatarUrl;
-  if (current.coverUrl !== initial.coverUrl) body.coverUrl = current.coverUrl;
-  return body;
-}
 
 function EditProfileSkeleton() {
   return (
@@ -62,18 +37,18 @@ function ProfileForm({ me }: { me: UserProfile }) {
   const reduce = useReducedMotion();
   const runtime = useRuntime() as WebRuntime;
   const update = useUpdateProfile();
-  const initial = fromProfile(me);
-  const [form, setForm] = useState<FormValues>(initial);
+  const initial = profileToForm(me);
+  const [form, setForm] = useState<ProfileFormValues>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState<'avatar' | 'cover' | null>(null);
   const avatarInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
 
-  const set = <K extends keyof FormValues>(key: K, value: FormValues[K]) => {
+  const set = <K extends keyof ProfileFormValues>(key: K, value: ProfileFormValues[K]) => {
     setForm(f => ({ ...f, [key]: value }));
     if (errors[key]) setErrors(e => { const n = { ...e }; delete n[key]; return n; });
   };
-  const change = (e: React.ChangeEvent<HTMLInputElement>) => set(e.target.name as keyof FormValues, e.target.value);
+  const change = (e: React.ChangeEvent<HTMLInputElement>) => set(e.target.name as keyof ProfileFormValues, e.target.value);
 
   const pick = async (purpose: 'avatar' | 'cover', files: FileList | null) => {
     const file = files?.[0];
