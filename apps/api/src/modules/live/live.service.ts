@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { ENV, type Env } from '../../config.js';
 import { serviceUnavailable } from '../../common/errors.js';
 import { MessagingService } from '../messaging/messaging.service.js';
+import { PrismaService } from '../../infra/prisma/prisma.service.js';
+import { forbidden } from '../../common/errors.js';
 
 export const LiveTokenSchema = z.object({
   room: z.string().regex(/^[\w.-]{1,64}$/, 'Room names are 1-64 word characters, dots or dashes'),
@@ -30,14 +32,18 @@ interface Identity {
 
 @Injectable()
 export class LiveService {
-  constructor(@Inject(ENV) private readonly env: Env, private readonly messaging: MessagingService) {}
+  constructor(@Inject(ENV) private readonly env: Env, private readonly messaging: MessagingService, private readonly prisma: PrismaService) {}
 
   get enabled() {
     return !!(this.env.LIVEKIT_API_KEY && this.env.LIVEKIT_API_SECRET && this.env.LIVEKIT_URL);
   }
 
-  /** Live-shopping room. Any signed-in user may host their own stream; room names are caller-chosen but bounded. */
+  /** Live-shopping room. A persisted session's room may only be published by its host. */
   async roomToken(user: Identity, body: LiveTokenRequest) {
+    if (body.role === 'host') {
+      const session = await this.prisma.liveSession.findUnique({ where: { id: body.room }, select: { hostId: true } });
+      if (session && session.hostId !== user.sub) throw forbidden('Only the live session host can publish to this room');
+    }
     return this.mint(user, body.room, GRANTS[body.role], LIVE_TOKEN_TTL);
   }
 

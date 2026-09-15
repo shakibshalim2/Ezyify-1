@@ -124,6 +124,12 @@ enum DevicePlatform {
   web
 }
 
+enum LiveSessionStatus {
+  scheduled
+  live
+  ended
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -176,9 +182,45 @@ model User {
   actedNotifs   Notification[]   @relation("Actor")
   reports       Report[]         @relation("Reporter")
   reviews       Review[]
+  liveSessions  LiveSession[]    @relation("LiveSessionHost")
+  liveViews     LiveViewer[]
 
   @@index([role])
   @@index([deletedAt])
+}
+
+model LiveSession {
+  id              String            @id @default(cuid())
+  hostId          String
+  host            User              @relation("LiveSessionHost", fields: [hostId], references: [id], onDelete: Cascade)
+  title           String            @db.VarChar(120)
+  status          LiveSessionStatus
+  category        String?           @db.VarChar(80)
+  coverUrl        String?
+  productIds      String[]          @default([])
+  pinnedProductId String?
+  likes           Int               @default(0)
+  peakViewers     Int               @default(0)
+  scheduledFor    DateTime?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  viewers         LiveViewer[]
+
+  @@index([status, startedAt])
+  @@index([hostId])
+}
+
+model LiveViewer {
+  sessionId  String
+  session    LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSeenAt DateTime    @default(now())
+
+  @@id([sessionId, userId])
+  @@index([sessionId, lastSeenAt])
 }
 
 /// Refresh-token rotation: each row is one device session; `replacedById` chain detects reuse.

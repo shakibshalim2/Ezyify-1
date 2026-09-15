@@ -7,6 +7,11 @@ const product = {
   id: 'p1', slug: 'p1', name: 'Thing', imageUrl: 'https://img.test/a.jpg', price: { amount: 100, currency: 'USD' }, compareAtPrice: null,
   rating: 4.5, reviewCount: 3, seller: { id: 's1', username: 'seller', name: 'S', verified: true }, badge: null, inStock: true,
 };
+const liveSession = {
+  id: 'live-1', room: 'live-1', title: 'A live event', host: { id: 's1', username: 'seller', name: 'Seller', avatarUrl: null, verified: true, role: 'seller' },
+  status: 'live' as const, category: 'tech', coverUrl: 'https://img.test/live.jpg', productIds: ['p1'], pinnedProductId: 'p1', viewers: 12, peakViewers: 20, likes: 4,
+  scheduledFor: null, startedAt: new Date().toISOString(), endedAt: null, createdAt: new Date().toISOString(),
+};
 const respond = (data: unknown) => new Response(JSON.stringify({ success: true, data }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
 function harness(data: unknown) {
@@ -51,6 +56,25 @@ describe('createEndpoints — request shapes match BACKEND_API_SPECIFICATION', (
     expect(call(1)).toMatchObject({ url: 'https://api.test/v1/cart/items/p%201', method: 'PATCH', body: { quantity: 3 } });
     await api.cart.remove('p 1');
     expect(call(2).method).toBe('DELETE');
+  });
+
+  it('live session endpoints validate bodies and encode session ids', async () => {
+    const page = { items: [liveSession], pagination: { page: 1, pageSize: 20, total: 1, hasMore: false } };
+    const list = harness(page);
+    await list.api.live.sessions({ status: 'live', category: 'tech' });
+    expect(list.call()).toMatchObject({ url: 'https://api.test/v1/live/sessions?status=live&category=tech', method: 'GET' });
+    const get = harness(liveSession);
+    await get.api.live.session('live / 1');
+    expect(get.call()).toMatchObject({ url: 'https://api.test/v1/live/sessions/live%20%2F%201', method: 'GET' });
+    const create = harness(liveSession);
+    await create.api.live.create({ title: 'A live event', productIds: ['p1'] });
+    expect(create.call()).toMatchObject({ method: 'POST', body: { title: 'A live event', productIds: ['p1'] } });
+    const pin = harness(liveSession);
+    await pin.api.live.pin('live-1', { productId: null });
+    expect(pin.call()).toMatchObject({ url: 'https://api.test/v1/live/sessions/live-1/pin', body: { productId: null } });
+    const heartbeat = harness({ viewers: 13, likes: 5 });
+    await heartbeat.api.live.heartbeat('live-1', true);
+    expect(heartbeat.call()).toMatchObject({ url: 'https://api.test/v1/live/sessions/live-1/heartbeat', body: { like: true } });
   });
 
   it('rejects malformed server payloads instead of leaking them into the UI', async () => {

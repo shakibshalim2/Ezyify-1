@@ -3,6 +3,7 @@ import type {
   Category,
   Conversation,
   Message,
+  LiveSession,
   Notification,
   Order,
   Post,
@@ -97,6 +98,15 @@ export const products: ProductDetail[] = seeds.map(s => ({
 }));
 export const productSummary = (p: ProductDetail): ProductSummary => ({ id: p.id, slug: p.slug, name: p.name, imageUrl: p.imageUrl, price: p.price, compareAtPrice: p.compareAtPrice, rating: p.rating, reviewCount: p.reviewCount, seller: p.seller, badge: p.badge, inStock: p.inStock });
 export const findProduct = (id: string | undefined) => products.find(p => p.id === id || p.slug === id);
+
+/** Live shopping fixtures mirror the seeded API sessions so mock-mode screens never need hard-coded streams. */
+export const liveSessions: LiveSession[] = [
+  { id: 'live-001', room: 'live-001', title: 'The ANC audio event — live demos', host: summary(byUsername('techstore')!), status: 'live', category: 'tech', coverUrl: products[0].imageUrl, productIds: ['prod-001', 'prod-002'], pinnedProductId: 'prod-001', viewers: 1240, peakViewers: 1240, likes: 842, scheduledFor: null, startedAt: ago(0.5), endedAt: null, createdAt: ago(0.5) },
+  { id: 'live-002', room: 'live-002', title: 'Weekend capsule wardrobe edit', host: summary(byUsername('fashion')!), status: 'live', category: 'fashion', coverUrl: products[3].imageUrl, productIds: ['prod-004', 'prod-005'], pinnedProductId: 'prod-004', viewers: 760, peakViewers: 760, likes: 516, scheduledFor: null, startedAt: ago(1), endedAt: null, createdAt: ago(1) },
+  { id: 'live-003', room: 'live-003', title: 'Glass-skin routine, step by step', host: summary(byUsername('glow.with.sara')!), status: 'live', category: 'beauty', coverUrl: products[5].imageUrl, productIds: ['prod-006'], pinnedProductId: 'prod-006', viewers: 1980, peakViewers: 1980, likes: 1299, scheduledFor: null, startedAt: ago(0.25), endedAt: null, createdAt: ago(0.25) },
+  { id: 'live-004', room: 'live-004', title: 'Derm-approved evening skincare', host: summary(byUsername('glowcare')!), status: 'scheduled', category: 'beauty', coverUrl: products[5].imageUrl, productIds: ['prod-006'], pinnedProductId: null, viewers: 0, peakViewers: 0, likes: 0, scheduledFor: ahead(1), startedAt: null, endedAt: null, createdAt: ago(2) },
+  { id: 'live-005', room: 'live-005', title: 'Back-to-school desk setup', host: summary(byUsername('techstore')!), status: 'scheduled', category: 'tech', coverUrl: products[2].imageUrl, productIds: ['prod-003'], pinnedProductId: null, viewers: 0, peakViewers: 0, likes: 0, scheduledFor: ahead(2), startedAt: null, endedAt: null, createdAt: ago(1) },
+];
 
 const media = (id: string, type: 'image' | 'video' = 'image') => ({ type, url: img(id, 1080), thumbnailUrl: img(id, 400), width: 1080, height: 1350, durationMs: type === 'video' ? 15000 : null });
 const u = (username: string) => summary(byUsername(username)!);

@@ -13,6 +13,7 @@ const img = (id: string, w = 800) => `https://images.unsplash.com/${id}?w=${w}&q
 export async function seed() {
   // Transactional state is wiped so repeated seeds (tests, dev resets) start from the same balances and empty carts.
   await prisma.$transaction([
+    prisma.liveViewer.deleteMany(), prisma.liveSession.deleteMany(),
     prisma.cartItem.deleteMany(), prisma.order.deleteMany(), prisma.transaction.deleteMany(), prisma.refreshSession.deleteMany(),
     prisma.otpCode.deleteMany(), prisma.report.deleteMany(), prisma.block.deleteMany(), prisma.device.deleteMany(), prisma.webhookEvent.deleteMany(),
     prisma.auditLog.deleteMany(), prisma.notification.deleteMany(), prisma.like.deleteMany(), prisma.save.deleteMany(),
@@ -83,6 +84,22 @@ export async function seed() {
     });
   }
 
+  const liveSessions = [
+    { id: 'live-001', hostId: 'u_techstore', title: 'The ANC audio event — live demos', status: 'live' as const, category: 'tech', coverUrl: products[0].images[0], productIds: ['prod-001', 'prod-002'], pinnedProductId: 'prod-001', likes: 842, peakViewers: 1240, startedAt: ago(0.5) },
+    { id: 'live-002', hostId: 'u_fashionhub', title: 'Weekend capsule wardrobe edit', status: 'live' as const, category: 'fashion', coverUrl: products[3].images[0], productIds: ['prod-004', 'prod-005'], pinnedProductId: 'prod-004', likes: 516, peakViewers: 760, startedAt: ago(1) },
+    { id: 'live-003', hostId: 'u_sara', title: 'Glass-skin routine, step by step', status: 'live' as const, category: 'beauty', coverUrl: products[5].images[0], productIds: ['prod-006'], pinnedProductId: 'prod-006', likes: 1299, peakViewers: 1980, startedAt: ago(0.25) },
+    { id: 'live-004', hostId: 'u_glowcare', title: 'Derm-approved evening skincare', status: 'scheduled' as const, category: 'beauty', coverUrl: products[5].images[0], productIds: ['prod-006'], pinnedProductId: null, likes: 0, peakViewers: 0, scheduledFor: new Date(Date.now() + 24 * 3600_000) },
+    { id: 'live-005', hostId: 'u_techstore', title: 'Back-to-school desk setup', status: 'scheduled' as const, category: 'tech', coverUrl: products[2].images[0], productIds: ['prod-003'], pinnedProductId: null, likes: 0, peakViewers: 0, scheduledFor: new Date(Date.now() + 2 * 24 * 3600_000) },
+    { id: 'live-006', hostId: 'u_fashionhub', title: 'A fresh take on everyday accessories', status: 'scheduled' as const, category: 'fashion', coverUrl: products[4].images[0], productIds: ['prod-005'], pinnedProductId: null, likes: 0, peakViewers: 0, scheduledFor: new Date(Date.now() + 3 * 24 * 3600_000) },
+  ];
+  for (const session of liveSessions) {
+    await prisma.liveSession.upsert({
+      where: { id: session.id },
+      create: session,
+      update: { ...session },
+    });
+  }
+
   for (const [followerId, followingId] of [['u_buyer', 'u_maya'], ['u_buyer', 'u_alex'], ['u_buyer', 'u_sara'], ['u_maya', 'u_sara'], ['u_alex', 'u_maya']]) {
     await prisma.follow.upsert({ where: { followerId_followingId: { followerId, followingId } }, create: { followerId, followingId }, update: {} });
   }
@@ -98,7 +115,7 @@ export async function seed() {
       ],
     });
   }
-  return { users: users.length, products: products.length, posts: posts.length };
+  return { users: users.length, products: products.length, posts: posts.length, liveSessions: liveSessions.length };
 }
 
 if (process.argv[1]?.endsWith('seed.ts')) {

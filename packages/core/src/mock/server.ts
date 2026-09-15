@@ -1,4 +1,4 @@
-import type { Address, Cart, CartItem, Comment, Conversation, Message, Notification, Order, Post, UserProfile } from '../schemas/index.js';
+import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, Post, UserProfile } from '../schemas/index.js';
 import * as fx from './fixtures.js';
 
 /**
@@ -62,6 +62,8 @@ export class MockApiError extends Error {
 const unauthorized = () => new MockApiError(401, 'UNAUTHORIZED', 'Sign in to continue');
 const notFound = (what: string) => new MockApiError(404, 'NOT_FOUND', `${what} not found`);
 const validation = (details: Record<string, string>) => new MockApiError(422, 'VALIDATION_ERROR', Object.values(details)[0] ?? 'Invalid input', details);
+const forbidden = (message = 'You do not have access to this resource') => new MockApiError(403, 'FORBIDDEN', message);
+const conflict = (message: string) => new MockApiError(409, 'CONFLICT', message);
 
 const PASSWORD = 'Password1';
 const OTP_INVALID = '000000';
@@ -92,7 +94,8 @@ export function createMockState() {
   const notifications = new Map<string, Notification[]>([['u_buyer', fx.notifications.map(n => ({ ...n }))]]);
   const comments = new Map<string, Comment[]>();
   const uploads = new Map<string, { contentType: string; sizeBytes: number }>();
-  return { users, passwords, sessions, refreshTokens, revoked, pendingOtp, mfa, mfaChallenges, posts, likes, saves, follows, blocks, carts, orders, addresses, wallets, transactions, conversations, messages, notifications, comments, uploads, counter: 1000 };
+  const liveSessions = fx.liveSessions.map(session => ({ ...session, host: { ...session.host }, productIds: [...session.productIds] }));
+  return { users, passwords, sessions, refreshTokens, revoked, pendingOtp, mfa, mfaChallenges, posts, likes, saves, follows, blocks, carts, orders, addresses, wallets, transactions, conversations, messages, notifications, comments, uploads, liveSessions, counter: 1000 };
 }
 export type MockState = ReturnType<typeof createMockState>;
 
@@ -410,6 +413,8 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       const room = String(c.body.room ?? '');
       if (!/^[\w.-]{1,64}$/.test(room)) throw validation({ room: 'Invalid room name' });
       if (c.body.role !== 'host' && c.body.role !== 'viewer') throw validation({ role: 'Role must be host or viewer' });
+      const liveSession = state.liveSessions.find(s => s.id === room);
+      if (c.body.role === 'host' && liveSession && liveSession.host.id !== u.id) throw forbidden('Only the live session host can publish to this room');
       return { token: `mock.livekit.${u.id}.${room}.${c.body.role}`, url: 'wss://live.mock.ezyify.app', room, identity: u.id };
     }],
     ['POST', '/live/call-token', c => {
@@ -417,6 +422,81 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       const id = String(c.body.conversationId ?? '');
       if (!convosOf(u.id).some(cv => cv.id === id)) throw notFound('Conversation');
       return { token: `mock.livekit.${u.id}.call-${id}`, url: 'wss://live.mock.ezyify.app', room: `call-${id}`, identity: u.id };
+    }],
+    ['GET', '/live/sessions', c => {
+      const status = c.query.get('status') ?? 'live';
+      if (!['scheduled', 'live', 'ended'].includes(status)) throw validation({ status: 'Invalid live session status' });
+      const category = c.query.get('category');
+      const host = c.query.get('host');
+      const sessions = state.liveSessions
+        .filter(s => s.status === status && (!category || s.category === category) && (!host || s.host.username === host))
+        .sort((a, b) => status === 'scheduled'
+          ? +(new Date(a.scheduledFor ?? 0)) - +(new Date(b.scheduledFor ?? 0))
+          : status === 'ended'
+            ? +(new Date(b.endedAt ?? 0)) - +(new Date(a.endedAt ?? 0))
+            : b.viewers - a.viewers);
+      return paginate(sessions, c.query);
+    }],
+    ['GET', '/live/sessions/:id', c => {
+      const session = state.liveSessions.find(s => s.id === c.params.id);
+      if (!session) throw notFound('Live session');
+      return session;
+    }],
+    ['POST', '/live/sessions', c => {
+      const u = requireUser(c);
+      if (!['seller', 'creator', 'admin'].includes(u.role)) throw forbidden('Only sellers and creators can host live sessions');
+      const title = String(c.body.title ?? '').trim();
+      if (!title || title.length > 120) throw validation({ title: 'Title must be 1–120 characters' });
+      const productIds = Array.isArray(c.body.productIds) ? c.body.productIds.map(String) : [];
+      if (productIds.some(id => !fx.findProduct(id))) throw validation({ productIds: 'One or more products do not exist' });
+      const scheduledFor = typeof c.body.scheduledFor === 'string' ? c.body.scheduledFor : null;
+      if (scheduledFor && Number.isNaN(+new Date(scheduledFor))) throw validation({ scheduledFor: 'Invalid scheduled time' });
+      const session: LiveSession = { id: nextId('live'), room: '', title, host: fx.summary(u), status: scheduledFor ? 'scheduled' : 'live', category: typeof c.body.category === 'string' ? c.body.category : null, coverUrl: typeof c.body.coverUrl === 'string' ? c.body.coverUrl : null, productIds, pinnedProductId: null, viewers: 0, peakViewers: 0, likes: 0, scheduledFor, startedAt: scheduledFor ? null : iso(), endedAt: null, createdAt: iso() };
+      session.room = session.id;
+      state.liveSessions.push(session);
+      c.status(201);
+      return session;
+    }],
+    ['POST', '/live/sessions/:id/start', c => {
+      const u = requireUser(c);
+      const session = state.liveSessions.find(s => s.id === c.params.id);
+      if (!session) throw notFound('Live session');
+      if (session.host.id !== u.id) throw forbidden('Only the host can manage this session');
+      if (session.status !== 'scheduled') throw conflict('Only scheduled sessions can be started');
+      session.status = 'live';
+      session.startedAt = iso();
+      session.endedAt = null;
+      return session;
+    }],
+    ['POST', '/live/sessions/:id/end', c => {
+      const u = requireUser(c);
+      const session = state.liveSessions.find(s => s.id === c.params.id);
+      if (!session) throw notFound('Live session');
+      if (session.host.id !== u.id && u.role !== 'admin') throw forbidden('Only the host or an admin can end this session');
+      if (session.status !== 'live') throw conflict('Only live sessions can be ended');
+      session.status = 'ended';
+      session.endedAt = iso();
+      return session;
+    }],
+    ['POST', '/live/sessions/:id/pin', c => {
+      const u = requireUser(c);
+      const session = state.liveSessions.find(s => s.id === c.params.id);
+      if (!session) throw notFound('Live session');
+      if (session.host.id !== u.id) throw forbidden('Only the host can manage this session');
+      const productId = c.body.productId === null ? null : typeof c.body.productId === 'string' ? c.body.productId : undefined;
+      if (productId === undefined || (productId && !session.productIds.includes(productId))) throw validation({ productId: 'Pinned product must belong to this live session' });
+      session.pinnedProductId = productId;
+      return session;
+    }],
+    ['POST', '/live/sessions/:id/heartbeat', c => {
+      requireUser(c);
+      const session = state.liveSessions.find(s => s.id === c.params.id);
+      if (!session) throw notFound('Live session');
+      if (session.status !== 'live') throw conflict('Only live sessions accept heartbeats');
+      session.viewers += 1;
+      session.peakViewers = Math.max(session.peakViewers, session.viewers);
+      if (c.body.like === true) session.likes += 1;
+      return { viewers: session.viewers, likes: session.likes };
     }],
 
     // ---- cart

@@ -68,6 +68,24 @@ describe('mock API server', () => {
     expect((await api.live.callToken(convo.id)).room).toBe(`call-${convo.id}`);
   });
 
+  it('serves live sessions and enforces lifecycle ownership in mock mode', async () => {
+    const { api, login } = harness();
+    const live = await api.live.sessions({ status: 'live' });
+    expect(live.items.length).toBe(3);
+    expect(live.items[0].viewers).toBeGreaterThanOrEqual(live.items[1].viewers);
+    await expect(api.live.create({ title: 'No permission' })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await login('techstore@ezyify.test');
+    const scheduled = await api.live.create({ title: 'Tomorrow launch', scheduledFor: new Date(Date.now() + 60_000).toISOString(), productIds: ['prod-001'] });
+    expect(scheduled.status).toBe('scheduled');
+    expect((await api.live.start(scheduled.id)).status).toBe('live');
+    expect((await api.live.pin(scheduled.id, { productId: 'prod-001' })).pinnedProductId).toBe('prod-001');
+    const before = await api.live.heartbeat(scheduled.id);
+    const after = await api.live.heartbeat(scheduled.id, true);
+    expect(after.viewers).toBeGreaterThan(before.viewers);
+    expect(after.likes).toBe(before.likes + 1);
+    expect((await api.live.end(scheduled.id)).status).toBe('ended');
+  });
+
   it('login → native refresh rotation → protected route; rejects bad credentials', async () => {
     const { api, login, tokens, setAccess } = harness();
     await expect(api.auth.login({ identifier: 'buyer@ezyify.test', password: 'nope' })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
