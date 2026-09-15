@@ -1,4 +1,4 @@
-import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, Post, ProductDetail, Review, SellerCustomer, SellerProduct, SellerReview, UserProfile } from '../schemas/index.js';
+import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, PayoutMethod, Post, ProductDetail, Review, SellerCustomer, SellerProduct, SellerReview, UserProfile } from '../schemas/index.js';
 import { sellerProductStatus } from '../schemas/index.js';
 import * as fx from './fixtures.js';
 
@@ -89,7 +89,12 @@ export function createMockState() {
   const orders: Order[] = fx.orders.map(o => ({ ...o }));
   const reviews: Review[] = fx.reviews.map(r => ({ ...r }));
   const addresses = new Map<string, Address[]>([['u_buyer', fx.addresses.map(a => ({ ...a }))]]);
-  const wallets = new Map<string, { balance: number; pending: number }>([['u_buyer', { balance: fx.wallet.balance.amount, pending: fx.wallet.pending.amount }]]);
+  // Sellers start with a realistic balance so Earnings/Withdraw demo well; buyers keep the fixture wallet.
+  const wallets = new Map<string, { balance: number; pending: number }>([
+    ['u_buyer', { balance: fx.wallet.balance.amount, pending: fx.wallet.pending.amount }],
+    ...fx.users.filter(u => u.role === 'seller').map(u => [u.id, { balance: 184_250 + (u.id.length * 1731) % 50_000, pending: 0 }] as [string, { balance: number; pending: number }]),
+  ]);
+  const payoutMethods = new Map<string, PayoutMethod[]>([['u_techstore', [{ id: 'pm_techstore_1', type: 'bank_account', label: 'Mandiri', holderName: 'TechStore Pte Ltd', institution: 'Bank Mandiri', accountLast4: '5544', country: 'ID', isDefault: true, createdAt: fx.ago(24 * 90) }]]]);
   const transactions = new Map<string, typeof fx.transactions>([['u_buyer', [...fx.transactions]]]);
   const conversations = new Map<string, Conversation[]>([['u_buyer', fx.conversations.map(c => ({ ...c }))]]);
   const messages: Record<string, Message[]> = Object.fromEntries(Object.entries(fx.messages).map(([k, v]) => [k, [...v]]));
@@ -97,7 +102,7 @@ export function createMockState() {
   const comments = new Map<string, Comment[]>();
   const uploads = new Map<string, { contentType: string; sizeBytes: number }>();
   const liveSessions = fx.liveSessions.map(session => ({ ...session, host: { ...session.host }, productIds: [...session.productIds] }));
-  return { users, passwords, sessions, refreshTokens, revoked, pendingOtp, mfa, mfaChallenges, posts, likes, saves, follows, blocks, carts, orders, reviews, addresses, wallets, transactions, conversations, messages, notifications, comments, uploads, liveSessions, counter: 1000 };
+  return { users, passwords, sessions, refreshTokens, revoked, pendingOtp, mfa, mfaChallenges, posts, likes, saves, follows, blocks, carts, orders, reviews, addresses, wallets, payoutMethods, transactions, conversations, messages, notifications, comments, uploads, liveSessions, counter: 1000 };
 }
 export type MockState = ReturnType<typeof createMockState>;
 
@@ -621,6 +626,90 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       all.sort((a, b) => (sort === 'spent' ? b.spent.amount - a.spent.amount : sort === 'orders' ? b.orders - a.orders : +new Date(b.lastOrderAt) - +new Date(a.lastOrderAt)));
       return { ...paginate(all, c.query), summary };
     }],
+    ['GET', '/seller/earnings', c => {
+      const u = requireUser(c);
+      if (u.role !== 'seller' && u.role !== 'admin') throw forbidden('Seller account required');
+      const DAY = 86_400_000;
+      const nowMs = now();
+      const w = state.wallets.get(u.id) ?? { balance: 0, pending: 0 };
+      const SALES = ['paid', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'completed'];
+      const mineOrders = state.orders.filter(o => o.seller.id === u.id);
+      const held = mineOrders.filter(o => SALES.includes(o.status) && o.escrow.status === 'held').reduce((n, o) => n + o.total.amount, 0);
+      const seed = [...u.id].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0, 7);
+      const mine = fx.products.filter(p => p.seller.username === u.username);
+      const dailyGross = (d: number) => Math.round(mine.reduce((n, p) => n + (p.soldCount * p.price.amount) / 365, 0) * (1 + 0.35 * Math.sin((d + seed % 7) / 7 * Math.PI * 2)));
+      const dailyReleased = (d: number) => Math.round(dailyGross(d) * 0.95);
+      const monthDay = new Date(nowMs).getUTCDate();
+      const sumDays = (from: number, to: number) => { let n = 0; for (let d = from; d < to; d++) n += dailyReleased(d); return n; };
+      const released = mineOrders.filter(o => o.escrow.status === 'released').reduce((n, o) => n + Math.round(o.total.amount * 0.95), 0);
+      const tx = state.transactions.get(u.id) ?? [];
+      const series = Array.from({ length: 30 }, (_, i) => {
+        const d = 29 - i;
+        const date = new Date(nowMs - d * DAY).toISOString().slice(0, 10);
+        const withdrawn = tx.filter(t => t.type === 'withdrawal' && t.createdAt.slice(0, 10) === date).reduce((n, t) => n + t.amount.amount, 0);
+        return { date, released: dailyReleased(d), withdrawn };
+      });
+      const allTime = sumDays(0, 365) + released;
+      return {
+        currency: 'USD' as const,
+        available: money(w.balance),
+        pendingWithdrawal: money(w.pending),
+        escrowHeld: money(held),
+        paidOutAllTime: money(allTime),
+        paidOutThisMonth: money(sumDays(0, monthDay) + released),
+        // Same‑length comparison (first `monthDay` days of last month) so a mid‑month view isn't a misleading drop.
+        paidOutLastMonth: money(sumDays(30, 30 + monthDay)),
+        platformFeeAllTime: money(Math.round(allTime / 0.95 - allTime)),
+        feeBps: 500,
+        withdrawalMin: money(500),
+        series,
+        recentPayouts: tx.filter(t => t.type === 'withdrawal' || t.type === 'commission').slice(0, 8),
+      };
+    }],
+    ['GET', '/seller/payout-methods', c => {
+      const u = requireUser(c);
+      if (!['seller', 'creator', 'admin'].includes(u.role)) throw forbidden('Seller account required');
+      return [...(state.payoutMethods.get(u.id) ?? [])].sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
+    }],
+    ['POST', '/seller/payout-methods', c => {
+      const u = requireUser(c);
+      if (!['seller', 'creator', 'admin'].includes(u.role)) throw forbidden('Seller account required');
+      const list = state.payoutMethods.get(u.id) ?? [];
+      if (list.length >= 5) throw validation({ _: 'You can keep up to 5 payout methods' });
+      const account = String(c.body.accountNumber ?? '').trim();
+      if (!/^[0-9A-Za-z-]{6,34}$/.test(account)) throw validation({ accountNumber: 'Enter a valid account number' });
+      const holderName = String(c.body.holderName ?? '').trim();
+      const institution = String(c.body.institution ?? '').trim();
+      if (holderName.length < 2) throw validation({ holderName: 'Enter the account holder name' });
+      if (institution.length < 2) throw validation({ institution: 'Enter the bank or wallet name' });
+      const digits = account.replace(/\D/g, '');
+      const makeDefault = !!c.body.isDefault || list.length === 0;
+      if (makeDefault) list.forEach(m => (m.isDefault = false));
+      const m: PayoutMethod = { id: nextId('pm'), type: c.body.type === 'ewallet' ? 'ewallet' : 'bank_account', label: String(c.body.label ?? institution).trim() || institution, holderName, institution, accountLast4: (digits.length >= 4 ? digits : account).slice(-4), country: typeof c.body.country === 'string' && c.body.country.length === 2 ? c.body.country : 'ID', isDefault: makeDefault, createdAt: iso() };
+      list.push(m);
+      state.payoutMethods.set(u.id, list);
+      c.status(201);
+      return m;
+    }],
+    ['POST', '/seller/payout-methods/:id/default', c => {
+      const u = requireUser(c);
+      const list = state.payoutMethods.get(u.id) ?? [];
+      const m = list.find(x => x.id === c.params.id);
+      if (!m) throw notFound('Payout method');
+      list.forEach(x => (x.isDefault = x.id === m.id));
+      return m;
+    }],
+    ['DELETE', '/seller/payout-methods/:id', c => {
+      const u = requireUser(c);
+      const list = state.payoutMethods.get(u.id) ?? [];
+      const m = list.find(x => x.id === c.params.id);
+      if (!m) throw notFound('Payout method');
+      if ((state.transactions.get(u.id) ?? []).some(t => t.type === 'withdrawal' && t.status === 'pending' && t.description.endsWith(m.accountLast4))) throw validation({ _: 'A withdrawal to this account is still processing' });
+      const rest = list.filter(x => x.id !== m.id);
+      if (m.isDefault && rest[0]) rest[0].isDefault = true;
+      state.payoutMethods.set(u.id, rest);
+      return { ok: true as const };
+    }],
     ['GET', '/seller/products', c => {
       const u = requireUser(c);
       if (u.role !== 'seller' && u.role !== 'admin') throw forbidden('Seller account required');
@@ -972,11 +1061,14 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       const u = requireUser(c);
       const amount = Number(c.body.amount);
       const w = state.wallets.get(u.id) ?? { balance: 0, pending: 0 };
-      if (!(amount > 0) || amount > w.balance) throw validation({ amount: 'Amount exceeds your available balance' });
+      if (!(amount >= 500)) throw validation({ amount: 'Minimum withdrawal is $5.00' });
+      if (amount > w.balance) throw validation({ amount: 'Amount exceeds your available balance' });
+      const method = (state.payoutMethods.get(u.id) ?? []).find(m => m.id === c.body.payoutMethodId);
+      if (!method) throw validation({ payoutMethodId: 'Choose a saved payout method' });
       w.balance -= amount;
       w.pending += amount;
       state.wallets.set(u.id, w);
-      const t = { id: nextId('t'), type: 'withdrawal' as const, direction: 'out' as const, amount: money(amount), status: 'pending' as const, description: 'Withdrawal · bank account', createdAt: iso() };
+      const t = { id: nextId('t'), type: 'withdrawal' as const, direction: 'out' as const, amount: money(amount), status: 'pending' as const, description: `Withdrawal · ${method.institution} ••••${method.accountLast4}`, createdAt: iso() };
       const tx = state.transactions.get(u.id) ?? [];
       tx.unshift(t);
       state.transactions.set(u.id, tx);

@@ -171,6 +171,32 @@ export const WalletSchema = z.object({
 });
 export type Wallet = z.infer<typeof WalletSchema>;
 
+export const PayoutMethodSchema = z.object({
+  id: IdSchema,
+  type: z.enum(['bank_account', 'ewallet']),
+  label: z.string(),
+  holderName: z.string(),
+  institution: z.string(),
+  /** Only the last 4 digits ever leave the server. */
+  accountLast4: z.string().length(4),
+  country: z.string().length(2),
+  isDefault: z.boolean(),
+  createdAt: IsoDateSchema,
+});
+export type PayoutMethod = z.infer<typeof PayoutMethodSchema>;
+
+export const CreatePayoutMethodRequestSchema = z.object({
+  type: z.enum(['bank_account', 'ewallet']).default('bank_account'),
+  label: z.string().trim().min(1).max(30),
+  holderName: z.string().trim().min(2).max(80),
+  institution: z.string().trim().min(2).max(80),
+  accountNumber: z.string().trim().regex(/^[0-9A-Za-z-]{6,34}$/, 'Enter a valid account number'),
+  routing: z.string().trim().max(34).optional(),
+  country: z.string().length(2).default('ID'),
+  isDefault: z.boolean().default(false),
+});
+export type CreatePayoutMethodRequest = z.infer<typeof CreatePayoutMethodRequestSchema>;
+
 export const TransactionSchema = z.object({
   id: IdSchema,
   type: z.enum(['topup', 'purchase', 'refund', 'commission', 'withdrawal', 'transfer']),
@@ -181,6 +207,25 @@ export const TransactionSchema = z.object({
   createdAt: IsoDateSchema,
 });
 export type Transaction = z.infer<typeof TransactionSchema>;
+
+/** Seller earnings (`GET /seller/earnings`): escrow → wallet → bank, with a daily payout series. */
+export const SellerEarningsSchema = z.object({
+  currency: MoneySchema.shape.currency,
+  available: MoneySchema,
+  pendingWithdrawal: MoneySchema,
+  escrowHeld: MoneySchema,
+  paidOutAllTime: MoneySchema,
+  /** Month‑to‑date, and the same day range of the previous month for an honest comparison. */
+  paidOutThisMonth: MoneySchema,
+  paidOutLastMonth: MoneySchema,
+  platformFeeAllTime: MoneySchema,
+  feeBps: z.number().int().min(0).max(10_000),
+  withdrawalMin: MoneySchema,
+  series: z.array(z.object({ date: z.string(), released: z.number().int().min(0), withdrawn: z.number().int().min(0) })),
+  recentPayouts: z.array(TransactionSchema),
+});
+export type SellerEarnings = z.infer<typeof SellerEarningsSchema>;
+
 
 /** Address book entry (GET/POST /addresses). Country is ISO‑3166‑1 alpha‑2. */
 export const AddressSchema = z.object({

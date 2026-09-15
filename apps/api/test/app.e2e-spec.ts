@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApp } from '../src/bootstrap.js';
 import { loadEnv } from '../src/config.js';
-import { OrderSchema, ProductReviewsResponseSchema, ProductSummarySchema, SellerReviewsResponseSchema, SellerAnalyticsSchema, SellerCustomersResponseSchema, SellerDashboardSchema, SellerProductsResponseSchema, SessionSchema, paginated } from '@ezyify/core';
+import { OrderSchema, ProductReviewsResponseSchema, ProductSummarySchema, SellerReviewsResponseSchema, SellerAnalyticsSchema, SellerCustomersResponseSchema, SellerDashboardSchema, SellerEarningsSchema, SellerProductsResponseSchema, SessionSchema, paginated } from '@ezyify/core';
 
 let app: NestFastifyApplication;
 const inject = (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, opts: { token?: string; body?: unknown; headers?: Record<string, string> } = {}) =>
@@ -249,6 +249,42 @@ describe('commerce: cart → checkout → escrow → release', () => {
     expect(stats.awaitingReply).toBe(mine.stats.awaitingReply - 1);
     const notes = json(await inject('GET', '/notifications', { token: buyer })).data;
     expect(JSON.stringify(notes)).toMatch(/replied to your review/);
+  });
+
+  it('seller earnings reconcile escrow, releases, fees and payouts; payout methods are encrypted and scoped', async () => {
+    expect((await inject('GET', '/seller/earnings', { token: buyer })).statusCode).toBe(403);
+    const e = json(await inject('GET', '/seller/earnings', { token: seller })).data;
+    expect(SellerEarningsSchema.safeParse(e).success).toBe(true);
+    const fee = Math.round(7999 * 0.05);
+    expect(e.paidOutAllTime.amount).toBe(7999 - fee);
+    expect(e.platformFeeAllTime.amount).toBe(fee);
+    expect(e.paidOutThisMonth.amount).toBe(7999 - fee);
+    expect(e.escrowHeld.amount).toBe(0);
+    expect(e.series).toHaveLength(30);
+    expect(e.series.reduce((n: number, d: { released: number }) => n + d.released, 0)).toBe(7999 - fee);
+    expect(e.available.amount).toBeGreaterThanOrEqual(7999 - fee);
+
+    expect(json(await inject('GET', '/seller/payout-methods', { token: seller })).data).toEqual([]);
+    expect((await inject('POST', '/seller/payout-methods', { token: seller, body: { label: 'Main', holderName: 'T', institution: 'X', accountNumber: '12' } })).statusCode).toBe(422);
+    const a = json(await inject('POST', '/seller/payout-methods', { token: seller, body: { label: 'Mandiri', holderName: 'TechStore Pte', institution: 'Bank Mandiri', accountNumber: '9988-7766-5544' } })).data;
+    const b = json(await inject('POST', '/seller/payout-methods', { token: seller, body: { label: 'GoPay', type: 'ewallet', holderName: 'TechStore Pte', institution: 'GoPay', accountNumber: '081234567890', isDefault: true } })).data;
+    expect(a).toMatchObject({ accountLast4: '5544', isDefault: true });
+    expect(b).toMatchObject({ accountLast4: '7890', isDefault: true, type: 'ewallet' });
+    const list = json(await inject('GET', '/seller/payout-methods', { token: seller })).data;
+    expect(list.map((m: { id: string; isDefault: boolean }) => [m.id, m.isDefault])).toEqual([[b.id, true], [a.id, false]]);
+    expect(JSON.stringify(list)).not.toMatch(/9988|081234567890|accountEncrypted/);
+    // Another seller can neither see nor use these methods.
+    const other = (await login('fashion@ezyify.test')).accessToken;
+    expect(json(await inject('GET', '/seller/payout-methods', { token: other })).data).toEqual([]);
+    expect((await inject('POST', '/wallet/withdraw', { token: other, body: { amount: 500, payoutMethodId: a.id } })).statusCode).toBe(422);
+    const w = json(await inject('POST', '/wallet/withdraw', { token: seller, body: { amount: 1000, payoutMethodId: a.id } })).data;
+    expect(w.description).toContain('••••5544');
+    const after = json(await inject('GET', '/seller/earnings', { token: seller })).data;
+    expect(after.pendingWithdrawal.amount).toBe(e.pendingWithdrawal.amount + 1000);
+    expect(after.available.amount).toBe(e.available.amount - 1000);
+    expect(after.recentPayouts[0]).toMatchObject({ type: 'withdrawal', status: 'pending' });
+    expect(json(await inject('POST', `/seller/payout-methods/${a.id}/default`, { token: seller })).data.isDefault).toBe(true);
+    expect((await inject('DELETE', `/seller/payout-methods/${b.id}`, { token: seller })).statusCode).toBe(200);
   });
 
   it('timeline records every transition', async () => {

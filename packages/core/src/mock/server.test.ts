@@ -181,6 +181,32 @@ describe('mock API server', () => {
     await expect(api.seller.replyReview('rev-003', { text: 'nope' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
+  it('seller earnings + payout methods: encrypted destinations gate withdrawals in mock mode', async () => {
+    const { api, login } = harness();
+    await login();
+    await expect(api.seller.earnings()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await login('techstore@ezyify.test');
+    const e = await api.seller.earnings();
+    expect(e.series).toHaveLength(30);
+    expect(e.available.amount).toBeGreaterThan(0);
+    expect(e.paidOutAllTime.amount).toBeGreaterThan(e.paidOutThisMonth.amount);
+    const before = await api.seller.payoutMethods();
+    expect(before).toHaveLength(1);
+    expect(before[0]).toMatchObject({ accountLast4: '5544', isDefault: true });
+    await expect(api.wallet.withdraw(1000, 'pm_not_mine')).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    const added = await api.seller.addPayoutMethod({ label: 'GoPay', type: 'ewallet', holderName: 'TechStore', institution: 'GoPay', accountNumber: '081234567890', isDefault: true });
+    expect(added).toMatchObject({ accountLast4: '7890', isDefault: true });
+    expect((await api.seller.payoutMethods()).find(m => m.id === before[0].id)?.isDefault).toBe(false);
+    const w = await api.wallet.withdraw(1000, added.id);
+    expect(w.description).toContain('••••7890');
+    const after = await api.seller.earnings();
+    expect(after.available.amount).toBe(e.available.amount - 1000);
+    expect(after.pendingWithdrawal.amount).toBe(e.pendingWithdrawal.amount + 1000);
+    await expect(api.seller.removePayoutMethod(added.id)).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    await api.seller.removePayoutMethod(before[0].id);
+    expect(await api.seller.payoutMethods()).toHaveLength(1);
+  });
+
   it('login → native refresh rotation → protected route; rejects bad credentials', async () => {
     const { api, login, tokens, setAccess } = harness();
     await expect(api.auth.login({ identifier: 'buyer@ezyify.test', password: 'nope' })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });

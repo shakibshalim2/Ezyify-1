@@ -66,6 +66,11 @@ enum PaymentMethod {
   cod
 }
 
+enum PayoutMethodType {
+  bank_account
+  ewallet
+}
+
 enum TransactionType {
   topup
   purchase
@@ -163,6 +168,7 @@ model User {
   mfaChallenges MfaChallenge[]
   devices       Device[]
   wallet        Wallet?
+  payoutMethods PayoutMethod[]
   addresses     Address[]
   products      Product[]        @relation("SellerProducts")
   cart          Cart?
@@ -495,6 +501,25 @@ model RefundRequest {
   resolvedAt DateTime?
 
   @@index([orderId])
+}
+
+/** Seller payout destination; the account number is AES‑256‑GCM encrypted (`MFA_ENCRYPTION_KEY`), only last4 in clear. */
+model PayoutMethod {
+  id               String           @id @default(cuid())
+  userId           String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type             PayoutMethodType @default(bank_account)
+  label            String
+  holderName       String
+  institution      String
+  accountLast4     String
+  accountEncrypted String
+  routing          String?
+  country          String           @default("ID")
+  isDefault        Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+
+  @@index([userId])
 }
 
 model Wallet {

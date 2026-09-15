@@ -1,7 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type { z } from 'zod';
 import type { FeedQuery, ProductQuery, SellerProductQuery } from '../api/endpoints.js';
-import type { CreateReviewRequest, SellerReviewFilter, ShipOrderRequest } from '../schemas/index.js';
+import type { CreatePayoutMethodRequest, CreateReviewRequest, PayoutMethod, SellerReviewFilter, ShipOrderRequest } from '../schemas/index.js';
 import type { SearchType } from '../schemas/index.js';
 import type { paginated } from '../schemas/common.js';
 import type { Cart, CheckoutRequest, CreateAddressRequest, CreatePostRequest, Post, UpdateProfileRequest, UserProfile } from '../schemas/index.js';
@@ -23,6 +23,8 @@ export const queryKeys = {
   sellerAnalytics: (params: Record<string, unknown> = {}) => ['seller', 'analytics', params] as const,
   sellerCustomers: (params: Record<string, unknown> = {}) => ['seller', 'customers', params] as const,
   sellerReviews: (params: Record<string, unknown> = {}) => ['seller', 'reviews', params] as const,
+  sellerEarnings: ['seller', 'earnings'] as const,
+  payoutMethods: ['seller', 'payout-methods'] as const,
   productReviews: (productId: string, params: Record<string, unknown> = {}) => ['products', productId, 'reviews', params] as const,
   search: (q: string) => ['search', q] as const,
   unifiedSearch: (q: string, type: SearchType = 'all') => ['search', 'all', q, type] as const,
@@ -146,6 +148,32 @@ export function useReplyReview() {
       qc.invalidateQueries({ queryKey: ['seller', 'reviews'] });
       qc.invalidateQueries({ queryKey: ['products', r.productId, 'reviews'] });
     },
+  });
+}
+
+export function useSellerEarnings() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sellerEarnings, queryFn: () => api.seller.earnings(), enabled: authed, staleTime: 30_000 });
+}
+
+export function usePayoutMethods() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.payoutMethods, queryFn: () => api.seller.payoutMethods(), enabled: authed });
+}
+
+export function usePayoutMethodAction() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { action: 'add'; body: CreatePayoutMethodRequest } | { action: 'remove' | 'default'; id: string }): Promise<PayoutMethod | null> => {
+      if (v.action === 'add') return api.seller.addPayoutMethod(v.body);
+      if (v.action === 'default') return api.seller.setDefaultPayoutMethod(v.id);
+      await api.seller.removePayoutMethod(v.id);
+      return null;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.payoutMethods }),
   });
 }
 
@@ -480,6 +508,7 @@ function useWalletMutation<TVars>(fn: (api: ReturnType<typeof useApi>, vars: TVa
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.wallet });
       qc.invalidateQueries({ queryKey: queryKeys.transactions });
+      qc.invalidateQueries({ queryKey: queryKeys.sellerEarnings });
     },
   });
 }
