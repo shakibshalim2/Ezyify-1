@@ -183,10 +183,6 @@ const FollowersPage = createLazyComponent(() => import('./pages/profile/Follower
 // Batch 9
 const RefundRequestPage = createLazyComponent(() => import('./pages/orders/RefundRequestPage'));
 const RefundStatusPage = createLazyComponent(() => import('./pages/orders/RefundStatusPage'));
-const ReturnRequestPage = createLazyComponent(() => import('./pages/orders/ReturnRequestPage'));
-const DisputePage = createLazyComponent(() => import('./pages/orders/DisputePage'));
-const DisputeDetailPage = createLazyComponent(() => import('./pages/orders/DisputeDetailPage'));
-const RefundHistoryPage = createLazyComponent(() => import('./pages/user/RefundHistoryPage'));
 const DisputeResolutionDashboard = createLazyComponent(() => import('./pages/admin/DisputeResolutionDashboard'));
 const AffiliateRulesPage = createLazyComponent(() => import('./pages/AffiliateRulesPage'));
 const ReferralTrackingPage = createLazyComponent(() => import('./pages/ReferralTrackingPage'));
@@ -197,7 +193,6 @@ const ContentModerationQueue = createLazyComponent(() => import('./pages/admin/m
 const FraudDetectionDashboard = createLazyComponent(() => import('./pages/admin/fraud/FraudDetectionDashboard'));
 const SellerApprovalQueue = createLazyComponent(() => import('./pages/admin/operations/SellerApprovalQueue'));
 const LiveShoppingPage = createLazyComponent(() => import('./pages/LiveShoppingPage'));
-const RefundNegotiationPage = createLazyComponent(() => import('./pages/orders/RefundNegotiationPage'));
 
 
 function PageLoader() {
@@ -406,12 +401,16 @@ export default function App() {
                 <Route path="/seller/withdraw" element={<WithdrawPage />} />
                 <Route path="/seller/payout-settings" element={<PayoutSettingsPage />} />
                 <Route path="/seller/security-monitor" element={<SecurityMonitorPage />} />
-                <Route path="/orders/refund-request" element={<RefundRequestPage />} />
-                <Route path="/orders/refund-status/:refundId" element={<RefundStatusPage />} />
-                <Route path="/orders/return-request" element={<ReturnRequestPage />} />
-                <Route path="/orders/dispute" element={<DisputePage />} />
-                <Route path="/orders/dispute/:disputeId" element={<DisputeDetailPage />} />
-                <Route path="/user/refund-history" element={<RefundHistoryPage />} />
+                <Route path="/orders/:id/refund/new" element={<RefundRequestPage />} />
+                <Route path="/orders/:id/refund" element={<RefundStatusPage />} />
+                {/* Legacy Figma-era paths; the case now lives under the order. */}
+                <Route path="/orders/refund-request" element={<Navigate to="/orders" replace />} />
+                <Route path="/orders/refund-status/:refundId" element={<Navigate to="/orders?filter=refunds" replace />} />
+                <Route path="/orders/return-request" element={<Navigate to="/orders" replace />} />
+                <Route path="/orders/dispute" element={<Navigate to="/orders?filter=refunds" replace />} />
+                <Route path="/orders/dispute/:disputeId" element={<Navigate to="/orders?filter=refunds" replace />} />
+                <Route path="/orders/refund-negotiation" element={<Navigate to="/orders?filter=refunds" replace />} />
+                <Route path="/user/refund-history" element={<Navigate to="/orders?filter=refunds" replace />} />
                 <Route path="/admin/disputes" element={<DisputeResolutionDashboard />} />
                 <Route path="/affiliate-rules" element={<AffiliateRulesPage />} />
                 <Route path="/referral-tracking" element={<ReferralTrackingPage />} />
@@ -424,7 +423,6 @@ export default function App() {
                 <Route path="/admin/fraud" element={<FraudDetectionDashboard />} />
                 <Route path="/admin/operations/seller-approval" element={<SellerApprovalQueue />} />
                 <Route path="/live-shopping" element={<LiveShoppingPage />} />
-                <Route path="/orders/refund-negotiation" element={<RefundNegotiationPage />} />
                 {devRoutes}
                 {/* Catch-all: any unmatched path shows 404 */}
                 <Route path="*" element={<NotFoundPage />} />

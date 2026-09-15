@@ -498,8 +498,12 @@ model RefundRequest {
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   reason    String
   itemIds   String[]
-  status    String   @default("requested") // requested | approved | rejected | negotiating | disputed | refunded
+  status    String   @default("requested") // requested | rejected | disputed | refunded | withdrawn
   amount    Int?
+  /// Seller's note when declining; buyer's escalation text; admin's closing note.
+  sellerResponse String?
+  disputeReason  String?
+  resolution     String?
   createdAt DateTime @default(now())
   resolvedAt DateTime?
 

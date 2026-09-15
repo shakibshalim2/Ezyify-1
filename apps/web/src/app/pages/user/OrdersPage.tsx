@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Package, Truck, CheckCircle, Clock, AlertCircle, RotateCcw, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatMoney, formatRelativeTime, formatTimeUntil, useOrderAction, useOrders, type Order, type OrderStatus } from '@ezyify/core';
@@ -78,7 +78,7 @@ function OrderCard({ order, onConfirmRequest }: { order: Order; onConfirmRequest
 
   const canConfirm = ['shipped', 'out_for_delivery', 'delivered'].includes(order.status);
   const canCancel = ['pending_payment', 'paid', 'processing'].includes(order.status);
-  const canRefund = canConfirm && order.escrow.status === 'held';
+  const canRefund = ['paid', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'completed'].includes(order.status) && order.escrow.status !== 'refunded' && !order.refund;
 
   return (
     <Card variant="elevated" className={cn(action.isPending && 'opacity-70')}>
@@ -153,21 +153,13 @@ function OrderCard({ order, onConfirmRequest }: { order: Order; onConfirmRequest
             </Button>
           )}
           {canRefund && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() =>
-                onConfirmRequest({
-                  title: 'Request a refund?',
-                  message: 'Funds stay in escrow while we review with the seller (usually within 48 hours).',
-                  confirmLabel: 'Request refund',
-                  cancelLabel: 'Back',
-                  destructive: true,
-                  onConfirm: () => run({ id: order.id, action: 'refund', reason: 'Item not as described', itemIds: order.items.map(i => i.id) }, 'Refund requested'),
-                })
-              }
-            >
-              Problem with order
+            <Button variant="secondary" size="sm" asChild>
+              <Link to={`/orders/${order.id}/refund/new`}>Problem with order</Link>
+            </Button>
+          )}
+          {(order.status === 'refund_requested' || order.status === 'disputed' || (order.status === 'refunded' && order.refund)) && (
+            <Button variant={order.status === 'refunded' ? 'outline' : 'gradient'} size="sm" asChild>
+              <Link to={`/orders/${order.id}/refund`}>{order.status === 'refund_requested' && order.refund?.status === 'rejected' ? 'Seller declined · respond' : 'View refund case'}</Link>
             </Button>
           )}
           {canCancel && (
@@ -222,7 +214,10 @@ function OrderCard({ order, onConfirmRequest }: { order: Order; onConfirmRequest
 
 export default function OrdersPage() {
   const reduce = useReducedMotion();
-  const [filter, setFilter] = useState<Filter>('all');
+  const [params, setParams] = useSearchParams();
+  const initial = params.get('filter');
+  const [filter, setFilterState] = useState<Filter>(FILTERS.some(([id]) => id === initial) ? (initial as Filter) : 'all');
+  const setFilter = (f: Filter) => { setFilterState(f); setParams(f === 'all' ? {} : { filter: f }, { replace: true }); };
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const orders = useOrders({ pageSize: 50 });
   const { items, loadMore, hasMore, loadingMore } = useInfiniteList<Order>(orders);

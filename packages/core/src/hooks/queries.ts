@@ -1,7 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type { z } from 'zod';
 import type { FeedQuery, ProductQuery, SellerProductQuery } from '../api/endpoints.js';
-import type { CreatePayoutMethodRequest, CreateReviewRequest, DeleteProductResult, NotificationPreferences, PayoutMethod, ReviewKycRequest, SellerProductDetail, SellerReviewFilter, ShipOrderRequest, SubmitKycRequest, UpdateNotificationPreferencesRequest, UpdateProductRequest, UpsertProductRequest } from '../schemas/index.js';
+import type { CreatePayoutMethodRequest, CreateReviewRequest, DeclineRefundRequest, DeleteProductResult, ResolveDisputeRequest, NotificationPreferences, PayoutMethod, ReviewKycRequest, SellerProductDetail, SellerReviewFilter, ShipOrderRequest, SubmitKycRequest, UpdateNotificationPreferencesRequest, UpdateProductRequest, UpsertProductRequest } from '../schemas/index.js';
 import type { SearchType } from '../schemas/index.js';
 import type { paginated } from '../schemas/common.js';
 import type { Cart, CheckoutRequest, CreateAddressRequest, CreatePostRequest, Post, UpdateProfileRequest, UserProfile } from '../schemas/index.js';
@@ -473,9 +473,14 @@ export function useOrderAction() {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { id: string; action: 'confirm' | 'cancel' } | { id: string; action: 'refund'; reason: string; itemIds: string[] }) => {
-      if (v.action === 'refund') return api.orders.requestRefund(v.id, v.reason, v.itemIds);
-      return v.action === 'confirm' ? api.orders.confirmDelivery(v.id) : api.orders.cancel(v.id);
+    mutationFn: (v: { id: string; action: 'confirm' | 'cancel' | 'withdrawRefund' } | { id: string; action: 'refund'; reason: string; itemIds: string[] } | { id: string; action: 'dispute'; reason: string }) => {
+      switch (v.action) {
+        case 'refund': return api.orders.requestRefund(v.id, v.reason, v.itemIds);
+        case 'dispute': return api.orders.dispute(v.id, { reason: v.reason });
+        case 'withdrawRefund': return api.orders.withdrawRefund(v.id);
+        case 'confirm': return api.orders.confirmDelivery(v.id);
+        case 'cancel': return api.orders.cancel(v.id);
+      }
     },
     onSuccess: order => {
       qc.setQueryData(queryKeys.order(order.id), order);
@@ -507,7 +512,8 @@ export function useSellerOrdersSummary() {
 
 export type SellerOrderAction =
   | { id: string; action: 'accept' | 'deliver' | 'approveRefund' | 'cancel' }
-  | { id: string; action: 'ship'; body: ShipOrderRequest };
+  | { id: string; action: 'ship'; body: ShipOrderRequest }
+  | { id: string; action: 'declineRefund'; body: DeclineRefundRequest };
 
 export function useSellerOrderAction() {
   const api = useApi();
@@ -519,6 +525,7 @@ export function useSellerOrderAction() {
         case 'ship': return api.sellerOrders.ship(v.id, v.body);
         case 'deliver': return api.sellerOrders.deliver(v.id);
         case 'approveRefund': return api.sellerOrders.approveRefund(v.id);
+        case 'declineRefund': return api.sellerOrders.declineRefund(v.id, v.body);
         case 'cancel': return api.sellerOrders.cancel(v.id);
       }
     },
@@ -684,6 +691,23 @@ export function useReviewKyc() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: ReviewKycRequest }) => api.kyc.adminReview(id, body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin', 'kyc'] }); qc.invalidateQueries({ queryKey: queryKeys.kyc }); },
+  });
+}
+
+// ---------- Disputes (admin) ----------
+
+export function useAdminDisputes(query: PageQuery = {}) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useInfiniteQuery({ queryKey: ['admin', 'disputes', query] as const, queryFn: ({ pageParam }) => api.disputes.list({ ...query, page: pageParam }), initialPageParam: 1, getNextPageParam: nextPage, enabled: authed });
+}
+
+export function useResolveDispute() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: ResolveDisputeRequest }) => api.disputes.resolve(id, body),
+    onSuccess: order => { qc.setQueryData(queryKeys.order(order.id), order); qc.invalidateQueries({ queryKey: ['admin', 'disputes'] }); qc.invalidateQueries({ queryKey: ['orders'] }); },
   });
 }
 

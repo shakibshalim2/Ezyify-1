@@ -50,6 +50,41 @@ export const OrderItemSchema = z.object({
   unitPrice: MoneySchema,
 });
 
+/** Latest refund case on an order. `rejected` keeps the order in `refund_requested` so the buyer can withdraw or escalate. */
+export const RefundCaseStatusSchema = z.enum(['requested', 'rejected', 'disputed', 'refunded', 'withdrawn']);
+export const RefundCaseSchema = z.object({
+  id: IdSchema,
+  status: RefundCaseStatusSchema,
+  reason: z.string(),
+  itemIds: z.array(IdSchema),
+  sellerResponse: z.string().nullable(),
+  disputeReason: z.string().nullable(),
+  resolution: z.string().nullable(),
+  requestedAt: IsoDateSchema,
+  resolvedAt: IsoDateSchema.nullable(),
+});
+export type RefundCase = z.infer<typeof RefundCaseSchema>;
+
+export const REFUND_REASONS = [
+  { id: 'not_received', label: 'Never arrived' },
+  { id: 'damaged', label: 'Arrived damaged' },
+  { id: 'not_as_described', label: 'Not as described' },
+  { id: 'wrong_item', label: 'Wrong item or size' },
+  { id: 'changed_mind', label: 'Changed my mind' },
+  { id: 'other', label: 'Something else' },
+] as const;
+export const RefundRequestBodySchema = z.object({
+  reason: z.string().trim().min(3, 'Tell the seller what went wrong').max(500),
+  itemIds: z.array(IdSchema).default([]),
+});
+export type RefundRequestBody = z.input<typeof RefundRequestBodySchema>;
+export const DeclineRefundRequestSchema = z.object({ response: z.string().trim().min(5, 'Explain your decision to the buyer').max(500) });
+export type DeclineRefundRequest = z.infer<typeof DeclineRefundRequestSchema>;
+export const DisputeRequestSchema = z.object({ reason: z.string().trim().min(10, 'Describe the problem in a bit more detail').max(1000) });
+export type DisputeRequest = z.infer<typeof DisputeRequestSchema>;
+export const ResolveDisputeRequestSchema = z.object({ decision: z.enum(['refund', 'release']), note: z.string().trim().min(5, 'Leave a short note for both parties').max(500) });
+export type ResolveDisputeRequest = z.infer<typeof ResolveDisputeRequestSchema>;
+
 export const OrderSchema = z.object({
   id: IdSchema,
   orderNumber: z.string(),
@@ -71,6 +106,7 @@ export const OrderSchema = z.object({
   tracking: z
     .object({ carrier: z.string(), number: z.string(), url: z.string().url().nullable() })
     .nullable(),
+  refund: RefundCaseSchema.nullable().default(null),
   placedAt: IsoDateSchema,
   deliveredAt: IsoDateSchema.nullable(),
 });

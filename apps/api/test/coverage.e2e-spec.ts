@@ -251,6 +251,47 @@ describe('orders: refund, cancel, seller list, errors', () => {
     expect((await inject('GET', '/orders/nope', { token: buyer })).statusCode).toBe(404);
   });
 
+  it('refund case: seller declines → buyer withdraws (order resumes) → re-requests → escalates → admin resolves', async () => {
+    const prisma = app.get(PrismaService);
+    await inject('POST', '/cart/items', { token: buyer, body: { productId: 'prod-003', quantity: 1 } });
+    const orders = json(await inject('POST', '/checkout', { token: buyer, body: { addressId: 'addr_buyer_home', paymentMethod: 'wallet' } })).data;
+    const order = orders.find((o: { seller: { username: string } }) => o.seller.username === 'homebyjules');
+    const jules = await login('jules@ezyify.test');
+    const admin = await login('admin@ezyify.test');
+    expect(json(await inject('GET', `/orders/${order.id}`, { token: buyer })).data.refund).toBeNull();
+    // Unknown item id → 422; a valid request attaches an open case.
+    expect((await inject('POST', `/orders/${order.id}/refund`, { token: buyer, body: { reason: 'Arrived cracked', itemIds: ['nope'] } })).statusCode).toBe(422);
+    const req = json(await inject('POST', `/orders/${order.id}/refund`, { token: buyer, body: { reason: 'Arrived cracked', itemIds: [order.items[0].id] } })).data;
+    expect(req.refund).toMatchObject({ status: 'requested', reason: 'Arrived cracked', sellerResponse: null });
+    // Decline needs a reason and seller ownership; the order stays refund_requested so the buyer keeps options.
+    expect((await inject('POST', `/seller/orders/${order.id}/refund/decline`, { token: jules, body: { response: 'no' } })).statusCode).toBe(422);
+    expect((await inject('POST', `/seller/orders/${order.id}/refund/decline`, { token: seller, body: { response: 'Not my order' } })).statusCode).toBe(403);
+    const declined = json(await inject('POST', `/seller/orders/${order.id}/refund/decline`, { token: jules, body: { response: 'Packaging photos show it left intact' } })).data;
+    expect(declined).toMatchObject({ status: 'refund_requested', refund: { status: 'rejected', sellerResponse: 'Packaging photos show it left intact' } });
+    // Buyer withdraws → order resumes at `paid`, seller notified, case closed as withdrawn.
+    const wres = await inject('POST', `/orders/${order.id}/refund/withdraw`, { token: buyer });
+    expect(wres.statusCode, wres.body).toBe(201);
+    const resumed = json(wres).data;
+    expect(resumed).toMatchObject({ status: 'paid', escrow: { status: 'held' }, refund: { status: 'withdrawn' } });
+    expect((await inject('POST', `/orders/${order.id}/refund/withdraw`, { token: buyer })).statusCode).toBe(409);
+    // Re-request, then escalate: escrow frozen, admin queue lists it, non-admin can't see the queue.
+    await inject('POST', `/orders/${order.id}/refund`, { token: buyer, body: { reason: 'Still cracked', itemIds: [] } });
+    expect((await inject('POST', `/orders/${order.id}/dispute`, { token: buyer, body: { reason: 'short' } })).statusCode).toBe(422);
+    const disputed = json(await inject('POST', `/orders/${order.id}/dispute`, { token: buyer, body: { reason: 'Seller refuses to acknowledge the damage; photos attached in chat.' } })).data;
+    expect(disputed).toMatchObject({ status: 'disputed', escrow: { status: 'disputed' }, refund: { status: 'disputed' } });
+    expect((await inject('GET', '/admin/disputes', { token: jules })).statusCode).toBe(403);
+    const queue = json(await inject('GET', '/admin/disputes', { token: admin })).data;
+    expect(queue.items.some((o: { id: string }) => o.id === order.id)).toBe(true);
+    // Seller can no longer approve/decline a disputed order; admin refunds the buyer.
+    expect((await inject('POST', `/seller/orders/${order.id}/refund/decline`, { token: jules, body: { response: 'Too late' } })).statusCode).toBe(409);
+    const walletBefore = json(await inject('GET', '/wallet', { token: buyer })).data.balance.amount;
+    const resolved = json(await inject('POST', `/admin/orders/${order.id}/resolve`, { token: admin, body: { decision: 'refund', note: 'Damage confirmed from buyer photos' } })).data;
+    expect(resolved).toMatchObject({ status: 'refunded', escrow: { status: 'refunded' }, refund: { status: 'refunded', resolution: 'Damage confirmed from buyer photos' } });
+    expect(json(await inject('GET', '/wallet', { token: buyer })).data.balance.amount - walletBefore).toBe(order.total.amount);
+    expect((await inject('POST', `/admin/orders/${order.id}/resolve`, { token: admin, body: { decision: 'release', note: 'again' } })).statusCode).toBe(409);
+    expect(await prisma.refundRequest.count({ where: { orderId: order.id } })).toBe(2);
+  });
+
   it('buyer cancels a paid order; empty cart / bad address / non-wallet payment paths', async () => {
     await inject('POST', '/cart/items', { token: buyer, body: { productId: 'prod-007', quantity: 1 } });
     const [order] = json(await inject('POST', '/checkout', { token: buyer, body: { addressId: 'addr_buyer_home', paymentMethod: 'wallet' } })).data;

@@ -66,6 +66,10 @@ import {
   TransactionSchema,
   UpdateProfileRequestSchema,
   NotificationPreferencesSchema,
+  RefundRequestBodySchema,
+  DeclineRefundRequestSchema,
+  DisputeRequestSchema,
+  ResolveDisputeRequestSchema,
   KycStateSchema,
   KycSubmissionSchema,
   SubmitKycRequestSchema,
@@ -106,6 +110,9 @@ import {
   type SignupRequest,
   type UpdateProfileRequest,
   type UpdateNotificationPreferencesRequest,
+  type DeclineRefundRequest,
+  type DisputeRequest,
+  type ResolveDisputeRequest,
   type SubmitKycRequest,
   type ReviewKycRequest,
   type VerifyOtpRequest,
@@ -220,8 +227,17 @@ export function createEndpoints(api: ApiClient) {
       get: (id: string) => api.get(`/orders/${enc(id)}`, OrderSchema),
       timeline: (id: string) => api.get(`/orders/${enc(id)}/timeline`, z.array(OrderEventSchema)),
       confirmDelivery: (id: string) => api.post(`/orders/${enc(id)}/confirm-delivery`, {}, OrderSchema),
-      requestRefund: (id: string, reason: string, itemIds: string[]) => api.post(`/orders/${enc(id)}/refund`, { reason, itemIds }, OrderSchema),
+      requestRefund: (id: string, reason: string, itemIds: string[]) => api.post(`/orders/${enc(id)}/refund`, RefundRequestBodySchema.parse({ reason, itemIds }), OrderSchema),
+      /** Buyer drops an open refund case; the order resumes its pre-refund status. */
+      withdrawRefund: (id: string) => api.post(`/orders/${enc(id)}/refund/withdraw`, {}, OrderSchema),
+      /** Buyer escalates an open refund case to Ezyify; escrow is frozen until an admin resolves it. */
+      dispute: (id: string, body: DisputeRequest) => api.post(`/orders/${enc(id)}/dispute`, DisputeRequestSchema.parse(body), OrderSchema),
       cancel: (id: string) => api.post(`/orders/${enc(id)}/cancel`, {}, OrderSchema),
+    },
+    disputes: {
+      /** Admin: orders currently in dispute, oldest first. */
+      list: (query: PageQuery = {}) => api.get('/admin/disputes', paginated(OrderSchema), { query }),
+      resolve: (id: string, body: ResolveDisputeRequest) => api.post(`/admin/orders/${enc(id)}/resolve`, ResolveDisputeRequestSchema.parse(body), OrderSchema),
     },
     sellerOrders: {
       /** Orders where the caller is the seller (`GET /orders?role=seller`). */
@@ -231,6 +247,7 @@ export function createEndpoints(api: ApiClient) {
       ship: (id: string, body: ShipOrderRequest) => api.post(`/seller/orders/${enc(id)}/ship`, ShipOrderRequestSchema.parse(body), OrderSchema),
       deliver: (id: string) => api.post(`/seller/orders/${enc(id)}/deliver`, {}, OrderSchema),
       approveRefund: (id: string) => api.post(`/seller/orders/${enc(id)}/refund`, {}, OrderSchema),
+      declineRefund: (id: string, body: DeclineRefundRequest) => api.post(`/seller/orders/${enc(id)}/refund/decline`, DeclineRefundRequestSchema.parse(body), OrderSchema),
       cancel: (id: string) => api.post(`/seller/orders/${enc(id)}/cancel`, {}, OrderSchema),
     },
     addresses: {

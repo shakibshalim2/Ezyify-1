@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { z } from 'zod';
-import { ShipOrderRequestSchema, type CheckoutRequest, type SellerOrdersSummary } from '@ezyify/core';
+import { DeclineRefundRequestSchema, DisputeRequestSchema, RefundRequestBodySchema, ResolveDisputeRequestSchema, ShipOrderRequestSchema, type CheckoutRequest, type SellerOrdersSummary } from '@ezyify/core';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
 import { ENV, type Env } from '../../config.js';
 import { ApiException, forbidden, notFound, validation } from '../../common/errors.js';
@@ -15,7 +15,10 @@ import { actorMay, canTransition, ESCROW_FOR_STATUS, type Actor } from './escrow
 import { orderInclude, toOrder } from './orders.mapper.js';
 
 export const OrderQuerySchema = PageQuerySchema.extend({ status: z.string().optional(), role: z.enum(['buyer', 'seller']).default('buyer') });
-export const RefundSchema = z.object({ reason: z.string().min(3).max(500), itemIds: z.array(z.string()).default([]) });
+export const RefundSchema = RefundRequestBodySchema;
+export const DeclineSchema = DeclineRefundRequestSchema;
+export const DisputeSchema = DisputeRequestSchema;
+export const ResolveSchema = ResolveDisputeRequestSchema;
 export const ShipSchema = ShipOrderRequestSchema;
 
 const orderNumber = () => `EZ-${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 900 + 100)}`;
@@ -145,11 +148,93 @@ export class OrdersService {
   }
 
   async requestRefund(userId: string, id: string, body: z.infer<typeof RefundSchema>) {
-    const order = await this.prisma.order.findUnique({ where: { id } });
+    const order = await this.prisma.order.findUnique({ where: { id }, include: { items: { select: { id: true } } } });
     if (!order) throw notFound('Order');
     if (order.buyerId !== userId) throw forbidden();
+    if (!canTransition(order.status, 'refund_requested')) throw new ApiException('CONFLICT', `Cannot request a refund on an order that is ${order.status.replace(/_/g, ' ')}`);
+    const known = new Set(order.items.map(i => i.id));
+    if (body.itemIds.some(i => !known.has(i))) throw validation({ itemIds: 'One of the items is not on this order' });
     await this.prisma.refundRequest.create({ data: { orderId: id, reason: body.reason, itemIds: body.itemIds } });
     return this.transition(id, 'refund_requested', 'buyer', userId, body.reason);
+  }
+
+  /** Latest refund case, or 409 if the order has none open. */
+  private async openCase(id: string, statuses: string[]) {
+    const c = await this.prisma.refundRequest.findFirst({ where: { orderId: id }, orderBy: { createdAt: 'desc' } });
+    if (!c || !statuses.includes(c.status)) throw new ApiException('CONFLICT', 'There is no open refund case on this order');
+    return c;
+  }
+
+  /** Where the order goes back to when a refund case is dropped: the last non-refund status on its timeline. */
+  private async statusBeforeRefund(id: string): Promise<OrderStatus> {
+    const events = await this.prisma.orderEvent.findMany({ where: { orderId: id }, orderBy: [{ at: 'desc' }, { id: 'desc' }] });
+    const FULFILMENT: OrderStatus[] = ['paid', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'completed'];
+    // Highest fulfilment stage reached wins, so same-millisecond checkout events (pending_payment → paid) can't win.
+    const reached = events.map(e => e.status).filter((st): st is OrderStatus => FULFILMENT.includes(st as OrderStatus));
+    return reached.sort((a, b) => FULFILMENT.indexOf(b) - FULFILMENT.indexOf(a))[0] ?? 'paid';
+  }
+
+  /** Seller declines: the case is marked rejected but the order stays `refund_requested` so the buyer can withdraw or escalate. */
+  async declineRefund(sellerId: string, id: string, body: z.infer<typeof DeclineSchema>) {
+    const order = await this.prisma.order.findUnique({ where: { id }, include: orderInclude });
+    if (!order) throw notFound('Order');
+    if (order.sellerId !== sellerId) throw forbidden();
+    if (order.status !== 'refund_requested') throw new ApiException('CONFLICT', `Cannot decline a refund on an order that is ${order.status.replace(/_/g, ' ')}`);
+    const c = await this.openCase(id, ['requested']);
+    await this.prisma.$transaction([
+      this.prisma.refundRequest.update({ where: { id: c.id }, data: { status: 'rejected', sellerResponse: body.response } }),
+      this.prisma.orderEvent.create({ data: { orderId: id, status: 'refund_requested', note: `Seller declined: ${body.response}` } }),
+      this.prisma.notification.create({ data: { recipientId: order.buyerId, actorId: sellerId, type: 'order', message: `${order.orderNumber} · refund declined by the seller — you can escalate to Ezyify`, href: `/orders/${id}/refund` } }),
+    ]);
+    return this.get(sellerId, id, 'seller');
+  }
+
+  async withdrawRefund(buyerId: string, id: string) {
+    const order = await this.prisma.order.findUnique({ where: { id } });
+    if (!order) throw notFound('Order');
+    if (order.buyerId !== buyerId) throw forbidden();
+    if (order.status !== 'refund_requested') throw new ApiException('CONFLICT', 'Only an open refund request can be withdrawn');
+    const c = await this.openCase(id, ['requested', 'rejected']);
+    await this.prisma.refundRequest.update({ where: { id: c.id }, data: { status: 'withdrawn', resolvedAt: new Date() } });
+    // `admin` actor because buyers can't normally re-enter fulfilment states; ownership was checked above.
+    const result = await this.transition(id, await this.statusBeforeRefund(id), 'admin', buyerId, 'Refund request withdrawn by buyer');
+    await this.prisma.notification.create({ data: { recipientId: order.sellerId, actorId: buyerId, type: 'order', message: `${order.orderNumber} · buyer withdrew the refund request`, href: `/seller/order-detail/${id}` } });
+    return result;
+  }
+
+  async dispute(buyerId: string, id: string, body: z.infer<typeof DisputeSchema>) {
+    const order = await this.prisma.order.findUnique({ where: { id } });
+    if (!order) throw notFound('Order');
+    if (order.buyerId !== buyerId) throw forbidden();
+    if (order.status === 'refund_requested') {
+      const c = await this.openCase(id, ['requested', 'rejected']);
+      await this.prisma.refundRequest.update({ where: { id: c.id }, data: { status: 'disputed', disputeReason: body.reason } });
+    } else if (order.status === 'delivered') {
+      await this.prisma.refundRequest.create({ data: { orderId: id, reason: body.reason, itemIds: [], status: 'disputed', disputeReason: body.reason } });
+    }
+    return this.transition(id, 'disputed', 'buyer', buyerId, `Escalated to Ezyify: ${body.reason}`);
+  }
+
+  async listDisputes(q: z.infer<typeof PageQuerySchema>) {
+    const where = { status: 'disputed' as OrderStatus };
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.order.findMany({ where, include: orderInclude, orderBy: { placedAt: 'asc' }, ...skipTake(q) }),
+      this.prisma.order.count({ where }),
+    ]);
+    return page(rows.map(toOrder), total, q);
+  }
+
+  /** Admin verdict: `refund` returns escrow to the buyer, `release` completes the order and pays the seller. */
+  async resolveDispute(adminId: string, id: string, body: z.infer<typeof ResolveSchema>) {
+    const order = await this.prisma.order.findUnique({ where: { id } });
+    if (!order) throw notFound('Order');
+    if (order.status !== 'disputed') throw new ApiException('CONFLICT', 'This order is not in dispute');
+    const c = await this.openCase(id, ['disputed']);
+    const to: OrderStatus = body.decision === 'refund' ? 'refunded' : 'completed';
+    await this.prisma.refundRequest.update({ where: { id: c.id }, data: { status: body.decision === 'refund' ? 'refunded' : 'rejected', resolution: body.note, resolvedAt: new Date() } });
+    const result = await this.transition(id, to, 'admin', adminId, `Ezyify decision: ${body.note}`);
+    await this.prisma.notification.create({ data: { recipientId: body.decision === 'refund' ? order.sellerId : order.buyerId, type: 'order', message: `${order.orderNumber} · dispute resolved: ${body.decision === 'refund' ? 'refunded to buyer' : 'released to seller'}`, href: `/orders/${id}` } });
+    return result;
   }
 
   async ship(sellerId: string, id: string, body: z.infer<typeof ShipSchema>) {
@@ -175,7 +260,9 @@ export class OrdersService {
     const escrow = ESCROW_FOR_STATUS[to] ?? order.escrowStatus;
     const now = new Date();
     const updated = await this.prisma.$transaction(async tx => {
-      if (to === 'completed' && order.escrowStatus === 'held') {
+      // Funds settle from `held` or from a frozen `disputed` escrow once an admin decides.
+      const settleable = order.escrowStatus === 'held' || order.escrowStatus === 'disputed';
+      if (to === 'completed' && settleable) {
         const fee = bps(order.total, this.env.PLATFORM_FEE_BPS);
         await tx.escrowLedger.createMany({
           data: [
@@ -185,7 +272,8 @@ export class OrdersService {
         });
         await this.wallet.credit(order.sellerId, order.total - fee, order.currency, 'commission', `Payout · ${order.orderNumber}`, `${id}:release`, tx);
       }
-      if ((to === 'refunded' || to === 'cancelled') && order.escrowStatus === 'held' && order.paidAt) {
+      if (to === 'refunded') await tx.refundRequest.updateMany({ where: { orderId: id, status: { in: ['requested', 'rejected', 'disputed'] } }, data: { status: 'refunded', resolvedAt: now } });
+      if ((to === 'refunded' || to === 'cancelled') && settleable && order.paidAt) {
         await tx.escrowLedger.create({ data: { orderId: id, kind: 'refund', amount: order.total, currency: order.currency, note: 'Refunded to buyer' } });
         await this.wallet.credit(order.buyerId, order.total, order.currency, 'refund', `Refund · ${order.orderNumber}`, `${id}:refund`, tx);
         for (const i of order.items) await tx.product.update({ where: { id: i.productId }, data: { stock: { increment: i.quantity }, soldCount: { decrement: i.quantity } } });

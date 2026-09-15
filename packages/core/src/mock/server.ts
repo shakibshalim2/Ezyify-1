@@ -1,5 +1,5 @@
 import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, PayoutMethod, Post, ProductDetail, Review, SellerCustomer, SellerProduct, SellerProductDetail, SellerReview, UserProfile } from '../schemas/index.js';
-import { ReviewKycRequestSchema, SubmitKycRequestSchema, UpdateNotificationPreferencesRequestSchema, UpdateProfileRequestSchema, UpsertProductRequestSchema, UpdateProductRequestSchema, resolveNotificationPreferences, type KycSubmission, type NotificationPreferences } from '../schemas/index.js';
+import { DeclineRefundRequestSchema, DisputeRequestSchema, RefundRequestBodySchema, ResolveDisputeRequestSchema, ReviewKycRequestSchema, SubmitKycRequestSchema, UpdateNotificationPreferencesRequestSchema, UpdateProfileRequestSchema, UpsertProductRequestSchema, UpdateProductRequestSchema, resolveNotificationPreferences, type KycSubmission, type NotificationPreferences } from '../schemas/index.js';
 import { sellerProductStatus } from '../schemas/index.js';
 import * as fx from './fixtures.js';
 
@@ -161,6 +161,21 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       .filter(p => !viewer || !set(state.blocks, viewer.id).has(p.author.id))
       .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
       .map(p => viewerPost(p, viewer));
+  /** Status an order had before its current refund request, so a withdrawal can resume fulfilment. */
+  const orderHistory = new Map<string, Order['status']>();
+  const notify = (userId: string, n: Omit<Notification, 'id' | 'read' | 'createdAt'>) => {
+    const inbox = state.notifications.get(userId) ?? [];
+    inbox.unshift({ id: nextId('n'), read: false, createdAt: iso(), ...n });
+    state.notifications.set(userId, inbox);
+  };
+  const creditWallet = (userId: string, amount: number, description: string) => {
+    const w = state.wallets.get(userId) ?? { balance: 0, pending: 0 };
+    w.balance += amount;
+    state.wallets.set(userId, w);
+    const tx = state.transactions.get(userId) ?? [];
+    tx.unshift({ id: nextId('t'), type: 'refund', direction: 'in', amount: money(amount), status: 'completed', description, createdAt: iso() });
+    state.transactions.set(userId, tx);
+  };
   const paginate = <T>(items: T[], q: URLSearchParams) => {
     const page = Math.max(1, Number(q.get('page') ?? 1));
     const pageSize = Math.min(100, Math.max(1, Number(q.get('pageSize') ?? 20)));
@@ -1010,6 +1025,7 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
           shipping: money(shipping),
           total: money(subtotal + shipping - discount),
           tracking: null,
+          refund: null,
           placedAt: iso(),
           deliveredAt: null,
         };
@@ -1064,7 +1080,7 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
           break;
         }
         case 'deliver': step(['shipped', 'out_for_delivery', 'refund_requested'], 'delivered'); o.deliveredAt = iso(); break;
-        case 'refund': step(['refund_requested', 'disputed'], 'refunded'); o.escrow = { status: 'refunded', autoReleaseAt: null }; break;
+        case 'refund': step(['refund_requested'], 'refunded'); o.escrow = { status: 'refunded', autoReleaseAt: null }; if (o.refund) o.refund = { ...o.refund, status: 'refunded', resolvedAt: iso() }; creditWallet(o.buyer.id, o.total.amount, `Refund · ${o.orderNumber}`); break;
         case 'cancel': step(['pending_payment', 'paid', 'processing'], 'cancelled'); o.escrow = { status: 'refunded', autoReleaseAt: null }; break;
         default: throw notFound('Action');
       }
@@ -1104,12 +1120,79 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       return o;
     }],
     ['POST', '/orders/:id/refund', c => {
-      requireUser(c);
+      const u = requireUser(c);
       const o = state.orders.find(x => x.id === c.params.id);
       if (!o) throw notFound('Order');
-      if (o.escrow.status !== 'held') throw new MockApiError(409, 'CONFLICT', 'Escrow already settled');
+      if (o.buyer.id !== u.id) throw forbidden();
+      if (o.escrow.status !== 'held' || ['pending_payment', 'refund_requested', 'disputed', 'cancelled', 'refunded'].includes(o.status)) throw new MockApiError(409, 'CONFLICT', `Cannot request a refund on an order that is ${o.status.replace(/_/g, ' ')}`);
+      const parsed = RefundRequestBodySchema.safeParse(c.body);
+      if (!parsed.success) throw validation(Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.') || '_', i.message])));
+      if (parsed.data.itemIds.some(id => !o.items.some(i => i.id === id))) throw validation({ itemIds: 'One of the items is not on this order' });
+      orderHistory.set(o.id, o.status);
       o.status = 'refund_requested';
+      o.refund = { id: nextId('rf'), status: 'requested', reason: parsed.data.reason, itemIds: parsed.data.itemIds, sellerResponse: null, disputeReason: null, resolution: null, requestedAt: iso(), resolvedAt: null };
+      notify(o.seller.id, { type: 'order', actor: fx.summary(u), message: `${o.orderNumber} · refund requested`, href: `/seller/order-detail/${o.id}`, thumbnailUrl: o.items[0].imageUrl });
+      return o;
+    }],
+    ['POST', '/orders/:id/refund/withdraw', c => {
+      const u = requireUser(c);
+      const o = state.orders.find(x => x.id === c.params.id);
+      if (!o) throw notFound('Order');
+      if (o.buyer.id !== u.id) throw forbidden();
+      if (o.status !== 'refund_requested' || !o.refund) throw new MockApiError(409, 'CONFLICT', 'Only an open refund request can be withdrawn');
+      o.refund = { ...o.refund, status: 'withdrawn', resolvedAt: iso() };
+      o.status = orderHistory.get(o.id) ?? 'delivered';
+      notify(o.seller.id, { type: 'order', actor: fx.summary(u), message: `${o.orderNumber} · buyer withdrew the refund request`, href: `/seller/order-detail/${o.id}`, thumbnailUrl: o.items[0].imageUrl });
+      return o;
+    }],
+    ['POST', '/orders/:id/dispute', c => {
+      const u = requireUser(c);
+      const o = state.orders.find(x => x.id === c.params.id);
+      if (!o) throw notFound('Order');
+      if (o.buyer.id !== u.id) throw forbidden();
+      const parsed = DisputeRequestSchema.safeParse(c.body);
+      if (!parsed.success) throw validation(Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.') || '_', i.message])));
+      if (o.status !== 'refund_requested' && o.status !== 'delivered') throw new MockApiError(409, 'CONFLICT', `Cannot go from ${o.status} to disputed`);
+      o.refund = o.refund && o.status === 'refund_requested'
+        ? { ...o.refund, status: 'disputed', disputeReason: parsed.data.reason }
+        : { id: nextId('rf'), status: 'disputed', reason: parsed.data.reason, itemIds: [], sellerResponse: null, disputeReason: parsed.data.reason, resolution: null, requestedAt: iso(), resolvedAt: null };
+      o.status = 'disputed';
       o.escrow = { status: 'disputed', autoReleaseAt: null };
+      notify(o.seller.id, { type: 'order', actor: fx.summary(u), message: `${o.orderNumber} · escalated to Ezyify`, href: `/seller/order-detail/${o.id}`, thumbnailUrl: o.items[0].imageUrl });
+      return o;
+    }],
+    ['POST', '/seller/orders/:id/refund/decline', c => {
+      const u = requireUser(c);
+      if (u.role !== 'seller') throw forbidden('Seller account required');
+      const o = state.orders.find(x => x.id === c.params.id);
+      if (!o) throw notFound('Order');
+      if (o.seller.id !== u.id) throw forbidden();
+      const parsed = DeclineRefundRequestSchema.safeParse(c.body);
+      if (!parsed.success) throw validation(Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.') || '_', i.message])));
+      if (o.status !== 'refund_requested' || !o.refund || o.refund.status !== 'requested') throw new MockApiError(409, 'CONFLICT', 'There is no open refund case on this order');
+      o.refund = { ...o.refund, status: 'rejected', sellerResponse: parsed.data.response };
+      notify(o.buyer.id, { type: 'order', actor: fx.summary(u), message: `${o.orderNumber} · refund declined by the seller — you can escalate to Ezyify`, href: `/orders/${o.id}/refund`, thumbnailUrl: o.items[0].imageUrl });
+      return o;
+    }],
+    ['GET', '/admin/disputes', c => {
+      if (requireUser(c).role !== 'admin') throw forbidden();
+      return paginate(state.orders.filter(o => o.status === 'disputed'), c.query);
+    }],
+    ['POST', '/admin/orders/:id/resolve', c => {
+      const u = requireUser(c);
+      if (u.role !== 'admin') throw forbidden();
+      const o = state.orders.find(x => x.id === c.params.id);
+      if (!o) throw notFound('Order');
+      if (o.status !== 'disputed' || !o.refund) throw new MockApiError(409, 'CONFLICT', 'This order is not in dispute');
+      const parsed = ResolveDisputeRequestSchema.safeParse(c.body);
+      if (!parsed.success) throw validation(Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.') || '_', i.message])));
+      const refund = parsed.data.decision === 'refund';
+      o.refund = { ...o.refund, status: refund ? 'refunded' : 'rejected', resolution: parsed.data.note, resolvedAt: iso() };
+      o.status = refund ? 'refunded' : 'completed';
+      o.escrow = { status: refund ? 'refunded' : 'released', autoReleaseAt: null };
+      if (refund) creditWallet(o.buyer.id, o.total.amount, `Refund · ${o.orderNumber}`);
+      notify(o.buyer.id, { type: 'order', actor: null, message: `${o.orderNumber} · dispute resolved: ${refund ? 'refunded to your wallet' : 'released to the seller'}`, href: `/orders/${o.id}`, thumbnailUrl: o.items[0].imageUrl });
+      notify(o.seller.id, { type: 'order', actor: null, message: `${o.orderNumber} · dispute resolved: ${refund ? 'refunded to buyer' : 'released to you'}`, href: `/seller/order-detail/${o.id}`, thumbnailUrl: o.items[0].imageUrl });
       return o;
     }],
     ['POST', '/orders/:id/cancel', c => {

@@ -113,6 +113,32 @@ describe('mock API server', () => {
     expect(await api.notifications.preferences()).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
   });
 
+  it('refund case: request → seller declines → buyer withdraws (resumes) → re-request → dispute → admin refunds wallet', async () => {
+    const { api, login } = harness();
+    await login();
+    const before = (await api.orders.get('o1')).status;
+    let o = await api.orders.requestRefund('o1', 'Arrived damaged', []);
+    expect(o).toMatchObject({ status: 'refund_requested', refund: { status: 'requested', reason: 'Arrived damaged' } });
+    await expect(api.orders.requestRefund('o1', 'again', [])).rejects.toMatchObject({ code: 'CONFLICT' });
+    await login('fashion@ezyify.test');
+    o = await api.sellerOrders.declineRefund('o1', { response: 'Left our warehouse intact' });
+    expect(o.refund).toMatchObject({ status: 'rejected', sellerResponse: 'Left our warehouse intact' });
+    await login();
+    o = await api.orders.withdrawRefund('o1');
+    expect(o.status).toBe(before);
+    expect(o.refund?.status).toBe('withdrawn');
+    o = await api.orders.requestRefund('o1', 'Still damaged', []);
+    o = await api.orders.dispute('o1', { reason: 'Seller will not accept the photos I sent.' });
+    expect(o).toMatchObject({ status: 'disputed', escrow: { status: 'disputed' }, refund: { status: 'disputed' } });
+    const wallet = (await api.wallet.get()).balance.amount;
+    await login('admin@ezyify.test');
+    expect((await api.disputes.list()).items.some(x => x.id === 'o1')).toBe(true);
+    o = await api.disputes.resolve('o1', { decision: 'refund', note: 'Damage confirmed' });
+    expect(o).toMatchObject({ status: 'refunded', refund: { status: 'refunded', resolution: 'Damage confirmed' } });
+    await login();
+    expect((await api.wallet.get()).balance.amount - wallet).toBe(o.total.amount);
+  });
+
   it('kyc: submit is redacted and single-flight, admin reject → resubmit → approve verifies the user', async () => {
     const { api, login } = harness();
     await login('sara@ezyify.test');
