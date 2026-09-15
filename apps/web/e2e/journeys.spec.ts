@@ -102,20 +102,14 @@ test('guest: cart is local and checkout asks to sign in', async ({ page }) => {
 });
 
 test.describe('accessibility (axe-core, WCAG 2.2 A/AA)', () => {
+  // The app honours prefers-reduced-motion, so entrance fades (which axe samples mid-transition as
+  // false colour-contrast hits) are skipped entirely under this emulation.
+  test.use({ contextOptions: { reducedMotion: 'reduce' } });
   for (const path of ['/', '/shop', '/login', '/cart']) {
     test(`${path} has no serious/critical violations`, async ({ page }) => {
       await page.goto(path);
       await page.waitForLoadState('networkidle');
-      // Entrance animations fade text in; sampling mid-fade yields false colour-contrast hits.
-      // Only await finite animations — the decorative floats loop forever.
-      await page.evaluate(() =>
-        Promise.all(
-          document
-            .getAnimations()
-            .filter(a => Number.isFinite(Number(a.effect?.getComputedTiming().endTime ?? Infinity)))
-            .map(a => a.finished.catch(() => undefined)),
-        ),
-      );
+      await page.waitForFunction(() => !document.querySelector('[aria-busy="true"], [aria-busy=""]'), null, { timeout: 15_000 }).catch(() => undefined);
       const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).exclude('[data-motion]').analyze();
       const serious = results.violations.filter(v => v.impact === 'serious' || v.impact === 'critical');
       expect(serious.map(v => `${v.id}: ${v.nodes.length}× ${v.help}`)).toEqual([]);
