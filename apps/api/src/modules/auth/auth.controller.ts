@@ -6,14 +6,21 @@ import { z } from 'zod';
 import {
   ForgotPasswordRequestSchema,
   LoginRequestSchema,
+  MfaDisableRequestSchema,
+  MfaEnableRequestSchema,
+  MfaVerifyRequestSchema,
   ResetPasswordRequestSchema,
   SignupRequestSchema,
   VerifyOtpRequestSchema,
   type LoginRequest,
+  type MfaDisableRequest,
+  type MfaEnableRequest,
+  type MfaVerifyRequest,
   type SignupRequest,
   type VerifyOtpRequest,
 } from '@ezyify/core';
-import { AuthService, type SessionResult } from './auth.service.js';
+import { AuthService, type MfaChallengeResult, type SessionResult } from './auth.service.js';
+import { MfaService } from './mfa.service.js';
 import { Public } from './auth.guard.js';
 import { CurrentUser } from './current-user.decorator.js';
 import type { AccessClaims } from './auth.guard.js';
@@ -32,7 +39,7 @@ const RefreshBody = z.object({ refreshToken: z.string().min(1).optional() });
 @Controller('auth')
 @Public()
 export class AuthController {
-  constructor(private readonly auth: AuthService, @Inject(ENV) private readonly env: Env) {}
+  constructor(private readonly auth: AuthService, private readonly mfa: MfaService, @Inject(ENV) private readonly env: Env) {}
 
   @Post('signup')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
@@ -49,8 +56,52 @@ export class AuthController {
 
   @Post('login')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Password login; 201 session, or 200 `{ mfaRequired, challengeToken }` when the account has MFA' })
   async login(@Body(zod(LoginRequestSchema)) body: LoginRequest, @Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
-    return this.emit(await this.auth.login(body, meta(req)), req, reply);
+    const result = await this.auth.login(body, meta(req));
+    if (!isChallenge(result)) return this.emit(result, req, reply);
+    reply.status(200); // nothing was created yet
+    return result;
+  }
+
+  // ---- MFA (TOTP) — ASVS 2.8
+
+  @Post('mfa/verify')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Second login step: TOTP or recovery code against a login challenge' })
+  async mfaVerify(@Body(zod(MfaVerifyRequestSchema)) body: MfaVerifyRequest, @Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
+    return this.emit(await this.auth.verifyMfa(body.challengeToken, body.code, meta(req)), req, reply);
+  }
+
+  @Get('mfa')
+  @Public(false)
+  mfaStatus(@CurrentUser() user: AccessClaims) {
+    return this.mfa.status(user.sub);
+  }
+
+  @Post('mfa/setup')
+  @Public(false)
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  mfaSetup(@CurrentUser() user: AccessClaims) {
+    return this.mfa.setup(user.sub);
+  }
+
+  @Post('mfa/enable')
+  @Public(false)
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  mfaEnable(@CurrentUser() user: AccessClaims, @Body(zod(MfaEnableRequestSchema)) body: MfaEnableRequest, @Req() req: FastifyRequest) {
+    return this.mfa.enable(user.sub, body.code, meta(req));
+  }
+
+  @Post('mfa/disable')
+  @Public(false)
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  mfaDisable(@CurrentUser() user: AccessClaims, @Body(zod(MfaDisableRequestSchema)) body: MfaDisableRequest, @Req() req: FastifyRequest) {
+    return this.mfa.disable(user.sub, body.code, meta(req));
   }
 
   @Post('refresh')
@@ -138,4 +189,5 @@ export class AuthController {
 }
 
 const isNative = (req: FastifyRequest) => req.headers['x-client'] === 'native';
+const isChallenge = (r: SessionResult | MfaChallengeResult): r is MfaChallengeResult => 'mfaRequired' in r;
 const meta = (req: FastifyRequest) => ({ userAgent: req.headers['user-agent'], ip: req.ip });

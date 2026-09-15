@@ -344,7 +344,7 @@ export default function CreatorProgramPage() {
               </Button>
             </div>
             <p className="text-sm mt-6 opacity-80">
-              Questions? Email <a href="mailto:creators@ezyify.com" className="underline font-medium">creators@ezyify.com</a>
+              Questions? Email <a href="mailto:creators@ezyify.app" className="underline font-medium">creators@ezyify.app</a>
             </p>
           </div>
         </>

@@ -9,9 +9,13 @@ export type AuditEvent =
   | 'auth.refresh_reuse'
   | 'auth.password_reset'
   | 'auth.session_revoked'
+  | 'auth.mfa_enabled'
+  | 'auth.mfa_disabled'
+  | 'auth.mfa_failed'
   | 'account.deleted'
   | 'account.exported'
   | 'admin.report_reviewed'
+  | 'moderation.child_safety_report'
   | 'payment.webhook'
   | 'payment.webhook_rejected';
 

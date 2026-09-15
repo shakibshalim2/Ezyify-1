@@ -108,8 +108,8 @@ export default function CopyrightPage() {
               <Mail className="w-5 h-5" />
               <AlertDescription>
                 <strong className="text-foreground">Send DMCA notices to:</strong><br />
-                <a href="mailto:copyright@ezyify.com" className="text-info hover:underline">
-                  copyright@ezyify.com
+                <a href="mailto:copyright@ezyify.app" className="text-info hover:underline">
+                  copyright@ezyify.app
                 </a><br />
                 <span className="text-sm text-muted-foreground">
                   Or mail to: Ezyify Legal Department, Copyright Agent, [Address]
@@ -149,7 +149,7 @@ export default function CopyrightPage() {
             </div>
 
             <p className="text-sm text-muted-foreground">
-              Send counter-notices to the same email: <a href="mailto:copyright@ezyify.com" className="text-info hover:underline">copyright@ezyify.com</a>
+              Send counter-notices to the same email: <a href="mailto:copyright@ezyify.app" className="text-info hover:underline">copyright@ezyify.app</a>
             </p>
           </CardContent>
         </Card>
@@ -185,8 +185,8 @@ export default function CopyrightPage() {
           </Button>
           <p className="text-sm text-muted-foreground mt-4">
             Questions about copyright? Email us at{' '}
-            <a href="mailto:copyright@ezyify.com" className="text-primary hover:underline">
-              copyright@ezyify.com
+            <a href="mailto:copyright@ezyify.app" className="text-primary hover:underline">
+              copyright@ezyify.app
             </a>
           </p>
         </div>

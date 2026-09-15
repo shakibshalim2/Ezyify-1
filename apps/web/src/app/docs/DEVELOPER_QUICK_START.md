@@ -616,7 +616,7 @@ Now that you've completed the quick start:
 ## 💬 Questions?
 
 - **Slack:** #escrow-system-dev
-- **Email:** engineering@ezyify.com
+- **Email:** engineering@ezyify.app
 - **Code Reviews:** Submit PR and tag @tech-lead
 
 ---

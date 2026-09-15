@@ -4,3 +4,4 @@ export * from './auth.js';
 export * from './catalog.js';
 export * from './commerce.js';
 export * from './social.js';
+export * from './live.js';

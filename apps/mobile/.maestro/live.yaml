@@ -1,0 +1,18 @@
+# Maestro flow: discover a live stream, enter the viewer, and shop a pinned product.
+appId: com.ezyify.app
+---
+- launchApp
+- tapOn:
+    id: "tab-explore"
+- tapOn: "Live"
+- extendedWaitUntil:
+    visible:
+      id: "live-card-live-001"
+    timeout: 15000
+- tapOn:
+    id: "live-card-live-001"
+- assertVisible:
+    id: "live-like"
+- tapOn:
+    id: "live-products"
+- assertVisible: "Buy"

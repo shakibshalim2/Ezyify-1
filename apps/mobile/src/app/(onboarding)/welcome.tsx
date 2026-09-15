@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Dimensions, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp, FadeOut } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -11,11 +10,12 @@ import { Button } from '@/components/Button';
 import { BrandMark, BrandWordmark } from '@/components/BrandMark';
 import { useAppStore } from '@/store/app';
 import { useTheme } from '@/theme';
+import { DiscoverScene, ShopSafeScene, GoLiveScene } from '@/components/onboarding/Scenes';
 
 const SLIDES = [
-  { id: 'discover', eyebrow: 'DISCOVER', title: 'Shopping that feels like scrolling', body: 'Loops, stories and live drops from creators you love — every product one tap away.', icon: 'play-circle' as const },
-  { id: 'protect', eyebrow: 'PROTECTED BY ESCROW', title: 'Pay with confidence, every time', body: 'Your money is held safely until your order arrives. Refunds and disputes handled in-app.', icon: 'shield-checkmark' as const },
-  { id: 'earn', eyebrow: 'CREATE & EARN', title: 'Go live. Sell. Get paid.', body: 'Start a store or share products you love and earn commissions from a single feed.', icon: 'videocam' as const },
+  { id: 'discover', eyebrow: 'DISCOVER', title: 'Shopping that feels like scrolling', body: 'Loops, stories and live drops from creators you love — every product one tap away.' },
+  { id: 'protect', eyebrow: 'PROTECTED BY ESCROW', title: 'Pay with confidence, every time', body: 'Your money is held safely until your order arrives. Refunds and disputes handled in-app.' },
+  { id: 'earn', eyebrow: 'CREATE & EARN', title: 'Go live. Sell. Get paid.', body: 'Start a store or share products you love and earn commissions from a single feed.' },
 ];
 const AUTO_MS = 6000;
 
@@ -72,8 +72,10 @@ export default function WelcomeScreen() {
       <GestureDetector gesture={swipe}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Animated.View key={slide.id + '-art'} entering={FadeInUp.duration(400)} exiting={FadeOut.duration(150)} style={{ alignItems: 'center', marginBottom: 24 }}>
-            <View style={{ width: width * 0.56, height: width * 0.56, borderRadius: radius.sheet, backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name={slide.icon} size={width * 0.24} color="#fff" />
+            <View style={{ width: width * 0.78, aspectRatio: 360 / 340, borderRadius: radius.sheet, backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {slide.id === 'discover' && <DiscoverScene size={width * 0.78} />}
+              {slide.id === 'protect' && <ShopSafeScene size={width * 0.78} />}
+              {slide.id === 'earn' && <GoLiveScene size={width * 0.78} />}
             </View>
           </Animated.View>
 

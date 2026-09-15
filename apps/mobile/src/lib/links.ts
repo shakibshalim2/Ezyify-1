@@ -21,6 +21,8 @@ export function pathFromUrl(url: string): string | null {
       case 'loops':
       case 'loop':
         return rest[0] ? `/loops?id=${rest[0]}` : '/loops';
+      case 'live':
+        return rest[0] ? `/live/${rest[0]}` : '/live';
       case 'profile':
       case 'u':
         return rest[0] ? `/profile/${rest[0]}` : '/(tabs)/profile';

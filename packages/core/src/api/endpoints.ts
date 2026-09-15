@@ -7,6 +7,7 @@ import {
   CheckoutRequestSchema,
   CommentSchema,
   ConversationSchema,
+  CreateLiveSessionRequestSchema,
   CreateAddressRequestSchema,
   CreatePostRequestSchema,
   DeleteAccountRequestSchema,
@@ -14,18 +15,45 @@ import {
   FinalizedUploadSchema,
   ForgotPasswordRequestSchema,
   LoginRequestSchema,
-  LoginResponseSchema,
+  LoginResultSchema,
+  LiveHeartbeatRequestSchema,
+  LiveHeartbeatSchema,
+  LiveSessionSchema,
+  LiveSessionsQuerySchema,
+  LiveTokenRequestSchema,
+  LiveTokenSchema,
   MessageSchema,
+  MfaDisableRequestSchema,
+  MfaEnableRequestSchema,
+  MfaEnableResponseSchema,
+  MfaSetupResponseSchema,
+  MfaStatusSchema,
+  MfaVerifyRequestSchema,
   NotificationSchema,
   OrderEventSchema,
   OrderSchema,
   PostSchema,
   ProductDetailSchema,
   ProductSummarySchema,
+  ProductReviewsResponseSchema,
+  ReviewSchema,
+  CreateReviewRequestSchema,
+  ReplyReviewRequestSchema,
+  SellerReviewsResponseSchema,
   RefreshResponseSchema,
   RegisterDeviceRequestSchema,
   ReportRequestSchema,
   ResetPasswordRequestSchema,
+  SearchResponseSchema,
+  SellerAnalyticsSchema,
+  SellerEarningsSchema,
+  PayoutMethodSchema,
+  CreatePayoutMethodRequestSchema,
+  SellerCustomersResponseSchema,
+  SellerDashboardSchema,
+  SellerOrdersSummarySchema,
+  SellerProductsResponseSchema,
+  ShipOrderRequestSchema,
   SendMessageRequestSchema,
   SignUploadRequestSchema,
   SignedUploadSchema,
@@ -43,9 +71,23 @@ import {
   type CreateAddressRequest,
   type CreatePostRequest,
   type DeleteAccountRequest,
+  type CreateLiveSessionRequest,
+  type LiveSessionsQuery,
+  type PinLiveSessionRequest,
+  type LiveTokenRequest,
   type LoginRequest,
+  type SellerProductStatus,
+  type SellerCustomerSort,
+  type SellerReviewFilter,
+  type CreateReviewRequest,
+  type CreatePayoutMethodRequest,
+  type ReplyReviewRequest,
+  type ShipOrderRequest,
+  type LoginResult,
+  type MfaVerifyRequest,
   type RegisterDeviceRequest,
   type ReportRequest,
+  type SearchType,
   type SendMessageRequest,
   type SignUploadRequest,
   type SignupRequest,
@@ -57,7 +99,8 @@ const Ok = z.object({ ok: z.literal(true) }).or(z.null());
 const Count = z.object({ count: z.number().int().min(0) });
 type PageQuery = { page?: number; pageSize?: number };
 export type FeedQuery = PageQuery & { kind?: 'post' | 'loop' | 'story'; author?: string; hashtag?: string };
-export type ProductQuery = PageQuery & { category?: string; q?: string; sort?: 'popular' | 'newest' | 'price_asc' | 'price_desc' | 'rating'; seller?: string };
+export type ProductQuery = PageQuery & { category?: string; q?: string; sort?: 'popular' | 'newest' | 'price_asc' | 'price_desc' | 'rating'; seller?: string; onSale?: boolean };
+export type SellerProductQuery = PageQuery & { q?: string; status?: SellerProductStatus };
 
 const enc = encodeURIComponent;
 
@@ -66,7 +109,8 @@ export function createEndpoints(api: ApiClient) {
   return {
     auth: {
       signup: (body: SignupRequest) => api.post('/auth/signup', SignupRequestSchema.parse(body), SignupResponseSchema, { auth: false }),
-      login: (body: LoginRequest) => api.post('/auth/login', LoginRequestSchema.parse(body), LoginResponseSchema, { auth: false }),
+      /** Resolves to a `Session`, or `{ mfaRequired: true, challengeToken }` — check `isMfaChallenge()` then call `auth.mfa.verify`. */
+      login: (body: LoginRequest): Promise<LoginResult> => api.post('/auth/login', LoginRequestSchema.parse(body), LoginResultSchema, { auth: false }) as Promise<LoginResult>,
       verifyOtp: (body: VerifyOtpRequest) => api.post('/auth/verify-otp', VerifyOtpRequestSchema.parse(body), VerifyOtpResponseSchema, { auth: false }),
       forgotPassword: (email: string) => api.post('/auth/forgot-password', ForgotPasswordRequestSchema.parse({ email }), Ok, { auth: false }),
       resetPassword: (token: string, password: string) => api.post('/auth/reset-password', ResetPasswordRequestSchema.parse({ token, password }), Ok, { auth: false }),
@@ -76,6 +120,14 @@ export function createEndpoints(api: ApiClient) {
       logoutAll: () => api.post('/auth/logout-all', {}, Ok),
       sessions: () => api.get('/auth/sessions', z.array(DeviceSessionSchema)),
       revokeSession: (id: string) => api.delete(`/auth/sessions/${enc(id)}`, Ok),
+      mfa: {
+        status: () => api.get('/auth/mfa', MfaStatusSchema),
+        setup: () => api.post('/auth/mfa/setup', {}, MfaSetupResponseSchema),
+        enable: (code: string) => api.post('/auth/mfa/enable', MfaEnableRequestSchema.parse({ code }), MfaEnableResponseSchema),
+        disable: (code: string) => api.post('/auth/mfa/disable', MfaDisableRequestSchema.parse({ code }), Ok),
+        /** Second login step; same session transport as `login` (cookie on web, body on native). */
+        verify: (body: MfaVerifyRequest) => api.post('/auth/mfa/verify', MfaVerifyRequestSchema.parse(body), VerifyOtpResponseSchema, { auth: false }),
+      },
     },
     users: {
       me: () => api.get('/users/me', UserProfileSchema),
@@ -90,7 +142,45 @@ export function createEndpoints(api: ApiClient) {
       products: (query: ProductQuery = {}) => api.get('/products', paginated(ProductSummarySchema), { query, auth: false }),
       product: (id: string) => api.get(`/products/${enc(id)}`, ProductDetailSchema, { auth: false }),
       categories: () => api.get('/categories', z.array(CategorySchema), { auth: false }),
+      reviews: (productId: string, query: PageQuery = {}) => api.get(`/products/${enc(productId)}/reviews`, ProductReviewsResponseSchema, { query, auth: false }),
+      /** One review per buyer per product; requires a completed order for "verified purchase" (server decides). */
+      review: (productId: string, body: CreateReviewRequest) => api.post(`/products/${enc(productId)}/reviews`, CreateReviewRequestSchema.parse(body), ReviewSchema),
       search: (q: string, query: PageQuery = {}) => api.get('/search', paginated(ProductSummarySchema), { query: { q, ...query }, auth: false }),
+    },
+    seller: {
+      /** Seller hub inventory: the caller's own products (incl. drafts) with stock, sales and revenue, plus status counts. */
+      products: (query: SellerProductQuery = {}) => api.get('/seller/products', SellerProductsResponseSchema, { query }),
+      /** Overview KPIs, 14‑day series and attention counts; `days` widens the comparison window (7–90). */
+      dashboard: (query: { days?: number } = {}) => api.get('/seller/dashboard', SellerDashboardSchema, { query }),
+      /** Top products, category mix, customers, fulfilment and payment mix for the window (7–90 days). */
+      analytics: (query: { days?: number } = {}) => api.get('/seller/analytics', SellerAnalyticsSchema, { query }),
+      /** Buyers aggregated from the seller's orders; `q` matches name/username, `sort` recent|spent|orders. */
+      customers: (query: PageQuery & { q?: string; sort?: SellerCustomerSort } = {}) => api.get('/seller/customers', SellerCustomersResponseSchema, { query }),
+      reviews: (query: PageQuery & { filter?: SellerReviewFilter; productId?: string } = {}) => api.get('/seller/reviews', SellerReviewsResponseSchema, { query }),
+      replyReview: (reviewId: string, body: ReplyReviewRequest) => api.post(`/seller/reviews/${enc(reviewId)}/reply`, ReplyReviewRequestSchema.parse(body), ReviewSchema),
+      earnings: () => api.get('/seller/earnings', SellerEarningsSchema),
+      payoutMethods: () => api.get('/seller/payout-methods', z.array(PayoutMethodSchema)),
+      addPayoutMethod: (body: CreatePayoutMethodRequest) => api.post('/seller/payout-methods', CreatePayoutMethodRequestSchema.parse(body), PayoutMethodSchema),
+      removePayoutMethod: (id: string) => api.delete(`/seller/payout-methods/${enc(id)}`, Ok),
+      setDefaultPayoutMethod: (id: string) => api.post(`/seller/payout-methods/${enc(id)}/default`, {}, PayoutMethodSchema),
+    },
+    search: {
+      /** Unified products + users + posts search (Meilisearch or Postgres fallback server-side). */
+      all: (q: string, query: { type?: SearchType; limit?: number; cursor?: string } = {}) =>
+        api.get('/search', SearchResponseSchema, { query: { q, ...query }, auth: false }),
+    },
+    live: {
+      /** LiveKit access token for a live-shopping room. 503 `details.code = LIVE_UNAVAILABLE` when the provider is not configured. */
+      token: (body: LiveTokenRequest) => api.post('/live/token', LiveTokenRequestSchema.parse(body), LiveTokenSchema),
+      /** 1:1 voice/video call token; the caller must be a member of the conversation. */
+      callToken: (conversationId: string) => api.post('/live/call-token', { conversationId }, LiveTokenSchema),
+      sessions: (query: LiveSessionsQuery = {}) => api.get('/live/sessions', paginated(LiveSessionSchema), { query: LiveSessionsQuerySchema.parse(query), auth: false }),
+      session: (id: string) => api.get(`/live/sessions/${enc(id)}`, LiveSessionSchema, { auth: false }),
+      create: (body: CreateLiveSessionRequest) => api.post('/live/sessions', CreateLiveSessionRequestSchema.parse(body), LiveSessionSchema),
+      start: (id: string) => api.post(`/live/sessions/${enc(id)}/start`, {}, LiveSessionSchema),
+      end: (id: string) => api.post(`/live/sessions/${enc(id)}/end`, {}, LiveSessionSchema),
+      pin: (id: string, body: PinLiveSessionRequest) => api.post(`/live/sessions/${enc(id)}/pin`, body, LiveSessionSchema),
+      heartbeat: (id: string, like = false) => api.post(`/live/sessions/${enc(id)}/heartbeat`, LiveHeartbeatRequestSchema.parse(like ? { like } : {}), LiveHeartbeatSchema),
     },
     cart: {
       get: () => api.get('/cart', CartSchema),
@@ -110,6 +200,16 @@ export function createEndpoints(api: ApiClient) {
       confirmDelivery: (id: string) => api.post(`/orders/${enc(id)}/confirm-delivery`, {}, OrderSchema),
       requestRefund: (id: string, reason: string, itemIds: string[]) => api.post(`/orders/${enc(id)}/refund`, { reason, itemIds }, OrderSchema),
       cancel: (id: string) => api.post(`/orders/${enc(id)}/cancel`, {}, OrderSchema),
+    },
+    sellerOrders: {
+      /** Orders where the caller is the seller (`GET /orders?role=seller`). */
+      list: (query: PageQuery & { status?: string } = {}) => api.get('/orders', paginated(OrderSchema), { query: { ...query, role: 'seller' } }),
+      summary: () => api.get('/seller/orders/summary', SellerOrdersSummarySchema),
+      accept: (id: string) => api.post(`/seller/orders/${enc(id)}/accept`, {}, OrderSchema),
+      ship: (id: string, body: ShipOrderRequest) => api.post(`/seller/orders/${enc(id)}/ship`, ShipOrderRequestSchema.parse(body), OrderSchema),
+      deliver: (id: string) => api.post(`/seller/orders/${enc(id)}/deliver`, {}, OrderSchema),
+      approveRefund: (id: string) => api.post(`/seller/orders/${enc(id)}/refund`, {}, OrderSchema),
+      cancel: (id: string) => api.post(`/seller/orders/${enc(id)}/cancel`, {}, OrderSchema),
     },
     addresses: {
       list: () => api.get('/addresses', z.array(AddressSchema)),

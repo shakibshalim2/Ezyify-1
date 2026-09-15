@@ -654,7 +654,7 @@ export let options = {
 };
 
 export default function () {
-  let response = http.get('https://api.ezyify.com/feed');
+  let response = http.get('https://api.ezyify.app/feed');
   check(response, { 'status is 200': (r) => r.status === 200 });
   sleep(1);
 }

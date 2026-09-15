@@ -198,9 +198,9 @@ const defaultMeta = {
   siteName: 'EZYIFY',
   defaultTitle: 'EZYIFY - AI-First Social Commerce Platform',
   defaultDescription: 'Your description here',
-  defaultImage: 'https://ezyify.com/og-image.png',
+  defaultImage: 'https://ezyify.app/og-image.png',
   twitterHandle: '@ezyify',
-  baseUrl: 'https://ezyify.com',
+  baseUrl: 'https://ezyify.app',
 };
 ```
 

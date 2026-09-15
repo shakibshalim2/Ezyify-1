@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Link, useRouter } from 'expo-router';
-import { LoginRequestSchema } from '@ezyify/core';
+import { LoginRequestSchema, isMfaChallenge } from '@ezyify/core';
 import { AuthShell, AuthDivider } from '@/components/AuthShell';
 import { SocialRow } from '@/components/SocialButton';
 import { Field } from '@/components/Field';
@@ -38,8 +38,12 @@ export default function LoginScreen() {
     setBanner(null);
     setLoading(true);
     try {
-      const session = await api.auth.login({ identifier: identifier.trim(), password });
-      await commitSession(session);
+      const result = await api.auth.login({ identifier: identifier.trim(), password });
+      if (isMfaChallenge(result)) {
+        router.push({ pathname: '/(auth)/two-factor', params: { challengeToken: result.challengeToken } });
+        return;
+      }
+      await commitSession(result);
       markSeen();
       router.replace('/(tabs)/home');
     } catch (err) {

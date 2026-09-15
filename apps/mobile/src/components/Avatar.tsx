@@ -2,21 +2,33 @@ import { View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/theme';
+import { avatarColors, initialsOf } from '@ezyify/core';
+import { fontFamily, useTheme } from '@/theme';
+import { Text } from './Text';
 
 interface AvatarProps {
   uri: string | null;
+  /** Used for the deterministic initials fallback when `uri` is null or fails to load. */
+  name?: string | null;
   size?: number;
   ring?: 'none' | 'story' | 'seen' | 'live';
   verified?: boolean;
 }
 
-export function Avatar({ uri, size = 40, ring = 'none', verified }: AvatarProps) {
+export function Avatar({ uri, name, size = 40, ring = 'none', verified }: AvatarProps) {
   const { colors, gradients } = useTheme();
   const pad = ring === 'none' ? 0 : 3;
+  const fallback = name ? avatarColors(name) : { background: colors.muted, foreground: colors.foregroundTertiary };
   const inner = (
-    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: colors.muted, borderWidth: pad ? 2 : 0, borderColor: colors.background }}>
-      {uri ? <Image source={{ uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={150} /> : null}
+    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: fallback.background, borderWidth: pad ? 2 : 0, borderColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+      {name ? (
+        <Text style={{ fontFamily: fontFamily.display, fontSize: size * 0.4, color: fallback.foreground, lineHeight: size * 0.48 }} allowFontScaling={false}>
+          {initialsOf(name)}
+        </Text>
+      ) : (
+        <Ionicons name="person" size={size * 0.5} color={fallback.foreground} />
+      )}
+      {uri ? <Image source={{ uri }} style={{ position: 'absolute', width: '100%', height: '100%' }} contentFit="cover" transition={150} /> : null}
     </View>
   );
   const outer = size + pad * 2;

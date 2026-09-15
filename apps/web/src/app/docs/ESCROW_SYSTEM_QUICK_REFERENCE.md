@@ -319,7 +319,7 @@ Processing Fee Calculation
   Contact Seller Support
 </Link>
 
-Email: seller-support@ezyify.com
+Email: seller-support@ezyify.app
 Response Time: Within 24 hours
 Priority: High for security issues
 ```

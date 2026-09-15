@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createApiClient } from '../api/client.js';
 import { createEndpoints } from '../api/endpoints.js';
 import { createMockFetch, MOCK_CREDENTIALS } from './server.js';
+import { isMfaChallenge } from '../schemas/index.js';
 import { OrderSchema, PostSchema, ProductDetailSchema, UserProfileSchema } from '../schemas/index.js';
 
 /** The mock server is exercised through the real client + endpoint map, so every response is contract-validated. */
@@ -45,6 +46,165 @@ describe('mock API server', () => {
     expect(detail.variants).toHaveLength(2);
     expect((await api.catalog.categories()).length).toBe(6);
     expect((await api.catalog.search('serum')).items[0].id).toBe('prod-006');
+  });
+
+  it('unified search returns products, users and posts sections; live tokens need a session', async () => {
+    const { api, login } = harness();
+    const res = await api.search.all('serum');
+    expect(res.products.items[0].id).toBe('prod-006');
+    expect(res.users.items).toEqual([]);
+    expect(res.posts.total).toBeGreaterThanOrEqual(0);
+    const onlyUsers = await api.search.all('maya', { type: 'users' });
+    expect(onlyUsers.products.items).toEqual([]);
+    expect(onlyUsers.users.items.some(u => u.username.includes('maya'))).toBe(true);
+
+    await expect(api.live.token({ room: 'live-maya', role: 'viewer' })).rejects.toMatchObject({ status: 401 });
+    await login();
+    const t = await api.live.token({ room: 'live-maya', role: 'viewer' });
+    expect(t.room).toBe('live-maya');
+    expect(t.url).toMatch(/^wss:/);
+    await expect(api.live.callToken('nope')).rejects.toMatchObject({ status: 404 });
+    const convo = (await api.messaging.conversations())[0];
+    expect((await api.live.callToken(convo.id)).room).toBe(`call-${convo.id}`);
+  });
+
+  it('serves live sessions and enforces lifecycle ownership in mock mode', async () => {
+    const { api, login } = harness();
+    const live = await api.live.sessions({ status: 'live' });
+    expect(live.items.length).toBe(3);
+    expect(live.items[0].viewers).toBeGreaterThanOrEqual(live.items[1].viewers);
+    await expect(api.live.create({ title: 'No permission' })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await login('techstore@ezyify.test');
+    const scheduled = await api.live.create({ title: 'Tomorrow launch', scheduledFor: new Date(Date.now() + 60_000).toISOString(), productIds: ['prod-001'] });
+    expect(scheduled.status).toBe('scheduled');
+    expect((await api.live.start(scheduled.id)).status).toBe('live');
+    expect((await api.live.pin(scheduled.id, { productId: 'prod-001' })).pinnedProductId).toBe('prod-001');
+    const before = await api.live.heartbeat(scheduled.id);
+    const after = await api.live.heartbeat(scheduled.id, true);
+    expect(after.viewers).toBeGreaterThan(before.viewers);
+    expect(after.likes).toBe(before.likes + 1);
+    expect((await api.live.end(scheduled.id)).status).toBe('ended');
+  });
+
+  it('seller hub inventory is scoped to the signed-in seller with status counts and filters', async () => {
+    const { api, login } = harness();
+    await expect(api.seller.products()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await login();
+    await expect(api.seller.products()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await login('techstore@ezyify.test');
+    const r = await api.seller.products();
+    expect(r.items.length).toBeGreaterThan(0);
+    expect(r.items.every(p => p.seller.username === 'techstore')).toBe(true);
+    expect(r.summary.total).toBe(r.items.length);
+    const q = await api.seller.products({ q: 'watch' });
+    expect(q.items.map(p => p.id)).toEqual(['prod-002']);
+  });
+
+  it('seller order routes are scoped and follow the escrow state machine in mock mode', async () => {
+    const { api, login } = harness();
+    await login('techstore@ezyify.test');
+    const mine = await api.sellerOrders.list();
+    expect(mine.items.length).toBeGreaterThan(0);
+    expect(mine.items.every(o => o.seller.username === 'techstore')).toBe(true);
+    const o2 = mine.items.find(o => o.id === 'o2')!;
+    expect(o2.status).toBe('processing');
+    expect(o2.buyer.username).toBe('buyer');
+    const before = await api.sellerOrders.summary();
+    expect(before.toShip).toBeGreaterThanOrEqual(1);
+    await expect(api.sellerOrders.accept('o2')).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(() => api.sellerOrders.ship('o2', { carrier: '', number: '' })).toThrow();
+    const shipped = await api.sellerOrders.ship('o2', { carrier: 'JNE', number: 'JNE123' });
+    expect(shipped.status).toBe('shipped');
+    expect(shipped.tracking).toMatchObject({ carrier: 'JNE', number: 'JNE123' });
+    expect((await api.sellerOrders.deliver('o2')).status).toBe('delivered');
+    const after = await api.sellerOrders.summary();
+    expect(after.toShip).toBe(before.toShip - 1);
+    expect(after.inTransit).toBe(before.inTransit + 1);
+    // Another seller's order is off-limits.
+    await expect(api.sellerOrders.accept('o1')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('seller dashboard is role-gated and internally consistent in mock mode', async () => {
+    const { api, login } = harness();
+    await login();
+    await expect(api.seller.dashboard()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await login('techstore@ezyify.test');
+    const d = await api.seller.dashboard({ days: 30 });
+    expect(d.series).toHaveLength(14);
+    expect(d.gross.current.amount).toBeGreaterThan(0);
+    expect(d.averageOrder.current.amount).toBe(Math.round(d.gross.current.amount / d.orders.current));
+    expect(d.attention.toShip).toBe((await api.sellerOrders.summary()).toShip);
+    expect(d.rating.average).toBeGreaterThan(4);
+  });
+
+  it('seller analytics is role-gated and its totals reconcile with the series in mock mode', async () => {
+    const { api, login } = harness();
+    await login();
+    await expect(api.seller.analytics()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await login('techstore@ezyify.test');
+    const a = await api.seller.analytics({ days: 7 });
+    expect(a.series).toHaveLength(7);
+    expect(a.series.reduce((n, d) => n + d.gross, 0)).toBe(a.totals.gross.amount);
+    expect(a.topProducts.every(p => p.id.startsWith('prod-'))).toBe(true);
+    expect(Math.round(a.categories.reduce((n, c) => n + c.share, 0) * 10) / 10).toBe(1);
+    expect(a.customers.firstTime + a.customers.repeat).toBe(a.customers.unique);
+  });
+
+  it('seller customers are aggregated per buyer and sortable in mock mode', async () => {
+    const { api, login } = harness();
+    await login('techstore@ezyify.test');
+    const r = await api.seller.customers({ sort: 'spent' });
+    expect(r.items.length).toBeGreaterThan(1);
+    expect(r.items.find(c => c.user.username === 'buyer')).toMatchObject({ orders: 1, openOrders: 1 });
+    expect(r.items.every((c, i) => i === 0 || c.spent.amount <= r.items[i - 1].spent.amount)).toBe(true);
+    expect(r.summary.total).toBe(r.items.length);
+    expect((await api.seller.customers({ q: 'test buyer' })).items.map(c => c.user.username)).toEqual(['buyer']);
+  });
+
+  it('reviews: public list + stats, one per buyer, seller reply flow in mock mode', async () => {
+    const { api, login } = harness();
+    const pub = await api.catalog.reviews('prod-001');
+    expect(pub.stats.total).toBe(2);
+    await expect(api.catalog.review('prod-001', { rating: 5 })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await login();
+    const created = await api.catalog.review('prod-001', { rating: 5, text: 'Love them.' });
+    expect(created.user.username).toBe('buyer');
+    await expect(api.catalog.review('prod-001', { rating: 4 })).rejects.toMatchObject({ code: 'CONFLICT' });
+    await login('techstore@ezyify.test');
+    const mine = await api.seller.reviews({ filter: 'unreplied' });
+    expect(mine.items.some(r => r.id === created.id)).toBe(true);
+    const replied = await api.seller.replyReview(created.id, { text: 'Thank you!' });
+    expect(replied.reply?.text).toBe('Thank you!');
+    expect((await api.seller.reviews({ filter: 'unreplied' })).stats.awaitingReply).toBe(mine.stats.awaitingReply - 1);
+    // fashion cannot reply to a techstore review
+    await login('fashion@ezyify.test');
+    await expect(api.seller.replyReview('rev-003', { text: 'nope' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('seller earnings + payout methods: encrypted destinations gate withdrawals in mock mode', async () => {
+    const { api, login } = harness();
+    await login();
+    await expect(api.seller.earnings()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await login('techstore@ezyify.test');
+    const e = await api.seller.earnings();
+    expect(e.series).toHaveLength(30);
+    expect(e.available.amount).toBeGreaterThan(0);
+    expect(e.paidOutAllTime.amount).toBeGreaterThan(e.paidOutThisMonth.amount);
+    const before = await api.seller.payoutMethods();
+    expect(before).toHaveLength(1);
+    expect(before[0]).toMatchObject({ accountLast4: '5544', isDefault: true });
+    await expect(api.wallet.withdraw(1000, 'pm_not_mine')).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    const added = await api.seller.addPayoutMethod({ label: 'GoPay', type: 'ewallet', holderName: 'TechStore', institution: 'GoPay', accountNumber: '081234567890', isDefault: true });
+    expect(added).toMatchObject({ accountLast4: '7890', isDefault: true });
+    expect((await api.seller.payoutMethods()).find(m => m.id === before[0].id)?.isDefault).toBe(false);
+    const w = await api.wallet.withdraw(1000, added.id);
+    expect(w.description).toContain('••••7890');
+    const after = await api.seller.earnings();
+    expect(after.available.amount).toBe(e.available.amount - 1000);
+    expect(after.pendingWithdrawal.amount).toBe(e.pendingWithdrawal.amount + 1000);
+    await expect(api.seller.removePayoutMethod(added.id)).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    await api.seller.removePayoutMethod(before[0].id);
+    expect(await api.seller.payoutMethods()).toHaveLength(1);
   });
 
   it('login → native refresh rotation → protected route; rejects bad credentials', async () => {
@@ -250,5 +410,53 @@ describe('mock API server', () => {
     const second = createMockFetch({ latencyMs: 0, persist });
     const api2 = await login(second);
     expect((await api2.cart.get()).items.map(i => [i.productId, i.quantity])).toEqual([['prod-003', 2]]);
+  });
+});
+
+describe('mock API server — MFA (TOTP)', () => {
+  it('seed users log in without MFA; setup → enable → login challenge → verify (TOTP or recovery code)', async () => {
+    const { api, login, setAccess } = harness();
+    const first = await login(MOCK_CREDENTIALS.seller);
+    expect(isMfaChallenge(first)).toBe(false);
+    expect(await api.auth.mfa.status()).toMatchObject({ enabled: false, requiredForRole: true, recoveryCodesLeft: 0 });
+    const setup = await api.auth.mfa.setup();
+    expect(setup.otpauthUrl).toMatch(/^otpauth:\/\/totp\/Ezyify:/);
+    await expect(api.auth.mfa.enable('000000')).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    const { recoveryCodes } = await api.auth.mfa.enable('123456');
+    expect(recoveryCodes).toHaveLength(10);
+    await expect(api.auth.mfa.setup()).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    setAccess(null);
+    const challenge = await api.auth.login({ identifier: MOCK_CREDENTIALS.seller, password: MOCK_CREDENTIALS.password });
+    expect(isMfaChallenge(challenge)).toBe(true);
+    expect(challenge.accessToken).toBeUndefined();
+    await expect(api.auth.mfa.verify({ challengeToken: challenge.challengeToken!, code: '000000' })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    const session = await api.auth.mfa.verify({ challengeToken: challenge.challengeToken!, code: recoveryCodes[0] });
+    expect(session.user.username).toBe('homebyjules');
+    setAccess(session.accessToken);
+    expect((await api.auth.mfa.status()).recoveryCodesLeft).toBe(9);
+    await expect(api.auth.mfa.verify({ challengeToken: challenge.challengeToken!, code: '123456' })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' }); // single use
+
+    expect(await api.auth.mfa.disable('123456')).toEqual({ ok: true });
+    expect((await api.auth.mfa.status()).enabled).toBe(false);
+  });
+
+  it('five wrong codes burn the challenge; admins cannot disable', async () => {
+    const { api, fetch, login, setAccess } = harness();
+    await login(MOCK_CREDENTIALS.seller);
+    await api.auth.mfa.setup();
+    await api.auth.mfa.enable('654321');
+    setAccess(null);
+    const { challengeToken } = await api.auth.login({ identifier: MOCK_CREDENTIALS.seller, password: MOCK_CREDENTIALS.password });
+    for (let i = 0; i < 4; i++) await expect(api.auth.mfa.verify({ challengeToken: challengeToken!, code: '000000' })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    await expect(api.auth.mfa.verify({ challengeToken: challengeToken!, code: '000000' })).rejects.toMatchObject({ code: 'RATE_LIMIT_EXCEEDED' });
+    await expect(api.auth.mfa.verify({ challengeToken: challengeToken!, code: '123456' })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+
+    // No admin fixture: promote the buyer in-state to exercise the admin guard.
+    fetch.state.users.find(u => u.id === 'u_buyer')!.role = 'admin';
+    await login(MOCK_CREDENTIALS.email);
+    await api.auth.mfa.setup();
+    await api.auth.mfa.enable('123456');
+    await expect(api.auth.mfa.disable('123456')).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });

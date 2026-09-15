@@ -138,7 +138,7 @@ export default function StoryScreen() {
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 4 }}>
           <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/profile/[username]', params: { username: group.user.username } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-            <Avatar uri={group.user.avatarUrl} size={36} verified={group.user.verified} />
+            <Avatar uri={group.user.avatarUrl} name={group.user.name} size={36} verified={group.user.verified} />
             <View style={{ flex: 1 }}>
               <Text variant="bodyMedium" style={{ color: '#fff' }}>{group.user.username}</Text>
               <Text variant="caption" style={{ color: 'rgba(255,255,255,0.7)' }}>{formatRelativeTime(frame.createdAt)}</Text>

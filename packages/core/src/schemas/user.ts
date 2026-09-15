@@ -83,7 +83,8 @@ export type DeleteAccountRequest = z.infer<typeof DeleteAccountRequestSchema>;
 export const ReportRequestSchema = z.object({
   targetType: z.enum(['user', 'post', 'loop', 'story', 'product', 'message', 'live', 'comment']),
   targetId: IdSchema,
-  reason: z.enum(['spam', 'scam', 'harassment', 'hate', 'nudity', 'violence', 'counterfeit', 'ip', 'self_harm', 'other']),
+  /** `child_safety` is CSAE (Play Child Safety Standards): routed to the front of the admin queue. */
+  reason: z.enum(['spam', 'scam', 'harassment', 'hate', 'nudity', 'child_safety', 'violence', 'counterfeit', 'ip', 'self_harm', 'other']),
   details: z.string().max(1000).optional(),
 });
 export type ReportRequest = z.infer<typeof ReportRequestSchema>;

@@ -68,7 +68,7 @@ export default function ChatScreen() {
       <IconButton icon="chevron-back" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/messages'))} />
       {other ? (
         <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/profile/[username]', params: { username: other.username } })} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <Avatar uri={other.avatarUrl} size={36} verified={other.verified} />
+          <Avatar uri={other.avatarUrl} name={other.name} size={36} verified={other.verified} />
           <View>
             <Text variant="bodyMedium">{other.name}</Text>
             <Text variant="caption" tone="secondary">@{other.username}</Text>

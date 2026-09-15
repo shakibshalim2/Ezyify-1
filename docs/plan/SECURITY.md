@@ -23,7 +23,7 @@ tested, ◐ = implemented, verification pending, ☐ = planned. Re-audit before 
 | 2.4 | Argon2id, m=19 MiB, t=2, p=1 (OWASP 2025 minimums) | `auth.service.ts#ARGON` | ☑ |
 | 2.5 | Forgot-password never reveals account existence; reset tokens are 192-bit random, single-use, 10 min TTL, sha256 at rest; reset revokes all sessions | `auth.service.ts#forgotPassword/resetPassword` | ☑ |
 | 2.7 | OTP: 6 digits, 10 min TTL, 5 attempts then new code required, previous codes invalidated on reissue | `auth.service.ts#issueOtp/verifyOtp` | ☑ e2e |
-| 2.8 | MFA (TOTP / passkeys) for sellers & admins | — | ☐ Phase 8 |
+| 2.8 | MFA (TOTP, RFC 6238, ±1 step) — mandatory for seller/admin (`GET /auth/mfa.requiredForRole`), opt-in for others. Secret AES-256-GCM encrypted at rest (`MFA_ENCRYPTION_KEY`, required in production); 10 single-use recovery codes stored as sha256; login returns `{ mfaRequired, challengeToken }` (256-bit random, sha256 at rest, 5 min TTL, single use, 5 wrong codes → invalidated + `auth.mfa_failed`); enabling revokes every other session; admins cannot disable; `/auth/mfa/verify` throttled 10/min | `auth/mfa.service.ts`, `auth/mfa.crypto.ts`, `auth.service.ts#login/verifyMfa`, `core/schemas/auth.ts#Mfa*` | ☑ unit (`mfa.crypto.spec.ts`) + e2e (`test/mfa.e2e-spec.ts`); passkeys deferred |
 | 2.10 | Service-to-service secrets (Stripe, FCM, S3) via env only, never in repo (`.env*` ignored, `.example` committed) | `.gitignore`, `.env.example` | ☑ |
 
 ## V3 Session management
@@ -53,7 +53,7 @@ tested, ◐ = implemented, verification pending, ☐ = planned. Re-audit before 
 |---|---------|-------|--------|
 | 5.1 | Every body/query parsed by zod with allow-lists (enums, lengths, regexes); unknown keys stripped | `common/zod.pipe.ts` | ☑ e2e |
 | 5.1.4 | Pagination bounded 1–100; IDs URL-encoded by the client | `common/pagination.ts`, `core/api/endpoints.ts` | ☑ |
-| 5.2 | User text is stored raw and rendered by React (auto-escaped); no `dangerouslySetInnerHTML` with user data on web | `apps/web` | ◐ lint rule pending |
+| 5.2 | User text is stored raw and rendered by React (auto-escaped); `react/no-danger` is an **error** in `apps/web` (allow-listed only for build-time chart CSS and the dev-only icon generator) | `apps/web/eslint.config.js` | ☑ lint (CI) |
 | 5.3.4 | Parameterised queries only (Prisma); no raw SQL with interpolation (`$queryRaw` used once with a constant) | `apps/api` | ☑ |
 | 5.5 | JSON body limit 2 MiB (413 beyond) | `bootstrap.ts` | ☑ e2e |
 
@@ -62,7 +62,7 @@ tested, ◐ = implemented, verification pending, ☐ = planned. Re-audit before 
 | # | Control | Where | Status |
 |---|---------|-------|--------|
 | 6.2 | `node:crypto` CSPRNG for tokens/OTP (`randomBytes`, `randomInt`); sha256 for token digests; argon2id for passwords | `auth.service.ts` | ☑ |
-| 6.4 | Secrets rotation procedure: change `JWT_*_SECRET` → all sessions invalid; documented in `apps/api/README.md` | — | ◐ |
+| 6.4 | Secrets rotation runbook: schedule + blast radius per secret, zero-downtime DB password swap, Stripe key/webhook roll, MFA key re-encryption, Android upload-key reset, incident checklist | `docs/plan/SECRETS_ROTATION.md` | ☑ |
 
 ## V7 Error handling & logging
 
@@ -80,7 +80,7 @@ tested, ◐ = implemented, verification pending, ☐ = planned. Re-audit before 
 | 8.3.4 | Users can delete their account in-app; soft delete → sessions/devices revoked immediately → hard purge after 30 days (cron); restorable for 14 days | `account.controller.ts`, `orders.service.ts#housekeeping` | ☑ |
 | 8.3.5 | Data-safety mapping for Play Console (collected: email, name, phone(opt), photos (UGC), purchase history, device token; shared: payment processor) | `docs/plan/PLAY_STORE_CHECKLIST.md` | ☑ |
 | 8.3.7 | Money never as floats — integer minor units end to end | `core/schemas/common.ts#MoneySchema` | ☑ |
-| 8.3.8 | Cookie/consent preferences on web (analytics off by default) | — | ☐ Phase 8 with analytics |
+| 8.3.8 | Cookie/consent preferences on web: analytics/marketing **off by default**, GPC/DNT honoured as opt-out, PostHog only loads after consent, Sentry sends no PII without it; banner + `/privacy-preferences` | `apps/web/src/app/lib/consent.ts`, `lib/telemetry.ts`, `components/CookieConsent.tsx` | ☑ unit + e2e |
 
 ## V9 Communications
 
@@ -132,6 +132,7 @@ tested, ◐ = implemented, verification pending, ☐ = planned. Re-audit before 
 | # | Control | Where | Status |
 |---|---------|-------|--------|
 | 14.2 | Dependencies pinned via lockfile; latest stable majors (NestJS 12, Prisma 7, Expo 57, Vite 6/8) | `pnpm-lock.yaml` | ☑ |
+| 14.4.w | Web origin: CSP `default-src 'self'; script-src 'self'` (no inline scripts — theme bootstrap is `/theme-init.js`), `object-src 'none'`, `frame-ancestors 'none'`, HSTS preload, `nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` — emitted as `<meta>` in the build and as `_headers` for Cloudflare Pages/Netlify | `apps/web/vite/seo.ts` | ☑ e2e |
 | 14.4 | Helmet: `X-Content-Type-Options`, `X-Frame-Options`/`frame-ancestors 'none'`, `Referrer-Policy: no-referrer`, CSP `default-src 'none'` (prod), no `X-Powered-By`, `Cross-Origin-Resource-Policy` | `bootstrap.ts` | ☑ e2e |
 | 14.5 | CORS: explicit origins, credentials, allowed headers `Authorization, Content-Type, Idempotency-Key, X-Client` | `bootstrap.ts` | ☑ |
 | 14.5.2 | Production refuses `*`/localhost origins and placeholder secrets at boot | `config.ts` | ☑ unit |
@@ -140,7 +141,7 @@ tested, ◐ = implemented, verification pending, ☐ = planned. Re-audit before 
 ## Threat model highlights
 
 - **Token theft on device** → refresh token in Keystore, 7-day expiry, rotation + reuse detection, user-visible session list with revoke.
-- **XSS on web** → access token in memory only (never `localStorage`), refresh in `HttpOnly` cookie, React escaping, CSP planned for the web origin in Phase 8.
+- **XSS on web** → access token in memory only (never `localStorage`), refresh in `HttpOnly` cookie, React escaping, web CSP (`script-src 'self'`, no inline) shipped in Phase 8.5.
 - **CSRF** → refresh is the only cookie-authenticated endpoint; `SameSite=Lax` + Origin allow-list; everything else is bearer.
 - **Payment tampering** → prices come from the DB at checkout, never the client; wallet and escrow move in one transaction; webhooks signed + idempotent.
 - **Account enumeration** → identical responses/timing for unknown accounts on login/forgot.

@@ -57,7 +57,8 @@ Security practices: data encrypted in transit ✅ · users can request deletion 
 - ✅ Report flow on every post/profile (`/report`, ≤2 taps) with reasons mapped to Play categories.
 - ✅ Block users (hides their content, removes follow, blocks messaging).
 - ✅ Terms of Service + Privacy Policy links in Settings (`ezyify.app/legal/*`).
-- ☐ Backend moderation queue + 24 h SLA (Phase 5 `admin/moderation` module), CSAE standards published at `ezyify.app/legal/child-safety` (required for social/dating categories).
+- ✅ Backend moderation queue (`GET /admin/reports`, ordered `priority desc, createdAt asc`; `child_safety` reports = priority 2 and audited), `child_safety` report reason on web + mobile.
+- ✅ CSAE standards published at `https://ezyify.app/legal/child-safety` (also `/child-safety`; prerendered + in sitemap) with designated contact `childsafety@ezyify.app` — declare both in Play Console → App content → **Child safety standards**.
 
 ## 6. Store listing
 

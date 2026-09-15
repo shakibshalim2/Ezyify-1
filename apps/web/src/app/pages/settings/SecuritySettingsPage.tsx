@@ -1,19 +1,19 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ChevronLeft, Lock, Smartphone, LogOut, AlertCircle, Shield, Clock } from 'lucide-react';
+import { ChevronLeft, Lock, LogOut, AlertCircle, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { Switch } from '../../components/ui/switch';
 import { SEO } from '../../components/SEO';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
+import { useRevokeSession, useSessions } from '@ezyify/core';
+import { TwoFactorSection } from './TwoFactorSection';
 
 export default function SecuritySettingsPage() {
   const navigate = useNavigate();
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [showChangePasswordDialog, setShowChangePasswordDialog] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -37,13 +37,23 @@ export default function SecuritySettingsPage() {
     setConfirmPassword('');
   };
 
-  const handleEnableTwoFactor = () => {
-    if (!twoFactorEnabled) {
-      toast.success('Two-factor authentication enabled');
-    } else {
-      toast.success('Two-factor authentication disabled');
-    }
-    setTwoFactorEnabled(!twoFactorEnabled);
+  const sessions = useSessions();
+  const revoke = useRevokeSession();
+  const describeAgent = (ua: string | null) => {
+    if (!ua) return 'Unknown device';
+    if (/ezyify|okhttp|expo/i.test(ua)) return 'Ezyify Android app';
+    const browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+    const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Mac OS/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
+    return os ? `${browser} on ${os}` : browser;
+  };
+  const relative = (iso: string) => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.round(diff / 60_000);
+    if (m < 2) return 'Just now';
+    if (m < 60) return `${m} min ago`;
+    const h = Math.round(m / 60);
+    if (h < 48) return `${h} h ago`;
+    return `${Math.round(h / 24)} days ago`;
   };
 
   const SecurityOption = ({
@@ -122,33 +132,7 @@ export default function SecuritySettingsPage() {
           </Card>
         </div>
 
-        {/* Two-Factor Authentication */}
-        <div className="mb-8">
-          <h2 className="font-display text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-            <Smartphone className="w-5 h-5" />
-            Two-Factor Authentication
-          </h2>
-          <Card className="border-border">
-            <CardContent className="pt-6 space-y-4">
-              <SecurityOption
-                icon={Smartphone}
-                title="Authenticator App"
-                description={twoFactorEnabled ? 'Enabled' : 'Use an app like Google Authenticator'}
-                action={
-                  <Switch
-                    checked={twoFactorEnabled}
-                    onCheckedChange={handleEnableTwoFactor}
-                  />
-                }
-              />
-              <div className="p-3 bg-info/5 border border-info/40 rounded-lg">
-                <p className="text-xs text-foreground-secondary">
-                  Two-factor authentication adds an extra layer of security to your account. You'll need a code from your authenticator app when signing in.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <TwoFactorSection />
 
         {/* Active Sessions */}
         <div className="mb-8">
@@ -158,27 +142,36 @@ export default function SecuritySettingsPage() {
           </h2>
           <Card className="border-border">
             <CardContent className="pt-6 space-y-3">
-              {[
-                { device: 'Chrome on MacOS', location: 'New York, US', lastActive: 'Now' },
-                { device: 'Safari on iPhone', location: 'New York, US', lastActive: '2 hours ago' },
-                { device: 'Chrome on Windows', location: 'New York, US', lastActive: '3 days ago' },
-              ].map((session, idx) => (
+              {sessions.isLoading && <p className="text-sm text-foreground-secondary">Loading your devices…</p>}
+              {sessions.isError && <p className="text-sm text-error">Couldn’t load sessions. Try again later.</p>}
+              {sessions.isSuccess && sessions.data.length === 0 && <p className="text-sm text-foreground-secondary">Only this device is signed in.</p>}
+              {(sessions.data ?? []).map((session, idx) => (
                 <motion.div
-                  key={idx}
+                  key={session.id}
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.1 }}
+                  transition={{ delay: Math.min(idx, 5) * 0.05 }}
                   className="flex items-center justify-between p-3 rounded-lg border border-border"
                 >
                   <div>
-                    <p className="font-medium text-foreground text-sm">{session.device}</p>
-                    <p className="text-xs text-foreground-secondary">{session.location} • {session.lastActive}</p>
+                    <p className="font-medium text-foreground text-sm">
+                      {describeAgent(session.userAgent)}
+                      {session.current && <span className="ml-2 rounded-full bg-success-subtle px-2 py-0.5 text-[11px] font-semibold text-success">This device</span>}
+                    </p>
+                    <p className="text-xs text-foreground-secondary">{session.ip ?? 'IP hidden'} • signed in {relative(session.createdAt)}</p>
                   </div>
-                  <Button size="sm" variant="outline">
-                    <LogOut className="w-4 h-4" />
-                  </Button>
+                  {!session.current && (
+                    <Button size="sm" variant="outline" aria-label="Sign out this device" disabled={revoke.isPending} onClick={() => revoke.mutate(session.id, { onSuccess: () => toast.success('Device signed out') })}>
+                      <LogOut className="w-4 h-4" />
+                    </Button>
+                  )}
                 </motion.div>
               ))}
+              {(sessions.data?.length ?? 0) > 1 && (
+                <Button variant="outline" size="sm" className="w-full" disabled={revoke.isPending} onClick={() => revoke.mutate(undefined, { onSuccess: () => toast.success('Signed out everywhere else') })}>
+                  Sign out of all other devices
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>

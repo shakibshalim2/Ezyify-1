@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
 import { conflict, notFound, validation } from '../../common/errors.js';
 import { toUserProfile } from './users.mapper.js';
+import { SearchIndexer } from '../search/search.indexer.js';
 
 export const UpdateProfileSchema = z.object({
   name: z.string().min(1).max(50).optional(),
@@ -17,7 +18,7 @@ export const UpdateProfileSchema = z.object({
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly indexer: SearchIndexer) {}
 
   async profile(usernameOrMe: string, viewerId?: string) {
     const where = usernameOrMe === 'me' ? { id: viewerId ?? '' } : { username: usernameOrMe };
@@ -37,6 +38,7 @@ export class UsersService {
       if (taken) throw conflict('That username is taken');
     }
     await this.prisma.user.update({ where: { id: userId }, data: body });
+    this.indexer.user(userId);
     return this.profile('me', userId);
   }
 

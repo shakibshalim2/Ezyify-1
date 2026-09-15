@@ -1,196 +1,138 @@
-import { useState, useEffect } from 'react';
-import { X, Download, Smartphone } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { Download, X } from 'lucide-react';
+import { BrandMark } from './primitives/BrandMark';
+import { Button } from './primitives/Button';
+import { hasDecided, onConsentChange } from '../lib/consent';
+import { EASE_EMPHASIZED } from '../lib/motion';
+import { storage } from '../lib/storage';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-export default function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
+const DISMISSED_KEY = 'ezyify.pwa.dismissedAt';
+const VISITS_KEY = 'ezyify.pwa.visits';
+const SNOOZE_DAYS = 14;
+/** Chrome's own heuristics fire `beforeinstallprompt` early; we wait for real engagement before asking. */
+const MIN_VISITS = 2;
+const MIN_ROUTE_CHANGES = 3;
+const QUIET_ROUTES = [/^\/welcome/, /^\/onboarding/, /^\/login/, /^\/signup/, /^\/otp/, /^\/forgot/, /^\/reset/, /^\/checkout/, /^\/loops/, /^\/stories/, /^\/live\//];
 
+let deferredEvent: BeforeInstallPromptEvent | null = null;
+const subscribers = new Set<() => void>();
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredEvent = e as BeforeInstallPromptEvent;
+    subscribers.forEach(fn => fn());
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredEvent = null;
+    subscribers.forEach(fn => fn());
+  });
+}
+
+const isStandalone = () =>
+  typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true);
+
+function useInstallEvent() {
+  const [, force] = useState(0);
   useEffect(() => {
-    try {
-      const isStandalone =
-        window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone === true;
-
-      if (isStandalone) { setIsInstalled(true); return; }
-
-      let daysSinceDismissed = 999;
-      try {
-        const dismissed = localStorage.getItem('pwa-install-dismissed');
-        if (dismissed) {
-          daysSinceDismissed = Math.floor(
-            (Date.now() - new Date(dismissed).getTime()) / (1000 * 60 * 60 * 24)
-          );
-        }
-      } catch {}
-
-      const handleBeforeInstallPrompt = (e: Event) => {
-        e.preventDefault();
-        setDeferredPrompt(e as BeforeInstallPromptEvent);
-        if (daysSinceDismissed > 7) {
-          setTimeout(() => setShowPrompt(true), 5000);
-        }
-      };
-
-      const handleAppInstalled = () => {
-        setIsInstalled(true);
-        setShowPrompt(false);
-        try { localStorage.removeItem('pwa-install-dismissed'); } catch {}
-      };
-
-      window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.addEventListener('appinstalled', handleAppInstalled);
-      return () => {
-        window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-        window.removeEventListener('appinstalled', handleAppInstalled);
-      };
-    } catch {}
+    const fn = () => force(n => n + 1);
+    subscribers.add(fn);
+    return () => {
+      subscribers.delete(fn);
+    };
   }, []);
+  return deferredEvent;
+}
 
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setIsInstalled(true);
-    } else {
-      try { localStorage.setItem('pwa-install-dismissed', new Date().toISOString()); } catch {}
-    }
-    setDeferredPrompt(null);
-    setShowPrompt(false);
+async function runInstall(event: BeforeInstallPromptEvent) {
+  await event.prompt();
+  const { outcome } = await event.userChoice;
+  if (outcome !== 'accepted') storage.set(DISMISSED_KEY, Date.now());
+  deferredEvent = null;
+  subscribers.forEach(fn => fn());
+  return outcome;
+}
+
+/**
+ * Contextual "Add to Home screen" card. Shows only after: consent decided, ≥2 visits, ≥3 in-app navigations,
+ * not on a focused flow, not snoozed in the last 14 days. Never blocks the page.
+ */
+export default function InstallPrompt() {
+  const event = useInstallEvent();
+  const location = useLocation();
+  const reduce = useReducedMotion();
+  const [routeChanges, setRouteChanges] = useState(0);
+  const [consented, setConsented] = useState(() => (typeof window !== 'undefined' ? hasDecided() : false));
+  const [dismissed, setDismissed] = useState(false);
+  const [visits] = useState(() => {
+    const n = storage.get<number>(VISITS_KEY, 0) + 1;
+    storage.set(VISITS_KEY, n);
+    return n;
+  });
+
+  useEffect(() => onConsentChange(() => setConsented(hasDecided())), []);
+  useEffect(() => setRouteChanges(n => n + 1), [location.pathname]);
+
+  const snoozedAt = storage.get<number>(DISMISSED_KEY, 0);
+  const snoozed = snoozedAt > 0 && Date.now() - snoozedAt < SNOOZE_DAYS * 86_400_000;
+  const quiet = QUIET_ROUTES.some(r => r.test(location.pathname));
+  const visible = Boolean(event) && !isStandalone() && consented && !dismissed && !snoozed && !quiet && visits >= MIN_VISITS && routeChanges >= MIN_ROUTE_CHANGES;
+
+  const dismiss = () => {
+    setDismissed(true);
+    storage.set(DISMISSED_KEY, Date.now());
   };
-
-  const handleDismiss = () => {
-    setShowPrompt(false);
-    try { localStorage.setItem('pwa-install-dismissed', new Date().toISOString()); } catch {}
-  };
-
-  if (isInstalled || !deferredPrompt) return null;
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-50 transition-opacity duration-300 ${
-          showPrompt ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={handleDismiss}
-      />
-
-      {/* Install Prompt Card */}
-      <div
-        className={`fixed bottom-4 left-4 right-4 md:left-auto md:right-8 md:bottom-8 md:w-96
-                    bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden
-                    transition-all duration-300 ${
-          showPrompt
-            ? 'opacity-100 translate-y-0 scale-100'
-            : 'opacity-0 translate-y-24 scale-95 pointer-events-none'
-        }`}
-      >
-        <button
-          onClick={handleDismiss}
-          className="absolute top-4 right-4 p-2 rounded-full hover:bg-muted transition-colors"
-          aria-label="Dismiss"
+    <AnimatePresence>
+      {visible && event && (
+        <motion.aside
+          role="complementary"
+          aria-label="Install Ezyify"
+          initial={reduce ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={reduce ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.98 }}
+          transition={{ duration: 0.32, ease: EASE_EMPHASIZED }}
+          className="fixed inset-x-3 bottom-[calc(var(--nav-height)+var(--safe-bottom)+0.75rem)] z-[55] mx-auto max-w-md overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-brand-lg backdrop-blur-xl sm:inset-x-6 lg:bottom-6 lg:left-auto lg:right-6 lg:mx-0"
         >
-          <X className="w-4 h-4 text-muted-foreground" />
-        </button>
-
-        <div className="p-6">
-          <div className="flex items-center justify-center w-16 h-16 mb-4 bg-primary/10 rounded-2xl">
-            <Smartphone className="w-8 h-8 text-primary" />
-          </div>
-
-          <h3 className="text-xl font-semibold text-foreground mb-2">Install Ezyify App</h3>
-          <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-            Install Ezyify on your device for a faster, native app experience.
-            Access your E-Commerce Social Media Ecosystem instantly — shop, share, and connect anywhere.
-          </p>
-
-          <div className="space-y-2 mb-6">
-            {['Works offline with cached content', 'Faster loading and performance', 'Native app-like experience'].map(f => (
-              <div key={f} className="flex items-center gap-3 text-sm text-foreground">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                <span>{f}</span>
+          <div className="pointer-events-none absolute inset-0 bg-aurora opacity-40" aria-hidden />
+          <button type="button" onClick={dismiss} aria-label="Not now" className="absolute right-2 top-2 z-10 flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <X className="size-4" />
+          </button>
+          <div className="relative flex gap-3 p-4">
+            <BrandMark size={44} className="mt-0.5 shrink-0" />
+            <div className="min-w-0 flex-1 pr-6">
+              <h2 className="font-display text-base font-semibold text-foreground">Add Ezyify to your home screen</h2>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">One tap to open, works offline, and loads in a blink — no store download needed.</p>
+              <div className="mt-3 flex gap-2">
+                <Button size="sm" leftIcon={<Download className="size-4" />} onClick={() => void runInstall(event).then(o => o === 'accepted' && setDismissed(true))}>
+                  Install
+                </Button>
+                <Button size="sm" variant="ghost" onClick={dismiss}>
+                  Not now
+                </Button>
               </div>
-            ))}
+            </div>
           </div>
-
-          <div className="flex gap-3">
-            <button
-              onClick={handleInstallClick}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3
-                         bg-primary hover:bg-primary-hover text-primary-foreground
-                         rounded-xl font-medium transition-all duration-200
-                         hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
-            >
-              <Download className="w-4 h-4" />
-              Install Now
-            </button>
-            <button
-              onClick={handleDismiss}
-              className="px-4 py-3 text-muted-foreground hover:text-foreground
-                         hover:bg-muted rounded-xl font-medium transition-colors"
-            >
-              Maybe Later
-            </button>
-          </div>
-        </div>
-
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
-      </div>
-    </>
+        </motion.aside>
+      )}
+    </AnimatePresence>
   );
 }
 
-export function InstallButton() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
-
-  useEffect(() => {
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true;
-    if (isStandalone) { setIsInstalled(true); return; }
-
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-    };
-    const handleAppInstalled = () => { setIsInstalled(true); setDeferredPrompt(null); };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
-  }, []);
-
-  const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') setIsInstalled(true);
-    setDeferredPrompt(null);
-  };
-
-  if (isInstalled || !deferredPrompt) return null;
-
+/** Compact header/settings entry; renders nothing when the browser has no install offer. */
+export function InstallButton({ className = '' }: { className?: string }) {
+  const event = useInstallEvent();
+  if (!event || isStandalone()) return null;
   return (
-    <button
-      onClick={handleInstall}
-      className="hidden md:flex items-center gap-2 px-4 py-2 text-sm font-medium
-                 text-foreground hover:text-primary bg-muted hover:bg-muted/80
-                 rounded-xl transition-colors"
-      title="Install Ezyify App"
-    >
-      <Download className="w-4 h-4" />
-      <span>Install App</span>
-    </button>
+    <Button variant="secondary" size="sm" leftIcon={<Download className="size-4" />} className={className} onClick={() => void runInstall(event)} title="Install Ezyify">
+      Install app
+    </Button>
   );
 }

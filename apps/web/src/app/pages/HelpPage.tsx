@@ -202,7 +202,7 @@ export default function HelpPage() {
                 Start chat
               </Button>
               <Button asChild variant="outline" aria-label="Email Ezyify support">
-                <a href="mailto:support@ezyify.com">
+                <a href="mailto:support@ezyify.app">
                   <Mail />
                   Email
                 </a>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCompactNumber, formatRelativeTime, formatTimeUntil, clamp, formatMoney } from './index.js';
+import { formatCompactNumber, formatRelativeTime, formatTimeAgo, formatTimeUntil, clamp, formatMoney } from './index.js';
 
 describe('utils (edge cases)', () => {
   it('compact numbers for engagement counters', () => {
@@ -11,6 +11,9 @@ describe('utils (edge cases)', () => {
     const now = Date.parse('2026-09-13T12:00:00Z');
     expect(formatRelativeTime('2026-09-13T11:59:50Z', now)).toBe('now');
     expect(formatRelativeTime('2026-09-13T09:00:00Z', now)).toBe('3h');
+    expect(formatTimeAgo('2026-09-13T09:00:00Z', now)).toBe('3h ago');
+    expect(formatTimeAgo('2026-09-13T11:59:50Z', now)).toBe('just now');
+    expect(formatTimeAgo('2026-08-01T09:00:00Z', now)).toBe('Aug 1');
     expect(formatRelativeTime('2026-09-01T09:00:00Z', now)).toMatch(/Sep 1/);
     expect(formatRelativeTime('2027-01-01T00:00:00Z', now)).toBe('now'); // future never goes negative
   });

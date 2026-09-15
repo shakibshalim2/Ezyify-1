@@ -18,6 +18,8 @@ export const test = base.extend({
       window.localStorage.setItem('ezyify.onboarding.seen', 'true');
       window.localStorage.setItem('ezyify.splash.shownAt', String(Date.now()));
       window.localStorage.setItem('ezyify.e2e', '1');
+      // Pre-decide cookie consent so the banner never overlaps journey targets.
+      window.localStorage.setItem('ezyify_cookie_consent', JSON.stringify({ version: '2', timestamp: Date.now(), preferences: { necessary: true, analytics: false, marketing: false, functional: false } }));
     });
     await provide(page);
   },

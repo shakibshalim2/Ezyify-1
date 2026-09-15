@@ -60,7 +60,7 @@ export default function NotificationsScreen() {
         renderItem={({ item }) => (
           <Pressable accessibilityRole="button" onPress={() => open(item)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: pressed ? colors.muted : item.read ? 'transparent' : colors.primarySubtle })}>
             {item.actor ? (
-              <Avatar uri={item.actor.avatarUrl} size={44} />
+              <Avatar uri={item.actor.avatarUrl} name={item.actor.name} size={44} />
             ) : (
               <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: item.type === 'system' ? colors.successSubtle : colors.accentSubtle, alignItems: 'center', justifyContent: 'center' }}>
                 <Ionicons name={ICON[item.type]} size={20} color={item.type === 'system' ? colors.success : colors.accent} />

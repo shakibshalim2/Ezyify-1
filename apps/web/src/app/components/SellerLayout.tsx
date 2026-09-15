@@ -1,4 +1,5 @@
 import { ReactNode, memo, useCallback } from 'react';
+import { formatMoney, useMe, useSellerDashboard, useSellerOrdersSummary } from '@ezyify/core';
 import { Link, useLocation } from 'react-router';
 import {
   LayoutDashboard,
@@ -23,10 +24,10 @@ import { cn } from './ui/utils';
 const navigation = [
   { name: 'Overview', href: '/seller-dashboard', icon: LayoutDashboard, badge: null },
   { name: 'Products', href: '/seller/products', icon: Package, badge: null },
-  { name: 'Orders', href: '/seller/orders', icon: ShoppingCart, badge: 12 },
+  { name: 'Orders', href: '/seller/orders', icon: ShoppingCart, badge: 'orders' as const },
   { name: 'Analytics', href: '/seller/analytics', icon: TrendingUp, badge: null },
   { name: 'Customers', href: '/seller/customers', icon: Users, badge: null },
-  { name: 'Reviews', href: '/seller/reviews', icon: Star, badge: 8 },
+  { name: 'Reviews', href: '/seller/reviews', icon: Star, badge: null },
   { name: 'Earnings', href: '/seller/earnings', icon: DollarSign, badge: null },
   { name: 'Settings', href: '/seller/settings', icon: Settings, badge: null },
   { name: 'Support', href: '/seller/support', icon: HelpCircle, badge: null }
@@ -38,6 +39,12 @@ interface SellerLayoutProps {
 
 export const SellerLayout = memo(function SellerLayout({ children }: SellerLayoutProps) {
   const location = useLocation();
+  const me = useMe();
+  const summary = useSellerOrdersSummary();
+  const dash = useSellerDashboard({ days: 30 });
+  const storeName = me.data?.name ?? 'Your store';
+  const badges: Record<'orders', number | undefined> = { orders: summary.data?.needsAction || undefined };
+  const delta = dash.data && dash.data.gross.previous.amount > 0 ? Math.round(((dash.data.gross.current.amount - dash.data.gross.previous.amount) / dash.data.gross.previous.amount) * 1000) / 10 : null;
 
   const isActive = useCallback((href: string) => {
     if (href === '/seller-dashboard') return location.pathname === href;
@@ -53,7 +60,7 @@ export const SellerLayout = memo(function SellerLayout({ children }: SellerLayou
           <Link to="/seller-dashboard" className="flex items-center gap-3">
             <BrandMark size={40} />
             <div className="min-w-0">
-              <div className="font-display font-semibold text-sm text-foreground">TechHub Store</div>
+              <div className="font-display font-semibold text-sm text-foreground truncate">{storeName}</div>
               <div className="flex items-center gap-1.5 text-xs text-foreground-secondary"><span className="size-1.5 rounded-full bg-success" /> Store live</div>
             </div>
           </Link>
@@ -82,11 +89,11 @@ export const SellerLayout = memo(function SellerLayout({ children }: SellerLayou
                   >
                     <Icon className="size-5 shrink-0" />
                     <span className="flex-1 truncate">{item.name}</span>
-                    {item.badge && (
-                      <span className={cn('text-xs font-semibold px-2 py-1 rounded-lg', active ? 'bg-primary/20 text-primary' : 'bg-background-elevated text-foreground-secondary')}>
-                        {item.badge}
+                    {item.badge && badges[item.badge] ? (
+                      <span className={cn('text-xs font-semibold px-2 py-1 rounded-lg tabular-nums', active ? 'bg-primary/20 text-primary' : 'bg-warning-subtle text-warning')} aria-label={`${badges[item.badge]} need action`}>
+                        {badges[item.badge]}
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </Link>
               );
@@ -98,11 +105,13 @@ export const SellerLayout = memo(function SellerLayout({ children }: SellerLayou
             <Link to="/seller/analytics">
               <Card variant="elevated" padding="md" interactive className="group">
                 <div className="flex items-start justify-between mb-2">
-                  <span className="text-xs font-semibold text-foreground-secondary">This Month</span>
-                  <ArrowUpRight className="size-4 text-success group-hover:text-success/80 transition-colors" />
+                  <span className="text-xs font-semibold text-foreground-secondary">Last 30 days</span>
+                  <ArrowUpRight className={cn('size-4 transition-colors', delta != null && delta < 0 ? 'text-error rotate-90' : 'text-success group-hover:text-success/80')} aria-hidden />
                 </div>
-                <p className="font-display font-bold text-lg text-foreground">$48,200</p>
-                <p className="text-xs text-success mt-2">+12.4% vs last month</p>
+                <p className="font-display font-bold text-lg text-foreground tabular-nums">{dash.data ? formatMoney(dash.data.gross.current, { compact: dash.data.gross.current.amount >= 1_000_000 }) : '—'}</p>
+                <p className={cn('text-xs mt-2', delta == null ? 'text-foreground-tertiary' : delta < 0 ? 'text-error' : 'text-success')}>
+                  {delta == null ? 'Gross sales' : `${delta > 0 ? '+' : ''}${delta}% vs previous 30 days`}
+                </p>
               </Card>
             </Link>
           </div>
@@ -115,7 +124,7 @@ export const SellerLayout = memo(function SellerLayout({ children }: SellerLayou
           <div className="flex min-w-0 items-center gap-2.5">
             <BrandMark size={32} />
             <div className="min-w-0">
-              <div className="truncate font-display text-sm font-semibold text-foreground">TechHub Store</div>
+              <div className="truncate font-display text-sm font-semibold text-foreground">{storeName}</div>
               <div className="flex items-center gap-1.5 text-[11px] text-foreground-secondary"><span className="size-1.5 rounded-full bg-success" /> Store live</div>
             </div>
           </div>

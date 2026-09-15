@@ -547,7 +547,7 @@ We sincerely apologize and are committed to preventing this in the future.
 
 Compensation: We've added $25 credit to your account as an apology.
 
-Questions? Contact: security@ezyify.com
+Questions? Contact: security@ezyify.app
 
 - EZYIFY Security Team
 ```
@@ -596,8 +596,8 @@ Questions? Contact: security@ezyify.com
 **How Users Can Get Help:**
 
 1. **In-App Reporting** — Flag content/users directly
-2. **Help Center** — Self-service articles (ezyify.com/help)
-3. **Email Support** — support@ezyify.com (24-48 hour response)
+2. **Help Center** — Self-service articles (ezyify.app/help)
+3. **Email Support** — support@ezyify.app (24-48 hour response)
 4. **Live Chat** — For urgent issues (available 9 AM - 9 PM)
 5. **Social Media** — @EZYIFYSupport on Twitter (public inquiries)
 6. **Emergency Hotline** — For safety concerns (24/7)

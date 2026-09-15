@@ -6,16 +6,16 @@
     "description": "Complete API specification for EZYIFY's escrow-based payment system. This API enables secure transactions, buyer protection, and commission-based payouts.",
     "contact": {
       "name": "EZYIFY Backend Team",
-      "email": "backend@ezyify.com"
+      "email": "backend@ezyify.app"
     }
   },
   "servers": [
     {
-      "url": "https://api.ezyify.com/v1",
+      "url": "https://api.ezyify.app/v1",
       "description": "Production server"
     },
     {
-      "url": "https://staging-api.ezyify.com/v1",
+      "url": "https://staging-api.ezyify.app/v1",
       "description": "Staging server"
     },
     {

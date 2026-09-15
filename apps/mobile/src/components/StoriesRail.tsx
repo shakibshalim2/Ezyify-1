@@ -38,7 +38,7 @@ export function StoriesRail() {
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}>
       <Pressable accessibilityRole="button" accessibilityLabel="Add to your story" onPress={() => router.push({ pathname: '/create', params: { kind: 'story' } })} style={{ alignItems: 'center', gap: 6, width: 68 }}>
         <View>
-          <Avatar uri={me?.avatarUrl ?? null} size={60} ring="seen" />
+          <Avatar uri={me?.avatarUrl ?? null} name={me?.name} size={60} ring="seen" />
           <View style={{ position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primary, borderWidth: 2, borderColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons name="add" size={14} color={colors.primaryForeground} />
           </View>
@@ -54,7 +54,7 @@ export function StoriesRail() {
           ))
         : groups.map(g => (
             <Pressable key={g.user.id} accessibilityRole="button" accessibilityLabel={`${g.user.name}'s story`} onPress={() => router.push({ pathname: '/story/[id]', params: { id: g.user.id } })} style={{ alignItems: 'center', gap: 6, width: 68 }}>
-              <Avatar uri={g.user.avatarUrl} size={60} ring="story" verified={g.user.verified} />
+              <Avatar uri={g.user.avatarUrl} name={g.user.name} size={60} ring="story" verified={g.user.verified} />
               <Text variant="caption" numberOfLines={1}>{g.user.username}</Text>
             </Pressable>
           ))}

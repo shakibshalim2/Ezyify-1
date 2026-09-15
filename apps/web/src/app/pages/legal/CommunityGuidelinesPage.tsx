@@ -220,7 +220,7 @@ export default function CommunityGuidelinesPage() {
           These guidelines may be updated periodically. Continued use of Ezyify means you accept the latest version.
         </p>
         <p>
-          Questions? Contact us at <a href="mailto:community@ezyify.com" className="text-primary hover:underline">community@ezyify.com</a>
+          Questions? Contact us at <a href="mailto:community@ezyify.app" className="text-primary hover:underline">community@ezyify.app</a>
         </p>
       </div>
     </div>

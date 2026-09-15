@@ -1,8 +1,9 @@
-import type {
+import type { Review,
   Address,
   Category,
   Conversation,
   Message,
+  LiveSession,
   Notification,
   Order,
   Post,
@@ -20,7 +21,7 @@ import type {
  */
 export const img = (id: string, w = 800) => `https://images.unsplash.com/${id}?w=${w}&q=80`;
 export const usd = (major: number) => ({ amount: Math.round(major * 100), currency: 'USD' as const });
-const ago = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
+export const ago = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
 const ahead = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString();
 
 export interface SeedUser extends UserSummary {
@@ -97,6 +98,15 @@ export const products: ProductDetail[] = seeds.map(s => ({
 }));
 export const productSummary = (p: ProductDetail): ProductSummary => ({ id: p.id, slug: p.slug, name: p.name, imageUrl: p.imageUrl, price: p.price, compareAtPrice: p.compareAtPrice, rating: p.rating, reviewCount: p.reviewCount, seller: p.seller, badge: p.badge, inStock: p.inStock });
 export const findProduct = (id: string | undefined) => products.find(p => p.id === id || p.slug === id);
+
+/** Live shopping fixtures mirror the seeded API sessions so mock-mode screens never need hard-coded streams. */
+export const liveSessions: LiveSession[] = [
+  { id: 'live-001', room: 'live-001', title: 'The ANC audio event — live demos', host: summary(byUsername('techstore')!), status: 'live', category: 'tech', coverUrl: products[0].imageUrl, productIds: ['prod-001', 'prod-002'], pinnedProductId: 'prod-001', viewers: 1240, peakViewers: 1240, likes: 842, scheduledFor: null, startedAt: ago(0.5), endedAt: null, createdAt: ago(0.5) },
+  { id: 'live-002', room: 'live-002', title: 'Weekend capsule wardrobe edit', host: summary(byUsername('fashion')!), status: 'live', category: 'fashion', coverUrl: products[3].imageUrl, productIds: ['prod-004', 'prod-005'], pinnedProductId: 'prod-004', viewers: 760, peakViewers: 760, likes: 516, scheduledFor: null, startedAt: ago(1), endedAt: null, createdAt: ago(1) },
+  { id: 'live-003', room: 'live-003', title: 'Glass-skin routine, step by step', host: summary(byUsername('glow.with.sara')!), status: 'live', category: 'beauty', coverUrl: products[5].imageUrl, productIds: ['prod-006'], pinnedProductId: 'prod-006', viewers: 1980, peakViewers: 1980, likes: 1299, scheduledFor: null, startedAt: ago(0.25), endedAt: null, createdAt: ago(0.25) },
+  { id: 'live-004', room: 'live-004', title: 'Derm-approved evening skincare', host: summary(byUsername('glowcare')!), status: 'scheduled', category: 'beauty', coverUrl: products[5].imageUrl, productIds: ['prod-006'], pinnedProductId: null, viewers: 0, peakViewers: 0, likes: 0, scheduledFor: ahead(1), startedAt: null, endedAt: null, createdAt: ago(2) },
+  { id: 'live-005', room: 'live-005', title: 'Back-to-school desk setup', host: summary(byUsername('techstore')!), status: 'scheduled', category: 'tech', coverUrl: products[2].imageUrl, productIds: ['prod-003'], pinnedProductId: null, viewers: 0, peakViewers: 0, likes: 0, scheduledFor: ahead(2), startedAt: null, endedAt: null, createdAt: ago(1) },
+];
 
 const media = (id: string, type: 'image' | 'video' = 'image') => ({ type, url: img(id, 1080), thumbnailUrl: img(id, 400), width: 1080, height: 1350, durationMs: type === 'video' ? 15000 : null });
 const u = (username: string) => summary(byUsername(username)!);
@@ -182,11 +192,20 @@ export const wallet = { balance: usd(500), pending: usd(45.99), currency: 'USD' 
 
 const orderItem = (p: ProductDetail, quantity: number, variant: string | null = null) => ({ id: `${p.id}-item`, productId: p.id, name: p.name, imageUrl: p.imageUrl, variant, quantity, unitPrice: p.price });
 const seller = (username: string) => u(username);
+const buyerBits = { buyer: summary(byUsername('buyer')!), shippingTo: { recipient: 'Test Buyer', city: 'Jakarta', region: 'DKI Jakarta', country: 'ID' }, paymentMethod: 'wallet' as const, note: null };
 export const orders: Order[] = [
-  { id: 'o1', orderNumber: 'EZ-10422', status: 'out_for_delivery', escrow: { status: 'held', autoReleaseAt: ahead(6) }, seller: seller('fashion'), items: [orderItem(products[3], 1, 'Midnight / M')], subtotal: usd(89.99), shipping: usd(0), total: usd(89.99), tracking: { carrier: 'J&T Express', number: 'JT8842019921', url: null }, placedAt: ago(52), deliveredAt: null },
-  { id: 'o2', orderNumber: 'EZ-10391', status: 'processing', escrow: { status: 'held', autoReleaseAt: ahead(7) }, seller: seller('techstore'), items: [orderItem(products[0], 1)], subtotal: usd(79.99), shipping: usd(0), total: usd(79.99), tracking: null, placedAt: ago(20), deliveredAt: null },
-  { id: 'o3', orderNumber: 'EZ-10240', status: 'completed', escrow: { status: 'released', autoReleaseAt: null }, seller: seller('glowcare'), items: [orderItem(products[5], 2)], subtotal: usd(69.98), shipping: usd(0), total: usd(69.98), tracking: { carrier: 'DHL', number: 'DHL77120931', url: null }, placedAt: ago(24 * 12), deliveredAt: ago(24 * 8) },
-  { id: 'o4', orderNumber: 'EZ-10188', status: 'refund_requested', escrow: { status: 'disputed', autoReleaseAt: null }, seller: seller('workspace'), items: [orderItem(products[2], 1)], subtotal: usd(45.99), shipping: usd(4.99), total: usd(50.98), tracking: null, placedAt: ago(24 * 18), deliveredAt: ago(24 * 14) },
+  { id: 'o1', orderNumber: 'EZ-10422', status: 'out_for_delivery', escrow: { status: 'held', autoReleaseAt: ahead(6) }, seller: seller('fashion'), ...buyerBits, items: [orderItem(products[3], 1, 'Midnight / M')], subtotal: usd(89.99), shipping: usd(0), total: usd(89.99), tracking: { carrier: 'J&T Express', number: 'JT8842019921', url: null }, placedAt: ago(52), deliveredAt: null },
+  { id: 'o2', orderNumber: 'EZ-10391', status: 'processing', escrow: { status: 'held', autoReleaseAt: ahead(7) }, seller: seller('techstore'), ...buyerBits, items: [orderItem(products[0], 1)], subtotal: usd(79.99), shipping: usd(0), total: usd(79.99), tracking: null, placedAt: ago(20), deliveredAt: null },
+  { id: 'o3', orderNumber: 'EZ-10240', status: 'completed', escrow: { status: 'released', autoReleaseAt: null }, seller: seller('glowcare'), ...buyerBits, items: [orderItem(products[5], 2)], subtotal: usd(69.98), shipping: usd(0), total: usd(69.98), tracking: { carrier: 'DHL', number: 'DHL77120931', url: null }, placedAt: ago(24 * 12), deliveredAt: ago(24 * 8) },
+  { id: 'o4', orderNumber: 'EZ-10188', status: 'refund_requested', escrow: { status: 'disputed', autoReleaseAt: null }, seller: seller('workspace'), ...buyerBits, items: [orderItem(products[2], 1)], subtotal: usd(45.99), shipping: usd(4.99), total: usd(50.98), tracking: null, placedAt: ago(24 * 18), deliveredAt: ago(24 * 14) },
+];
+
+export const reviews: Review[] = [
+  { id: 'rev-001', productId: 'prod-001', user: summary(byUsername('fashionista_maya')!), rating: 5, text: 'ANC is genuinely class‑leading and the 30h battery is real. Shipped in a day.', verifiedPurchase: true, reply: null, createdAt: ago(24 * 3) },
+  { id: 'rev-002', productId: 'prod-001', user: summary(byUsername('tech_reviews_pro')!), rating: 4, text: 'Great sound. Ear cups run a little warm on long sessions.', verifiedPurchase: true, reply: { text: 'Thanks Alex — the vented cushions ship free to existing buyers, DM us!', at: ago(24 * 1.5) }, createdAt: ago(24 * 2) },
+  { id: 'rev-003', productId: 'prod-002', user: summary(byUsername('fitwithdan')!), rating: 3, text: 'Strap clasp popped open twice during runs. Watch itself is fine.', verifiedPurchase: true, reply: null, createdAt: ago(20) },
+  { id: 'rev-004', productId: 'prod-004', user: summary(byUsername('noor.travels')!), rating: 5, text: 'Leather smells amazing and the laptop sleeve fits my 15”.', verifiedPurchase: false, reply: null, createdAt: ago(24 * 6) },
+  { id: 'rev-005', productId: 'prod-002', user: summary(byUsername('glow.with.sara')!), rating: 5, text: 'Sleep tracking finally matches my ring. Battery lasted 8 days.', verifiedPurchase: true, reply: null, createdAt: ago(24 * 9) },
 ];
 
 export const addresses: Address[] = [

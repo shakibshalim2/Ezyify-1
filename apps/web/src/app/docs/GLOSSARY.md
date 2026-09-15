@@ -823,4 +823,4 @@ Documented operational procedures for running the production system.
 
 ---
 
-*If you encounter a term not defined here, please request an addition via [documentation@ezyify.com]*
+*If you encounter a term not defined here, please request an addition via [documentation@ezyify.app]*

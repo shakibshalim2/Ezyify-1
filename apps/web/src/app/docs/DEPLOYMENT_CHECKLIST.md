@@ -446,9 +446,9 @@ This checklist ensures all escrow, payout, and fraud prevention systems are read
 
 ### Communication Channels
 - **Slack:** #production-incidents
-- **Email:** incidents@ezyify.com
+- **Email:** incidents@ezyify.app
 - **Phone:** Emergency hotline
-- **Status Page:** https://status.ezyify.com
+- **Status Page:** https://status.ezyify.app
 
 ---
 

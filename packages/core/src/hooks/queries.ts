@@ -1,6 +1,8 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type { z } from 'zod';
-import type { FeedQuery, ProductQuery } from '../api/endpoints.js';
+import type { FeedQuery, ProductQuery, SellerProductQuery } from '../api/endpoints.js';
+import type { CreatePayoutMethodRequest, CreateReviewRequest, PayoutMethod, SellerReviewFilter, ShipOrderRequest } from '../schemas/index.js';
+import type { SearchType } from '../schemas/index.js';
 import type { paginated } from '../schemas/common.js';
 import type { Cart, CheckoutRequest, CreateAddressRequest, CreatePostRequest, Post, UpdateProfileRequest, UserProfile } from '../schemas/index.js';
 import { useApi, useAuth } from './index.js';
@@ -16,9 +18,20 @@ export const queryKeys = {
   products: (params: Record<string, unknown> = {}) => ['products', params] as const,
   product: (id: string) => ['product', id] as const,
   categories: ['categories'] as const,
+  sellerProducts: (params: Record<string, unknown> = {}) => ['seller', 'products', params] as const,
+  sellerDashboard: (params: Record<string, unknown> = {}) => ['seller', 'dashboard', params] as const,
+  sellerAnalytics: (params: Record<string, unknown> = {}) => ['seller', 'analytics', params] as const,
+  sellerCustomers: (params: Record<string, unknown> = {}) => ['seller', 'customers', params] as const,
+  sellerReviews: (params: Record<string, unknown> = {}) => ['seller', 'reviews', params] as const,
+  sellerEarnings: ['seller', 'earnings'] as const,
+  payoutMethods: ['seller', 'payout-methods'] as const,
+  productReviews: (productId: string, params: Record<string, unknown> = {}) => ['products', productId, 'reviews', params] as const,
   search: (q: string) => ['search', q] as const,
+  unifiedSearch: (q: string, type: SearchType = 'all') => ['search', 'all', q, type] as const,
   cart: ['cart'] as const,
   orders: (params: Record<string, unknown> = {}) => ['orders', params] as const,
+  sellerOrders: (params: Record<string, unknown> = {}) => ['orders', 'seller', params] as const,
+  sellerOrdersSummary: ['orders', 'seller', 'summary'] as const,
   order: (id: string) => ['order', id] as const,
   orderTimeline: (id: string) => ['order', id, 'timeline'] as const,
   addresses: ['addresses'] as const,
@@ -35,6 +48,8 @@ export const queryKeys = {
   notifications: ['notifications'] as const,
   unreadCount: ['notifications', 'unread'] as const,
   blocked: ['blocked'] as const,
+  sessions: ['auth', 'sessions'] as const,
+  mfa: ['auth', 'mfa'] as const,
 };
 
 /** Shared cursor for every paginated endpoint: page numbers, `hasMore` from the envelope. */
@@ -68,6 +83,98 @@ export function useCategories() {
 export function useSearch(q: string, query: PageQuery = {}) {
   const api = useApi();
   return useQuery({ queryKey: [...queryKeys.search(q), query], queryFn: () => api.catalog.search(q, query), enabled: q.trim().length > 0 });
+}
+
+/** Searches all discoverable entities through the sectioned search endpoint. */
+export function useUnifiedSearch(q: string, type: SearchType = 'all') {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.unifiedSearch(q, type), queryFn: () => api.search.all(q, { type }), enabled: q.trim().length > 0 });
+}
+
+/** Seller hub inventory (role seller/admin); keeps previous page while filters change so counts don't flicker. */
+export function useSellerProducts(query: SellerProductQuery = {}) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sellerProducts(query), queryFn: () => api.seller.products(query), enabled: authed, placeholderData: keepPreviousData });
+}
+
+export function useSellerDashboard(query: { days?: number } = {}) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sellerDashboard(query), queryFn: () => api.seller.dashboard(query), enabled: authed, placeholderData: keepPreviousData, staleTime: 60_000 });
+}
+
+export function useSellerAnalytics(query: { days?: number } = {}) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sellerAnalytics(query), queryFn: () => api.seller.analytics(query), enabled: authed, placeholderData: keepPreviousData, staleTime: 60_000 });
+}
+
+export function useSellerCustomers(query: PageQuery & { q?: string; sort?: 'recent' | 'spent' | 'orders' } = {}) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sellerCustomers(query), queryFn: () => api.seller.customers(query), enabled: authed, placeholderData: keepPreviousData });
+}
+
+export function useProductReviews(productId: string | undefined, query: PageQuery = {}) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.productReviews(productId ?? '', query), queryFn: () => api.catalog.reviews(productId!, query), enabled: !!productId, staleTime: 60_000 });
+}
+
+export function useCreateReview(productId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateReviewRequest) => api.catalog.review(productId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['products', productId] });
+      qc.invalidateQueries({ queryKey: queryKeys.product(productId) });
+    },
+  });
+}
+
+export function useSellerReviews(query: PageQuery & { filter?: SellerReviewFilter; productId?: string } = {}) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sellerReviews(query), queryFn: () => api.seller.reviews(query), enabled: authed, placeholderData: keepPreviousData });
+}
+
+export function useReplyReview() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { reviewId: string; text: string }) => api.seller.replyReview(v.reviewId, { text: v.text }),
+    onSuccess: r => {
+      qc.invalidateQueries({ queryKey: ['seller', 'reviews'] });
+      qc.invalidateQueries({ queryKey: ['products', r.productId, 'reviews'] });
+    },
+  });
+}
+
+export function useSellerEarnings() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sellerEarnings, queryFn: () => api.seller.earnings(), enabled: authed, staleTime: 30_000 });
+}
+
+export function usePayoutMethods() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.payoutMethods, queryFn: () => api.seller.payoutMethods(), enabled: authed });
+}
+
+export function usePayoutMethodAction() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { action: 'add'; body: CreatePayoutMethodRequest } | { action: 'remove' | 'default'; id: string }): Promise<PayoutMethod | null> => {
+      if (v.action === 'add') return api.seller.addPayoutMethod(v.body);
+      if (v.action === 'default') return api.seller.setDefaultPayoutMethod(v.id);
+      await api.seller.removePayoutMethod(v.id);
+      return null;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.payoutMethods }),
+  });
 }
 
 // ---------- Social ----------
@@ -341,6 +448,52 @@ export function useOrderAction() {
   });
 }
 
+/** Seller hub orders (role seller); the buyer list uses `useOrders`. */
+export function useSellerOrders(query: PageQuery & { status?: string } = {}) {
+  const api = useApi();
+  const authed = useAuthed();
+  return useInfiniteQuery({
+    queryKey: queryKeys.sellerOrders(query),
+    queryFn: ({ pageParam }) => api.sellerOrders.list({ ...query, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
+    enabled: authed,
+  });
+}
+
+export function useSellerOrdersSummary() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sellerOrdersSummary, queryFn: () => api.sellerOrders.summary(), enabled: authed, placeholderData: keepPreviousData });
+}
+
+export type SellerOrderAction =
+  | { id: string; action: 'accept' | 'deliver' | 'approveRefund' | 'cancel' }
+  | { id: string; action: 'ship'; body: ShipOrderRequest };
+
+export function useSellerOrderAction() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: SellerOrderAction) => {
+      switch (v.action) {
+        case 'accept': return api.sellerOrders.accept(v.id);
+        case 'ship': return api.sellerOrders.ship(v.id, v.body);
+        case 'deliver': return api.sellerOrders.deliver(v.id);
+        case 'approveRefund': return api.sellerOrders.approveRefund(v.id);
+        case 'cancel': return api.sellerOrders.cancel(v.id);
+      }
+    },
+    onSuccess: order => {
+      qc.setQueryData(queryKeys.order(order.id), order);
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: queryKeys.orderTimeline(order.id) });
+      qc.invalidateQueries({ queryKey: queryKeys.wallet });
+      qc.invalidateQueries({ queryKey: ['seller'] });
+    },
+  });
+}
+
 export function useWallet() {
   const api = useApi();
   const authed = useAuthed();
@@ -355,6 +508,7 @@ function useWalletMutation<TVars>(fn: (api: ReturnType<typeof useApi>, vars: TVa
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.wallet });
       qc.invalidateQueries({ queryKey: queryKeys.transactions });
+      qc.invalidateQueries({ queryKey: queryKeys.sellerEarnings });
     },
   });
 }
@@ -440,4 +594,41 @@ export function useMarkNotificationsRead() {
       qc.invalidateQueries({ queryKey: queryKeys.unreadCount });
     },
   });
+}
+
+// ---------- Account security ----------
+
+export function useSessions() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.sessions, queryFn: () => api.auth.sessions(), enabled: authed });
+}
+
+export function useRevokeSession() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id?: string) => (id ? api.auth.revokeSession(id) : api.auth.logoutAll()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.sessions }),
+  });
+}
+
+export function useMfaStatus() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.mfa, queryFn: () => api.auth.mfa.status(), enabled: authed, staleTime: 60_000 });
+}
+
+/** Setup → enable → disable; every step refreshes the status query and the session list (enable revokes others). */
+export function useMfaActions() {
+  const api = useApi();
+  const qc = useQueryClient();
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: queryKeys.mfa });
+    qc.invalidateQueries({ queryKey: queryKeys.sessions });
+  };
+  const setup = useMutation({ mutationFn: () => api.auth.mfa.setup() });
+  const enable = useMutation({ mutationFn: (code: string) => api.auth.mfa.enable(code), onSuccess: refresh });
+  const disable = useMutation({ mutationFn: (code: string) => api.auth.mfa.disable(code), onSuccess: refresh });
+  return { setup, enable, disable };
 }

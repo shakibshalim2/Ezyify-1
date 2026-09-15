@@ -21,7 +21,8 @@
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "lighthouse": "lhci autorun",
     "e2e:update-snapshots": "PW_VISUAL=1 playwright test --update-snapshots",
-    "e2e:visual": "PW_VISUAL=1 playwright test"
+    "e2e:visual": "PW_VISUAL=1 playwright test",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "@ezyify/core": "workspace:*",
@@ -56,6 +57,7 @@
     "@radix-ui/react-toggle-group": "1.1.2",
     "@radix-ui/react-tooltip": "1.1.8",
     "@radix-ui/react-visually-hidden": "1.1.1",
+    "@sentry/react": "^10.74.0",
     "@tanstack/react-query": "^5.62.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
@@ -64,6 +66,8 @@
     "input-otp": "1.4.2",
     "lucide-react": "0.487.0",
     "motion": "12.23.24",
+    "posthog-js": "^1.433.2",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-day-picker": "8.10.1",
     "react-dom": "^18.3.1",
@@ -75,6 +79,7 @@
     "tailwind-merge": "3.2.0",
     "tw-animate-css": "1.3.8",
     "vaul": "1.1.2",
+    "vite-plugin-pwa": "^1.3.0",
     "zod": "^3.24.1",
     "zustand": "^5.0.2"
   },
@@ -82,12 +87,14 @@
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.17.0",
     "@ezyify/config": "workspace:*",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "4.1.12",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",
     "@types/node": "^22.10.2",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "4.7.0",
@@ -95,17 +102,19 @@
     "axe-core": "^4.13.0",
     "eslint": "^9.17.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.16",
     "globals": "^15.14.0",
     "jsdom": "^25.0.1",
     "prettier": "^3.4.2",
+    "sharp": "^0.35.4",
     "tailwindcss": "4.1.12",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.18.1",
     "vite": "6.3.5",
     "vitest": "^2.1.8",
     "vitest-axe": "^0.1.0",
-    "@lhci/cli": "^0.15.1"
+    "workbox-window": "^7.4.1"
   }
 }

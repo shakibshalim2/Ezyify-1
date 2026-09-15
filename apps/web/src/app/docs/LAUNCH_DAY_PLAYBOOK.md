@@ -179,8 +179,8 @@ pm2 restart ezyify-web
 
 # Step 4: Verify services
 pm2 status
-curl https://api.ezyify.com/health
-curl https://ezyify.com
+curl https://api.ezyify.app/health
+curl https://ezyify.app
 ```
 
 **9:15 AM - Smoke Tests**
@@ -366,7 +366,7 @@ pm2 restart ezyify-web
 # Set escrow_enabled = false in admin panel
 
 # Verify rollback successful
-curl https://api.ezyify.com/health
+curl https://api.ezyify.app/health
 ```
 
 ---

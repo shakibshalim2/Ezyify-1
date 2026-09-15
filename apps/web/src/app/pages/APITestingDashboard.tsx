@@ -348,9 +348,9 @@ const APITestingDashboard = () => {
       case 'local':
         return 'http://localhost:3000';
       case 'staging':
-        return 'https://staging.ezyify.com';
+        return 'https://staging.ezyify.app';
       case 'production':
-        return 'https://api.ezyify.com';
+        return 'https://api.ezyify.app';
       default:
         return 'http://localhost:3000';
     }

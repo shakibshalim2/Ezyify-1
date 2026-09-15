@@ -6,15 +6,16 @@ import {
   Repeat2, Play, Zap, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { formatCompactNumber as fmtCount, formatMoney, formatRelativeTime, useProduct, useProfile, useToggleFollow, useToggleLike, useToggleSave, type Post } from '@ezyify/core';
+import { avatarUrlFor, formatCompactNumber as fmtCount, formatMoney, formatRelativeTime, useProduct, useProfile, useToggleFollow, useToggleLike, useToggleSave, type Post } from '@ezyify/core';
 import { VerifiedBadge } from './VerifiedBadge';
 import { CommentSheet } from './CommentSheet';
 import { RepostSheet } from './RepostSheet';
 import { toast } from 'sonner';
 import { useAddLine, useAuthed, useInCart } from '../lib/data';
 import { formErrors } from '../lib/apiErrors';
+import { Img } from './primitives/Img';
 
-const avatarOf = (u: { avatarUrl: string | null; name: string }) => u.avatarUrl ?? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.name)}`;
+const avatarOf = (u: { avatarUrl: string | null; name: string }) => avatarUrlFor(u, 72);
 
 /** Tagged-product chip: the post only carries ids. */
 function ProductChip({ id, onAdd, inCart, pending }: { id: string; onAdd: (id: string, name: string) => void; inCart: boolean; pending: boolean }) {
@@ -32,7 +33,7 @@ function ProductChip({ id, onAdd, inCart, pending }: { id: string; onAdd: (id: s
         onClick={e => { e.preventDefault(); e.stopPropagation(); onAdd(id, product.name); }}
         disabled={pending || !product.inStock}
         aria-label={inCart ? 'In cart' : `Add ${product.name} to cart`}
-        className={`mr-1 p-1 rounded-lg transition-all duration-200 ${inCart ? 'bg-emerald-500/15 text-emerald-600' : 'hover:bg-primary/10 text-foreground-secondary hover:text-primary'}`}
+        className={`mr-1 p-1 rounded-lg transition-all duration-200 ${inCart ? 'bg-success/15 text-success' : 'hover:bg-primary/10 text-foreground-secondary hover:text-primary'}`}
       >
         {inCart ? <Check className="w-3.5 h-3.5" /> : <ShoppingCart className="w-3.5 h-3.5" />}
       </button>
@@ -172,8 +173,8 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0,
       {/* Reposted-by-you bar */}
       {isReposted && (
         <div className="flex items-center gap-1.5 px-3.5 pt-2.5 pb-0">
-          <Repeat2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-          <span className="text-[11px] font-semibold text-emerald-600">You reposted</span>
+          <Repeat2 className="w-3.5 h-3.5 text-success shrink-0" />
+          <span className="text-[11px] font-semibold text-success">You reposted</span>
         </div>
       )}
 
@@ -184,11 +185,11 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0,
             {isLive ? (
               <div className="p-[2.5px] rounded-full" style={{ background: 'linear-gradient(135deg, var(--error), var(--orange-500))' }}>
                 <div className="bg-card p-[2px] rounded-full">
-                  <img loading="lazy" src={avatarOf(post.author)} alt={post.author.name} className="w-9 h-9 rounded-full object-cover" />
+                  <Img loading="lazy" src={avatarOf(post.author)} alt={post.author.name} className="w-9 h-9 rounded-full object-cover" />
                 </div>
               </div>
             ) : (
-              <img loading="lazy" src={avatarOf(post.author)} alt={post.author.name} className="w-9 h-9 rounded-full object-cover ring-[1.5px] ring-border/60 group-hover:ring-2 group-hover:ring-primary/30 transition-all" />
+              <Img loading="lazy" src={avatarOf(post.author)} alt={post.author.name} className="w-9 h-9 rounded-full object-cover ring-[1.5px] ring-border/60 group-hover:ring-2 group-hover:ring-primary/30 transition-all" />
             )}
             {isLive && (
               <span className="absolute -bottom-0.5 -right-0.5 px-1 py-px rounded-full text-[8px] font-black text-error-foreground leading-none bg-error border border-card">
@@ -412,7 +413,7 @@ export const PostCard = React.memo(function PostCard({ post, animationDelay = 0,
             aria-label={isReposted ? 'Undo repost' : 'Repost'}
             aria-pressed={isReposted}
             className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 active:scale-[0.88] ${
-              isReposted ? 'text-emerald-500 hover:bg-emerald-500/10' : 'text-foreground-secondary hover:text-foreground hover:bg-muted/60'
+              isReposted ? 'text-success hover:bg-success/10' : 'text-foreground-secondary hover:text-foreground hover:bg-muted/60'
             }`}
           >
             <Repeat2 className="w-[18px] h-[18px] shrink-0" />

@@ -76,7 +76,7 @@ export default function ReferralTrackingPage() {
   });
   const [referrals, setReferrals] = useState<any[]>([]);
 
-  const referralLink = `https://ezyify.com/ref/${referralCode}`;
+  const referralLink = `https://ezyify.app/ref/${referralCode}`;
 
   // Load referral data progressively
   useEffect(() => {

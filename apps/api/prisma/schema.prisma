@@ -66,6 +66,11 @@ enum PaymentMethod {
   cod
 }
 
+enum PayoutMethodType {
+  bank_account
+  ewallet
+}
+
 enum TransactionType {
   topup
   purchase
@@ -124,6 +129,12 @@ enum DevicePlatform {
   web
 }
 
+enum LiveSessionStatus {
+  scheduled
+  live
+  ended
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -145,13 +156,19 @@ model User {
   failedLogins  Int       @default(0)
   lockedUntil   DateTime?
   passwordChangedAt DateTime?
+  // TOTP MFA (ASVS 2.8): secret is AES-256-GCM encrypted at rest; recovery codes are sha256 hashes, removed on use.
+  mfaSecret     String?
+  mfaEnabledAt  DateTime?
+  mfaRecoveryCodes String[] @default([])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   sessions      RefreshSession[]
   otps          OtpCode[]
+  mfaChallenges MfaChallenge[]
   devices       Device[]
   wallet        Wallet?
+  payoutMethods PayoutMethod[]
   addresses     Address[]
   products      Product[]        @relation("SellerProducts")
   cart          Cart?
@@ -171,9 +188,45 @@ model User {
   actedNotifs   Notification[]   @relation("Actor")
   reports       Report[]         @relation("Reporter")
   reviews       Review[]
+  liveSessions  LiveSession[]    @relation("LiveSessionHost")
+  liveViews     LiveViewer[]
 
   @@index([role])
   @@index([deletedAt])
+}
+
+model LiveSession {
+  id              String            @id @default(cuid())
+  hostId          String
+  host            User              @relation("LiveSessionHost", fields: [hostId], references: [id], onDelete: Cascade)
+  title           String            @db.VarChar(120)
+  status          LiveSessionStatus
+  category        String?           @db.VarChar(80)
+  coverUrl        String?
+  productIds      String[]          @default([])
+  pinnedProductId String?
+  likes           Int               @default(0)
+  peakViewers     Int               @default(0)
+  scheduledFor    DateTime?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  viewers         LiveViewer[]
+
+  @@index([status, startedAt])
+  @@index([hostId])
+}
+
+model LiveViewer {
+  sessionId  String
+  session    LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSeenAt DateTime    @default(now())
+
+  @@id([sessionId, userId])
+  @@index([sessionId, lastSeenAt])
 }
 
 /// Refresh-token rotation: each row is one device session; `replacedById` chain detects reuse.
@@ -188,6 +241,20 @@ model RefreshSession {
   revokedAt    DateTime?
   replacedById String?
   createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Login step-up: password accepted, TOTP / recovery code still pending. Short-lived, single use, hashed token.
+model MfaChallenge {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([expiresAt])
@@ -310,9 +377,14 @@ model Review {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   rating    Int
   text      String?
+  /** Set when the review was left from a completed order → "Verified purchase". */
+  orderId   String?
+  reply     String?
+  repliedAt DateTime?
   createdAt DateTime @default(now())
 
   @@unique([productId, userId])
+  @@index([productId, createdAt(sort: Desc)])
 }
 
 model Cart {
@@ -429,6 +501,25 @@ model RefundRequest {
   resolvedAt DateTime?
 
   @@index([orderId])
+}
+
+/** Seller payout destination; the account number is AES‑256‑GCM encrypted (`MFA_ENCRYPTION_KEY`), only last4 in clear. */
+model PayoutMethod {
+  id               String           @id @default(cuid())
+  userId           String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type             PayoutMethodType @default(bank_account)
+  label            String
+  holderName       String
+  institution      String
+  accountLast4     String
+  accountEncrypted String
+  routing          String?
+  country          String           @default("ID")
+  isDefault        Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+
+  @@index([userId])
 }
 
 model Wallet {
@@ -627,10 +718,12 @@ model Report {
   reason     String
   details    String?          @db.VarChar(1000)
   status     ReportStatus     @default(open)
+  /// 2 = child safety (CSAE), 1 = self-harm / violence, 0 = everything else. Queue is ordered priority desc, createdAt asc.
+  priority   Int              @default(0)
   createdAt  DateTime         @default(now())
   resolvedAt DateTime?
 
-  @@index([status, createdAt])
+  @@index([status, priority(sort: Desc), createdAt])
   @@index([targetType, targetId])
 }
 

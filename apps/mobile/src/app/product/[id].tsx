@@ -65,7 +65,7 @@ function SellerCard({ username, verified, name }: { username: string; verified: 
   const profile = useProfile(username);
   return (
     <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }}>
-      <Avatar uri={profile.data?.avatarUrl ?? null} size={44} verified={verified} />
+      <Avatar uri={profile.data?.avatarUrl ?? null} name={profile.data?.name} size={44} verified={verified} />
       <View style={{ flex: 1 }}>
         <Text variant="bodyMedium">{name}</Text>
         <Text variant="caption" tone="secondary">{profile.data ? `${formatCompactNumber(profile.data.followers)} followers · ${profile.data.posts} posts` : 'Ships in 1–2 days'}</Text>

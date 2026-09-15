@@ -6,6 +6,7 @@ import { discountPercent, formatCompactNumber, formatMoney, type ProductSummary 
 import { useAddLine, useInCart } from '../../lib/data';
 import { useWishlist } from '../../lib/wishlist';
 import { formErrors } from '../../lib/apiErrors';
+import { Img } from '../primitives/Img';
 
 interface ProductCardProps {
   product: ProductSummary & { soldCount?: number };
@@ -58,7 +59,7 @@ export const ProductCard = React.memo(({ product, size = 'normal' }: ProductCard
           <div className="absolute top-2.5 left-2.5 z-10 bg-primary text-primary-foreground text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm">{BADGE_LABEL[product.badge]}</div>
         ) : null}
 
-        <img src={product.imageUrl} alt={product.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-400 group-hover:scale-105" />
+        <Img src={product.imageUrl} alt={product.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-400 group-hover:scale-105" />
 
         <div className="absolute top-2.5 right-2.5 flex flex-col gap-2 transition-all duration-200 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 focus-within:opacity-100 focus-within:translate-y-0">
           <button

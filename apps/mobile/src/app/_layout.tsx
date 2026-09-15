@@ -54,6 +54,8 @@ function RootStack() {
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="product/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="loops" options={{ animation: 'fade', contentStyle: { backgroundColor: '#000' } }} />
+        <Stack.Screen name="live/index" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="live/[id]" options={{ animation: 'fade', presentation: 'fullScreenModal', contentStyle: { backgroundColor: '#000' } }} />
         <Stack.Screen name="story/[id]" options={{ animation: 'fade', presentation: 'fullScreenModal', contentStyle: { backgroundColor: '#000' } }} />
         <Stack.Screen name="create" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="cart" options={{ animation: 'slide_from_right' }} />

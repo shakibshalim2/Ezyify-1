@@ -32,7 +32,7 @@ export default function BlockedScreen() {
         }
         renderItem={({ item }) => (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, backgroundColor: colors.card, borderRadius: radius.card, borderWidth: 1, borderColor: colors.borderSubtle }}>
-            <Avatar uri={item.avatarUrl} size={44} />
+            <Avatar uri={item.avatarUrl} name={item.name} size={44} />
             <View style={{ flex: 1 }}>
               <Text variant="bodyMedium" onPress={() => router.push({ pathname: '/profile/[username]', params: { username: item.username } })}>{item.name}</Text>
               <Text variant="caption" tone="secondary">@{item.username}</Text>

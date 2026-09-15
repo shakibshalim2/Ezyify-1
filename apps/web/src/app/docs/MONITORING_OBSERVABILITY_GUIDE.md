@@ -499,13 +499,13 @@ When alert fires → Link to relevant runbook section:
 
 ```yaml
 alert: WithdrawalFailureSpike
-runbook_url: https://docs.ezyify.com/runbooks/withdrawal-failure-spike
+runbook_url: https://docs.ezyify.app/runbooks/withdrawal-failure-spike
 ```
 
 Example runbook URLs:
-- `https://docs.ezyify.com/runbooks/escrow-balance-mismatch`
-- `https://docs.ezyify.com/runbooks/api-error-rate-high`
-- `https://docs.ezyify.com/runbooks/database-pool-exhausted`
+- `https://docs.ezyify.app/runbooks/escrow-balance-mismatch`
+- `https://docs.ezyify.app/runbooks/api-error-rate-high`
+- `https://docs.ezyify.app/runbooks/database-pool-exhausted`
 
 ---
 

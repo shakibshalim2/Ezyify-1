@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Notification, RegisterDeviceRequest } from '@ezyify/core';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
-import { ENV, type Env } from '../../config.js';
+import { FCM_TRANSPORT, type FcmTransport } from './fcm.provider.js';
 import { PageQuerySchema, page, skipTake } from '../../common/pagination.js';
 import { toUserSummary } from '../users/users.mapper.js';
 import type { z } from 'zod';
@@ -13,7 +13,7 @@ const toNotification = (n: Row): Notification => ({ id: n.id, type: n.type, acto
 @Injectable()
 export class NotificationsService {
   private readonly log = new Logger(NotificationsService.name);
-  constructor(private readonly prisma: PrismaService, @Inject(ENV) private readonly env: Env) {}
+  constructor(private readonly prisma: PrismaService, @Inject(FCM_TRANSPORT) private readonly fcm: FcmTransport) {}
 
   async list(userId: string, q: z.infer<typeof PageQuerySchema>) {
     const [rows, total] = await this.prisma.$transaction([
@@ -51,15 +51,28 @@ export class NotificationsService {
     return { ok: true as const };
   }
 
-  /** FCM HTTP v1 delivery; without a service account we log instead so dev/test never hit the network. */
-  async push(userId: string, title: string, body: string, data: Record<string, string> = {}) {
+  /**
+   * FCM HTTP v1 delivery per device; without a service account we log instead so dev/test never hit the network.
+   * Returns the number of devices delivered to. Stale tokens (UNREGISTERED/NOT_FOUND) are deleted.
+   */
+  async push(userId: string, title: string, body: string, data: Record<string, string> = {}, channelId?: string) {
     const devices = await this.prisma.device.findMany({ where: { userId } });
     if (!devices.length) return 0;
-    if (!this.env.FCM_SERVICE_ACCOUNT_JSON) {
+    if (!this.fcm.enabled) {
       this.log.debug(`push→${userId} [${devices.length} device(s)] ${title}: ${body} ${JSON.stringify(data)}`);
       return devices.length;
     }
-    // Real FCM v1 send lands in Phase 6 (google-auth-library → fcm.googleapis.com/v1/projects/{id}/messages:send).
-    return devices.length;
+    let delivered = 0;
+    const stale: string[] = [];
+    await Promise.all(
+      devices.map(async d => {
+        const r = await this.fcm.send({ token: d.token, title, body, data, channelId }).catch((e: Error) => ({ ok: false as const, status: 0, unregistered: false, error: e.message }));
+        if (r.ok) delivered++;
+        else if (r.unregistered) stale.push(d.token);
+        else this.log.warn(`push→${userId} device ${d.id} failed: ${r.error ?? r.status}`);
+      }),
+    );
+    if (stale.length) await this.prisma.device.deleteMany({ where: { token: { in: stale } } }).catch(() => undefined);
+    return delivered;
   }
 }

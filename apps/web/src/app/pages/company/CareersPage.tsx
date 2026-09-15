@@ -332,7 +332,7 @@ export default function CareersPage() {
                           </span>
                         </div>
                       </div>
-                      <Button onClick={() => toast.info(`Application for "${position.title}" coming soon! Send your resume to careers@ezyify.com`)}>
+                      <Button onClick={() => toast.info(`Application for "${position.title}" coming soon! Send your resume to careers@ezyify.app`)}>
                         Apply Now
                         <ArrowRight className="w-4 h-4 ml-2" />
                       </Button>
@@ -354,7 +354,7 @@ export default function CareersPage() {
               Send General Application
             </Button>
             <p className="text-sm mt-4 opacity-80">
-              Or email us at <a href="mailto:careers@ezyify.com" className="underline font-medium">careers@ezyify.com</a>
+              Or email us at <a href="mailto:careers@ezyify.app" className="underline font-medium">careers@ezyify.app</a>
             </p>
           </div>
         </>

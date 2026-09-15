@@ -18,7 +18,7 @@ function CommentRow({ c }: { c: Comment }) {
   const router = useRouter();
   return (
     <View style={{ flexDirection: 'row', gap: 10 }}>
-      <Avatar uri={c.author.avatarUrl} size={34} />
+      <Avatar uri={c.author.avatarUrl} name={c.author.name} size={34} />
       <View style={{ flex: 1, gap: 2 }}>
         <Text>
           <Text variant="bodyMedium" onPress={() => router.push({ pathname: '/profile/[username]', params: { username: c.author.username } })}>{c.author.username} </Text>
@@ -91,7 +91,7 @@ export default function PostDetailScreen() {
       />
       {add.error && <ErrorState compact error={add.error} onRetry={send} />}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 8, paddingBottom: insets.bottom + 8, borderTopWidth: 1, borderTopColor: colors.borderSubtle, backgroundColor: colors.background }}>
-        <Avatar uri={me?.avatarUrl ?? null} size={34} />
+        <Avatar uri={me?.avatarUrl ?? null} name={me?.name} size={34} />
         <View style={{ flex: 1 }}><SearchBar placeholder={authed ? 'Add a comment…' : 'Sign in to comment'} value={draft} onChangeText={setDraft} onSubmitEditing={send} onFocus={() => !authed && router.push('/(auth)/login')} returnKeyType="send" maxLength={1000} /></View>
         <IconButton icon="send" label="Post comment" color={draft ? colors.primary : colors.foregroundTertiary} disabled={!draft || add.isPending} onPress={send} />
       </View>

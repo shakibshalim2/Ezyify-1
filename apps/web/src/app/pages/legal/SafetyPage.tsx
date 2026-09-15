@@ -265,7 +265,7 @@ export default function SafetyPage() {
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          Safety emergencies: <a href="mailto:safety@ezyify.com" className="text-primary hover:underline font-medium">safety@ezyify.com</a>
+          Safety emergencies: <a href="mailto:safety@ezyify.app" className="text-primary hover:underline font-medium">safety@ezyify.app</a>
         </p>
         <p className="text-sm text-muted-foreground">
           For law enforcement: See our <Link to="/safety-trust" className="text-primary hover:underline">Safety &amp; Trust Guidelines</Link>

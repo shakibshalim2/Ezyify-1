@@ -41,10 +41,13 @@ export class WalletService {
   async withdraw(userId: string, body: z.infer<typeof WithdrawSchema>): Promise<Transaction> {
     const w = await this.ensure(userId);
     if (body.amount > w.balance) throw validation({ amount: 'Insufficient balance' });
+    // The destination must be one of the caller's saved payout methods — never a free‑form account from the client.
+    const method = await this.prisma.payoutMethod.findFirst({ where: { id: body.payoutMethodId, userId }, select: { id: true, institution: true, accountLast4: true } });
+    if (!method) throw validation({ payoutMethodId: 'Choose a saved payout method' });
     const [, tx] = await this.prisma.$transaction([
       this.prisma.wallet.update({ where: { id: w.id }, data: { balance: { decrement: body.amount }, pending: { increment: body.amount } } }),
       this.prisma.transaction.create({
-        data: { walletId: w.id, type: 'withdrawal', direction: 'out', amount: body.amount, currency: w.currency, status: 'pending', description: 'Withdrawal to bank account', reference: body.payoutMethodId },
+        data: { walletId: w.id, type: 'withdrawal', direction: 'out', amount: body.amount, currency: w.currency, status: 'pending', description: `Withdrawal · ${method.institution} ••••${method.accountLast4}`, reference: method.id },
       }),
     ]);
     return toTransaction(tx);
