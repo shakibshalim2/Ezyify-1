@@ -3,7 +3,7 @@ import { ZodError } from 'zod';
 import { createApiClient } from '../api/client.js';
 import { createEndpoints } from '../api/endpoints.js';
 import { createMockFetch, MOCK_CREDENTIALS } from './server.js';
-import { isMfaChallenge } from '../schemas/index.js';
+import { DEFAULT_NOTIFICATION_PREFERENCES, isMfaChallenge } from '../schemas/index.js';
 import { OrderSchema, PostSchema, ProductDetailSchema, UserProfileSchema } from '../schemas/index.js';
 
 /** The mock server is exercised through the real client + endpoint map, so every response is contract-validated. */
@@ -99,6 +99,18 @@ describe('mock API server', () => {
     expect(r.summary.total).toBe(r.items.length);
     const q = await api.seller.products({ q: 'watch' });
     expect(q.items.map(p => p.id)).toEqual(['prod-002']);
+  });
+
+  it('notification preferences default from core, merge per category/channel and persist per user', async () => {
+    const { api, login } = harness();
+    await login();
+    expect(await api.notifications.preferences()).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+    const patched = await api.notifications.updatePreferences({ promos: { email: true }, social: { push: false } });
+    expect(patched.promos).toEqual({ push: false, email: true });
+    expect(patched.social).toEqual({ push: false, email: false });
+    expect(await api.notifications.preferences()).toEqual(patched);
+    await login('techstore@ezyify.test');
+    expect(await api.notifications.preferences()).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
   });
 
   it('seller product CRUD: drafts stay out of the public catalog, ownership is enforced, sold products archive instead of deleting', async () => {

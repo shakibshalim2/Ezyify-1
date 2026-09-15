@@ -65,6 +65,8 @@ import {
   SignupResponseSchema,
   TransactionSchema,
   UpdateProfileRequestSchema,
+  NotificationPreferencesSchema,
+  UpdateNotificationPreferencesRequestSchema,
   UserProfileSchema,
   UserSummarySchema,
   VerifyOtpRequestSchema,
@@ -98,6 +100,7 @@ import {
   type SignUploadRequest,
   type SignupRequest,
   type UpdateProfileRequest,
+  type UpdateNotificationPreferencesRequest,
   type VerifyOtpRequest,
 } from '../schemas/index.js';
 
@@ -266,6 +269,8 @@ export function createEndpoints(api: ApiClient) {
       /** Register/refresh this device's push token (FCM on Android, APNs on iOS, web push). */
       registerDevice: (body: RegisterDeviceRequest) => api.post('/devices', RegisterDeviceRequestSchema.parse(body), Ok),
       unregisterDevice: (token: string) => api.delete(`/devices/${enc(token)}`, Ok),
+      preferences: () => api.get('/users/me/notification-preferences', NotificationPreferencesSchema),
+      updatePreferences: (body: UpdateNotificationPreferencesRequest) => api.patch('/users/me/notification-preferences', UpdateNotificationPreferencesRequestSchema.parse(body), NotificationPreferencesSchema),
     },
     uploads: {
       sign: (body: SignUploadRequest) => api.post('/uploads/sign', SignUploadRequestSchema.parse(body), SignedUploadSchema),

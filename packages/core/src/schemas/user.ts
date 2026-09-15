@@ -88,3 +88,41 @@ export const ReportRequestSchema = z.object({
   details: z.string().max(1000).optional(),
 });
 export type ReportRequest = z.infer<typeof ReportRequestSchema>;
+
+/** Notification categories map 1:1 onto the Android channels the app creates; `email` mirrors them for mail digests. */
+export const NotificationCategorySchema = z.enum(['orders', 'social', 'messages', 'live', 'promos']);
+export type NotificationCategory = z.infer<typeof NotificationCategorySchema>;
+export const NotificationChannelPrefsSchema = z.object({ push: z.boolean(), email: z.boolean() });
+export const NotificationPreferencesSchema = z.object({
+  orders: NotificationChannelPrefsSchema,
+  social: NotificationChannelPrefsSchema,
+  messages: NotificationChannelPrefsSchema,
+  live: NotificationChannelPrefsSchema,
+  promos: NotificationChannelPrefsSchema,
+});
+export type NotificationPreferences = z.infer<typeof NotificationPreferencesSchema>;
+/** Defaults for a new account: everything on except marketing. Shared so client + API agree on unset values. */
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  orders: { push: true, email: true },
+  social: { push: true, email: false },
+  messages: { push: true, email: false },
+  live: { push: true, email: false },
+  promos: { push: false, email: false },
+};
+/** PATCH body: any subset of categories, each with any subset of channels. */
+export const UpdateNotificationPreferencesRequestSchema = z.object({
+  orders: NotificationChannelPrefsSchema.partial().optional(),
+  social: NotificationChannelPrefsSchema.partial().optional(),
+  messages: NotificationChannelPrefsSchema.partial().optional(),
+  live: NotificationChannelPrefsSchema.partial().optional(),
+  promos: NotificationChannelPrefsSchema.partial().optional(),
+});
+export type UpdateNotificationPreferencesRequest = z.infer<typeof UpdateNotificationPreferencesRequestSchema>;
+/** Merges a stored (possibly partial / legacy) value over the defaults. */
+export function resolveNotificationPreferences(stored: unknown): NotificationPreferences {
+  const parsed = UpdateNotificationPreferencesRequestSchema.safeParse(stored ?? {});
+  const patch = parsed.success ? parsed.data : {};
+  const out = { ...DEFAULT_NOTIFICATION_PREFERENCES };
+  for (const k of NotificationCategorySchema.options) out[k] = { ...DEFAULT_NOTIFICATION_PREFERENCES[k], ...(patch[k] ?? {}) };
+  return out;
+}

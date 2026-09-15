@@ -1,5 +1,5 @@
 import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, PayoutMethod, Post, ProductDetail, Review, SellerCustomer, SellerProduct, SellerProductDetail, SellerReview, UserProfile } from '../schemas/index.js';
-import { UpdateProfileRequestSchema, UpsertProductRequestSchema, UpdateProductRequestSchema } from '../schemas/index.js';
+import { UpdateNotificationPreferencesRequestSchema, UpdateProfileRequestSchema, UpsertProductRequestSchema, UpdateProductRequestSchema, resolveNotificationPreferences, type NotificationPreferences } from '../schemas/index.js';
 import { sellerProductStatus } from '../schemas/index.js';
 import * as fx from './fixtures.js';
 
@@ -104,8 +104,9 @@ export function createMockState() {
   const notifications = new Map<string, Notification[]>([['u_buyer', fx.notifications.map(n => ({ ...n }))]]);
   const comments = new Map<string, Comment[]>();
   const uploads = new Map<string, { contentType: string; sizeBytes: number }>();
+  const notificationPrefs = new Map<string, NotificationPreferences>();
   const liveSessions = fx.liveSessions.map(session => ({ ...session, host: { ...session.host }, productIds: [...session.productIds] }));
-  return { users, passwords, sessions, refreshTokens, revoked, pendingOtp, mfa, mfaChallenges, products, posts, likes, saves, follows, blocks, carts, orders, reviews, addresses, wallets, payoutMethods, transactions, conversations, messages, notifications, comments, uploads, liveSessions, counter: 1000 };
+  return { users, passwords, sessions, refreshTokens, revoked, pendingOtp, mfa, mfaChallenges, products, posts, likes, saves, follows, blocks, carts, orders, reviews, addresses, wallets, payoutMethods, transactions, conversations, messages, notifications, comments, uploads, notificationPrefs, liveSessions, counter: 1000 };
 }
 export type MockState = ReturnType<typeof createMockState>;
 
@@ -1328,6 +1329,16 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       const n = (state.notifications.get(requireUser(c).id) ?? []).find(x => x.id === c.params.id);
       if (n) n.read = true;
       return { ok: true };
+    }],
+    ['GET', '/users/me/notification-preferences', c => resolveNotificationPreferences(state.notificationPrefs.get(requireUser(c).id))],
+    ['PATCH', '/users/me/notification-preferences', c => {
+      const u = requireUser(c);
+      const parsed = UpdateNotificationPreferencesRequestSchema.safeParse(c.body);
+      if (!parsed.success) throw validation(Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.') || '_', i.message])));
+      const current = resolveNotificationPreferences(state.notificationPrefs.get(u.id));
+      for (const k of Object.keys(parsed.data) as (keyof typeof current)[]) current[k] = { ...current[k], ...parsed.data[k] };
+      state.notificationPrefs.set(u.id, current);
+      return current;
     }],
     ['POST', '/devices', c => (requireUser(c), { ok: true })],
     ['DELETE', '/devices/:token', () => ({ ok: true })],

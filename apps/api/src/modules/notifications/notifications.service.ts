@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { Notification, RegisterDeviceRequest } from '@ezyify/core';
+import { resolveNotificationPreferences, type Notification, type NotificationCategory, type NotificationPreferences, type RegisterDeviceRequest, type UpdateNotificationPreferencesRequest } from '@ezyify/core';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
 import { FCM_TRANSPORT, type FcmTransport } from './fcm.provider.js';
 import { PageQuerySchema, page, skipTake } from '../../common/pagination.js';
@@ -55,7 +55,28 @@ export class NotificationsService {
    * FCM HTTP v1 delivery per device; without a service account we log instead so dev/test never hit the network.
    * Returns the number of devices delivered to. Stale tokens (UNREGISTERED/NOT_FOUND) are deleted.
    */
+  async preferences(userId: string): Promise<NotificationPreferences> {
+    const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { notificationPrefs: true } });
+    return resolveNotificationPreferences(u?.notificationPrefs);
+  }
+
+  async updatePreferences(userId: string, body: UpdateNotificationPreferencesRequest): Promise<NotificationPreferences> {
+    const current = await this.preferences(userId);
+    for (const k of Object.keys(body) as NotificationCategory[]) current[k] = { ...current[k], ...body[k] };
+    await this.prisma.user.update({ where: { id: userId }, data: { notificationPrefs: current } });
+    return current;
+  }
+
+  /** True when the recipient has push enabled for the channel (Android channel id == preference category). */
+  async wantsPush(userId: string, channelId?: string) {
+    if (!channelId) return true;
+    const prefs = await this.preferences(userId);
+    const cat = channelId as NotificationCategory;
+    return cat in prefs ? prefs[cat].push : true;
+  }
+
   async push(userId: string, title: string, body: string, data: Record<string, string> = {}, channelId?: string) {
+    if (!(await this.wantsPush(userId, channelId))) return 0;
     const devices = await this.prisma.device.findMany({ where: { userId } });
     if (!devices.length) return 0;
     if (!this.fcm.enabled) {

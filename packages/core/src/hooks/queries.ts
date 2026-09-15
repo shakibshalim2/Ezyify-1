@@ -1,7 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type { z } from 'zod';
 import type { FeedQuery, ProductQuery, SellerProductQuery } from '../api/endpoints.js';
-import type { CreatePayoutMethodRequest, CreateReviewRequest, DeleteProductResult, PayoutMethod, SellerProductDetail, SellerReviewFilter, ShipOrderRequest, UpdateProductRequest, UpsertProductRequest } from '../schemas/index.js';
+import type { CreatePayoutMethodRequest, CreateReviewRequest, DeleteProductResult, NotificationPreferences, PayoutMethod, SellerProductDetail, SellerReviewFilter, ShipOrderRequest, UpdateNotificationPreferencesRequest, UpdateProductRequest, UpsertProductRequest } from '../schemas/index.js';
 import type { SearchType } from '../schemas/index.js';
 import type { paginated } from '../schemas/common.js';
 import type { Cart, CheckoutRequest, CreateAddressRequest, CreatePostRequest, Post, UpdateProfileRequest, UserProfile } from '../schemas/index.js';
@@ -48,6 +48,7 @@ export const queryKeys = {
   messages: (id: string) => ['conversations', id, 'messages'] as const,
   notifications: ['notifications'] as const,
   unreadCount: ['notifications', 'unread'] as const,
+  notificationPreferences: ['notifications', 'preferences'] as const,
   blocked: ['blocked'] as const,
   sessions: ['auth', 'sessions'] as const,
   mfa: ['auth', 'mfa'] as const,
@@ -617,6 +618,36 @@ export function useUnreadCount() {
   const api = useApi();
   const authed = useAuthed();
   return useQuery({ queryKey: queryKeys.unreadCount, queryFn: () => api.notifications.unreadCount(), enabled: authed, refetchInterval: 30_000, select: d => d.count });
+}
+
+export function useNotificationPreferences() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: queryKeys.notificationPreferences, queryFn: () => api.notifications.preferences(), enabled: authed, staleTime: 5 * 60_000 });
+}
+
+/** Optimistic per-toggle update; the server returns the merged document. */
+export function useUpdateNotificationPreferences() {
+  const api = useApi();
+  const qc = useQueryClient();
+  const key = ['notifications', 'preferences', 'update'];
+  return useMutation({
+    mutationKey: key,
+    mutationFn: (body: UpdateNotificationPreferencesRequest) => api.notifications.updatePreferences(body),
+    onMutate: async body => {
+      await qc.cancelQueries({ queryKey: queryKeys.notificationPreferences });
+      const previous = qc.getQueryData<NotificationPreferences>(queryKeys.notificationPreferences);
+      if (previous) {
+        const next = { ...previous };
+        for (const k of Object.keys(body) as (keyof NotificationPreferences)[]) next[k] = { ...previous[k], ...body[k] };
+        qc.setQueryData(queryKeys.notificationPreferences, next);
+      }
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => { if (ctx?.previous) qc.setQueryData(queryKeys.notificationPreferences, ctx.previous); },
+    // Rapid toggles overlap: only the last in-flight response may replace the optimistic document.
+    onSuccess: data => { if (qc.isMutating({ mutationKey: key }) <= 1) qc.setQueryData(queryKeys.notificationPreferences, data); },
+  });
 }
 
 export function useMarkNotificationsRead() {

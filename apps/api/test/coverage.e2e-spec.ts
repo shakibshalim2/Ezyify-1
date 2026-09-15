@@ -6,7 +6,7 @@ import { loadEnv } from '../src/config.js';
 import { PrismaService } from '../src/infra/prisma/prisma.service.js';
 import { OrdersService } from '../src/modules/orders/orders.service.js';
 import { NotificationsService } from '../src/modules/notifications/notifications.service.js';
-import { CategorySchema, ConversationSchema, MessageSchema, NotificationSchema, PostSchema, ProductDetailSchema, TransactionSchema, UserProfileSchema, WalletSchema, paginated } from '@ezyify/core';
+import { CategorySchema, ConversationSchema, MessageSchema, NotificationSchema, PostSchema, ProductDetailSchema, TransactionSchema, UserProfileSchema, WalletSchema, paginated, DEFAULT_NOTIFICATION_PREFERENCES } from '@ezyify/core';
 import { z } from 'zod';
 
 /** Broad behavioural coverage of the remaining modules: users, catalog detail, cart edge cases, feed authoring, messaging, wallet, account, orders refund/cancel. */
@@ -66,6 +66,20 @@ describe('users', () => {
     expect((await inject('POST', '/users/buyer/follow', { token: buyer })).statusCode).toBe(422);
     expect(json(await inject('DELETE', '/users/fashionista_maya/follow', { token: buyer })).data.ok).toBe(true);
     expect(json(await inject('POST', '/users/fashionista_maya/follow', { token: buyer })).data.ok).toBe(true);
+  });
+
+  it('notification preferences default from core, patch per category/channel, and gate push delivery', async () => {
+    expect((await inject('GET', '/users/me/notification-preferences')).statusCode).toBe(401);
+    const initial = json(await inject('GET', '/users/me/notification-preferences', { token: buyer })).data;
+    expect(initial).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+    const patched = json(await inject('PATCH', '/users/me/notification-preferences', { token: buyer, body: { promos: { email: true }, social: { push: false } } })).data;
+    expect(patched.promos).toEqual({ push: false, email: true });
+    expect(patched.social).toEqual({ push: false, email: false });
+    expect(patched.orders).toEqual(DEFAULT_NOTIFICATION_PREFERENCES.orders);
+    expect(json(await inject('GET', '/users/me/notification-preferences', { token: buyer })).data).toEqual(patched);
+    expect((await inject('PATCH', '/users/me/notification-preferences', { token: buyer, body: { social: { push: 'yes' } } })).statusCode).toBe(422);
+    // Restore so later suites see defaults.
+    await inject('PATCH', '/users/me/notification-preferences', { token: buyer, body: { promos: { email: false }, social: { push: true } } });
   });
 });
 
