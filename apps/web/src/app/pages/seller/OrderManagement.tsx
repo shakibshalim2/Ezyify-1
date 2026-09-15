@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { Link, useNavigate } from 'react-router';
 import { Package, Search, Eye, Truck, CheckCircle, AlertCircle, ShieldCheck } from 'lucide-react';
-import { avatarUrlFor, formatMoney, formatRelativeTime, formatTimeUntil, useAuth, useSellerOrders, useSellerOrdersSummary, type Order, type OrderStatus } from '@ezyify/core';
+import { avatarUrlFor, formatMoney, formatTimeAgo, formatTimeUntil, useAuth, useSellerOrders, useSellerOrdersSummary, type Order, type OrderStatus } from '@ezyify/core';
 import { Button } from '../../components/primitives/Button';
 import { Card } from '../../components/primitives/Card';
 import { Field } from '../../components/primitives/Field';
@@ -73,7 +73,7 @@ function SellerOrderCard({ order }: { order: Order }) {
               <span aria-hidden>•</span>
               <span>{order.shippingTo.city}, {order.shippingTo.country}</span>
               <span aria-hidden>•</span>
-              <time dateTime={order.placedAt}>{formatRelativeTime(order.placedAt)} ago</time>
+              <time dateTime={order.placedAt}>{formatTimeAgo(order.placedAt)}</time>
             </div>
           </div>
           <div className="text-right flex-shrink-0">

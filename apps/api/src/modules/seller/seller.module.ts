@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { SellerDashboardController } from './seller-dashboard.controller.js';
 import { SellerAnalyticsController } from './seller-analytics.controller.js';
+import { SellerCustomersController } from './seller-customers.controller.js';
 
-@Module({ controllers: [SellerDashboardController, SellerAnalyticsController] })
+@Module({ controllers: [SellerDashboardController, SellerAnalyticsController, SellerCustomersController] })
 export class SellerModule {}

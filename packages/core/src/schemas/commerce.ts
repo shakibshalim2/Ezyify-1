@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IdSchema, IsoDateSchema, MoneySchema } from './common.js';
+import { IdSchema, IsoDateSchema, MoneySchema, PaginationSchema } from './common.js';
 import { ProductSummarySchema } from './catalog.js';
 import { UserSummarySchema } from './user.js';
 
@@ -128,6 +128,27 @@ export const SellerAnalyticsSchema = z.object({
   paymentMix: z.array(z.object({ method: z.enum(['wallet', 'card', 'bank_transfer', 'cod']), orders: z.number().int().min(0), share: z.number().min(0).max(1) })),
 });
 export type SellerAnalytics = z.infer<typeof SellerAnalyticsSchema>;
+
+/** Seller customers (`GET /seller/customers`): buyers aggregated from the seller's paid orders — no email/phone exposure. */
+export const SellerCustomerSchema = z.object({
+  user: UserSummarySchema,
+  orders: z.number().int().min(1),
+  spent: MoneySchema,
+  firstOrderAt: IsoDateSchema,
+  lastOrderAt: IsoDateSchema,
+  /** City/country of the most recent shipment — what a seller needs for logistics, nothing more. */
+  lastShippedTo: z.object({ city: z.string(), country: z.string() }).nullable(),
+  openOrders: z.number().int().min(0),
+});
+export type SellerCustomer = z.infer<typeof SellerCustomerSchema>;
+
+export const SellerCustomersResponseSchema = z.object({
+  items: z.array(SellerCustomerSchema),
+  pagination: PaginationSchema,
+  summary: z.object({ total: z.number().int().min(0), repeat: z.number().int().min(0), averageOrder: MoneySchema, averageLifetime: MoneySchema }),
+});
+export type SellerCustomersResponse = z.infer<typeof SellerCustomersResponseSchema>;
+export type SellerCustomerSort = 'recent' | 'spent' | 'orders';
 
 export const OrderEventSchema = z.object({
   status: OrderStatusSchema,

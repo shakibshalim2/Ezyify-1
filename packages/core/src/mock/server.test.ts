@@ -150,6 +150,17 @@ describe('mock API server', () => {
     expect(a.customers.firstTime + a.customers.repeat).toBe(a.customers.unique);
   });
 
+  it('seller customers are aggregated per buyer and sortable in mock mode', async () => {
+    const { api, login } = harness();
+    await login('techstore@ezyify.test');
+    const r = await api.seller.customers({ sort: 'spent' });
+    expect(r.items.length).toBeGreaterThan(1);
+    expect(r.items.find(c => c.user.username === 'buyer')).toMatchObject({ orders: 1, openOrders: 1 });
+    expect(r.items.every((c, i) => i === 0 || c.spent.amount <= r.items[i - 1].spent.amount)).toBe(true);
+    expect(r.summary.total).toBe(r.items.length);
+    expect((await api.seller.customers({ q: 'test buyer' })).items.map(c => c.user.username)).toEqual(['buyer']);
+  });
+
   it('login → native refresh rotation → protected route; rejects bad credentials', async () => {
     const { api, login, tokens, setAccess } = harness();
     await expect(api.auth.login({ identifier: 'buyer@ezyify.test', password: 'nope' })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });

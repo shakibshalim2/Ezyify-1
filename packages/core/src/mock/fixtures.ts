@@ -21,7 +21,7 @@ import type {
  */
 export const img = (id: string, w = 800) => `https://images.unsplash.com/${id}?w=${w}&q=80`;
 export const usd = (major: number) => ({ amount: Math.round(major * 100), currency: 'USD' as const });
-const ago = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
+export const ago = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
 const ahead = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString();
 
 export interface SeedUser extends UserSummary {

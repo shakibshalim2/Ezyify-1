@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApp } from '../src/bootstrap.js';
 import { loadEnv } from '../src/config.js';
-import { OrderSchema, ProductSummarySchema, SellerAnalyticsSchema, SellerDashboardSchema, SellerProductsResponseSchema, SessionSchema, paginated } from '@ezyify/core';
+import { OrderSchema, ProductSummarySchema, SellerAnalyticsSchema, SellerCustomersResponseSchema, SellerDashboardSchema, SellerProductsResponseSchema, SessionSchema, paginated } from '@ezyify/core';
 
 let app: NestFastifyApplication;
 const inject = (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, opts: { token?: string; body?: unknown; headers?: Record<string, string> } = {}) =>
@@ -202,6 +202,21 @@ describe('commerce: cart → checkout → escrow → release', () => {
     expect(a.fulfillment.cancelRate).toBe(0.5);
     expect(typeof a.fulfillment.avgHoursToShip).toBe('number');
     expect(a.paymentMix).toEqual([{ method: 'wallet', orders: 1, share: 1 }]);
+  });
+
+  it('seller customers aggregate buyers from paid orders with public profile data only', async () => {
+    expect((await inject('GET', '/seller/customers', { token: buyer })).statusCode).toBe(403);
+    const r = json(await inject('GET', '/seller/customers?sort=spent', { token: seller })).data;
+    expect(SellerCustomersResponseSchema.safeParse(r).success).toBe(true);
+    expect(r.items).toHaveLength(1);
+    const c = r.items[0];
+    expect(c.user.username).toBe('buyer');
+    expect(c.user).not.toHaveProperty('email');
+    // Only the completed 7999 order counts; the cancelled one is excluded from orders/spend.
+    expect(c).toMatchObject({ orders: 1, spent: { amount: 7999 }, openOrders: 0 });
+    expect(c.lastShippedTo).toMatchObject({ city: expect.any(String), country: expect.any(String) });
+    expect(r.summary).toMatchObject({ total: 1, repeat: 0, averageOrder: { amount: 7999 }, averageLifetime: { amount: 7999 } });
+    expect(json(await inject('GET', '/seller/customers?q=nobody', { token: seller })).data.items).toHaveLength(0);
   });
 
   it('timeline records every transition', async () => {

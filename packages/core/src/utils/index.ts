@@ -35,6 +35,12 @@ export function formatRelativeTime(iso: string, now = Date.now()): string {
   return new Date(iso).toLocaleDateString('en', { month: 'short', day: 'numeric' });
 }
 
+/** "3h ago" / "2d ago" for recent times, otherwise an absolute "Sep 8" — never "Sep 8 ago". */
+export function formatTimeAgo(iso: string, now = Date.now()): string {
+  const r = formatRelativeTime(iso, now);
+  return r === 'now' ? 'just now' : /^\d+[mhd]$/.test(r) ? `${r} ago` : r;
+}
+
 /** Future-facing counterpart of `formatRelativeTime` ("in 6d", "in 3h", "in 12m"). */
 export function formatTimeUntil(iso: string, now = Date.now()): string {
   const diff = new Date(iso).getTime() - now;

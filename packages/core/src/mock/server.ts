@@ -1,4 +1,4 @@
-import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, Post, ProductDetail, SellerProduct, UserProfile } from '../schemas/index.js';
+import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, Post, ProductDetail, SellerCustomer, SellerProduct, UserProfile } from '../schemas/index.js';
 import { sellerProductStatus } from '../schemas/index.js';
 import * as fx from './fixtures.js';
 
@@ -535,6 +535,39 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
         },
         paymentMix: (['wallet', 'card', 'bank_transfer', 'cod'] as const).map((method, i) => ({ method, orders: Math.round(orders * [0.46, 0.34, 0.12, 0.08][i]), share: [0.46, 0.34, 0.12, 0.08][i] })),
       };
+    }],
+    ['GET', '/seller/customers', c => {
+      const u = requireUser(c);
+      if (u.role !== 'seller' && u.role !== 'admin') throw forbidden('Seller account required');
+      const SALES = ['paid', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'completed'];
+      const OPEN = ['paid', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'refund_requested', 'disputed'];
+      const mine = state.orders.filter(o => o.seller.id === u.id && SALES.includes(o.status)).sort((a, b) => +new Date(b.placedAt) - +new Date(a.placedAt));
+      const byBuyer = new Map<string, SellerCustomer>();
+      for (const o of mine) {
+        const cur = byBuyer.get(o.buyer.id);
+        if (cur) {
+          cur.orders += 1; cur.spent = money(cur.spent.amount + o.total.amount); cur.firstOrderAt = o.placedAt;
+        } else {
+          byBuyer.set(o.buyer.id, { user: o.buyer, orders: 1, spent: money(o.total.amount), firstOrderAt: o.placedAt, lastOrderAt: o.placedAt, lastShippedTo: { city: o.shippingTo.city, country: o.shippingTo.country }, openOrders: 0 });
+        }
+      }
+      for (const o of state.orders.filter(o => o.seller.id === u.id && OPEN.includes(o.status))) { const cst = byBuyer.get(o.buyer.id); if (cst) cst.openOrders += 1; }
+      // Demo sellers get a few extra buyers from the fixture roster so the page is not a single row.
+      const extras = fx.users.filter(x => (x.role === 'user' || x.role === 'creator') && x.id !== 'u_buyer' && x.id !== u.id && !byBuyer.has(x.id)).slice(0, 4);
+      extras.forEach((x, i) => {
+        const orders = 1 + ((i * 7 + u.id.length) % 4);
+        const spent = orders * (2999 + ((i * 1313) % 9000));
+        byBuyer.set(x.id, { user: fx.summary(x), orders, spent: money(spent), firstOrderAt: fx.ago(24 * (30 + i * 11)), lastOrderAt: fx.ago(24 * (2 + i * 5)), lastShippedTo: { city: x.location ?? 'Jakarta', country: 'ID' }, openOrders: 0 });
+      });
+      let all = [...byBuyer.values()];
+      const totalSpent = all.reduce((n, cst) => n + cst.spent.amount, 0);
+      const totalOrders = all.reduce((n, cst) => n + cst.orders, 0);
+      const summary = { total: all.length, repeat: all.filter(cst => cst.orders > 1).length, averageOrder: money(totalOrders ? Math.round(totalSpent / totalOrders) : 0), averageLifetime: money(all.length ? Math.round(totalSpent / all.length) : 0) };
+      const q = c.query.get('q')?.toLowerCase();
+      if (q) all = all.filter(cst => cst.user.name.toLowerCase().includes(q) || cst.user.username.toLowerCase().includes(q));
+      const sort = c.query.get('sort') ?? 'recent';
+      all.sort((a, b) => (sort === 'spent' ? b.spent.amount - a.spent.amount : sort === 'orders' ? b.orders - a.orders : +new Date(b.lastOrderAt) - +new Date(a.lastOrderAt)));
+      return { ...paginate(all, c.query), summary };
     }],
     ['GET', '/seller/products', c => {
       const u = requireUser(c);

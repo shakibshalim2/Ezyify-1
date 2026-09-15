@@ -41,6 +41,7 @@ import {
   ResetPasswordRequestSchema,
   SearchResponseSchema,
   SellerAnalyticsSchema,
+  SellerCustomersResponseSchema,
   SellerDashboardSchema,
   SellerOrdersSummarySchema,
   SellerProductsResponseSchema,
@@ -68,6 +69,7 @@ import {
   type LiveTokenRequest,
   type LoginRequest,
   type SellerProductStatus,
+  type SellerCustomerSort,
   type ShipOrderRequest,
   type LoginResult,
   type MfaVerifyRequest,
@@ -137,6 +139,8 @@ export function createEndpoints(api: ApiClient) {
       dashboard: (query: { days?: number } = {}) => api.get('/seller/dashboard', SellerDashboardSchema, { query }),
       /** Top products, category mix, customers, fulfilment and payment mix for the window (7–90 days). */
       analytics: (query: { days?: number } = {}) => api.get('/seller/analytics', SellerAnalyticsSchema, { query }),
+      /** Buyers aggregated from the seller's orders; `q` matches name/username, `sort` recent|spent|orders. */
+      customers: (query: PageQuery & { q?: string; sort?: SellerCustomerSort } = {}) => api.get('/seller/customers', SellerCustomersResponseSchema, { query }),
     },
     search: {
       /** Unified products + users + posts search (Meilisearch or Postgres fallback server-side). */
