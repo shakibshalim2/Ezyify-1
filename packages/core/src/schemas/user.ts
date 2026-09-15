@@ -15,6 +15,8 @@ export const UserSummarySchema = z.object({
 export type UserSummary = z.infer<typeof UserSummarySchema>;
 
 export const UserProfileSchema = UserSummarySchema.extend({
+  /** Private accounts hide posts, followers and following from non-followers; the profile card stays discoverable. */
+  isPrivate: z.boolean().default(false),
   bio: z.string().max(160).nullable(),
   coverUrl: z.string().url().nullable(),
   website: z.string().url().nullable(),
@@ -36,8 +38,20 @@ export const UpdateProfileRequestSchema = z.object({
   avatarUrl: z.string().url().nullable().optional(),
   coverUrl: z.string().url().nullable().optional(),
   interests: z.array(z.string()).max(20).optional(),
+  isPrivate: z.boolean().optional(),
 });
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequestSchema>;
+
+/** Own account details from `GET /users/me/account` — the private contact fields that never appear on a profile. */
+export const AccountDetailsSchema = z.object({
+  email: z.string().email(),
+  emailVerified: z.boolean(),
+  phone: z.string().nullable(),
+  role: RoleSchema,
+  createdAt: IsoDateSchema,
+  deletionScheduledAt: IsoDateSchema.nullable(),
+});
+export type AccountDetails = z.infer<typeof AccountDetailsSchema>;
 
 /** One refresh session (device) as listed by GET /auth/sessions. */
 export const DeviceSessionSchema = z.object({

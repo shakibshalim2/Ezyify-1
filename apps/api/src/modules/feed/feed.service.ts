@@ -52,9 +52,10 @@ export class FeedService {
     const where: Prisma.PostWhereInput = {
       deletedAt: null,
       ...(q.kind ? { kind: q.kind } : { kind: { not: 'story' } }),
-      ...(q.author ? { author: { username: q.author } } : {}),
       ...(q.hashtag ? { hashtags: { has: q.hashtag.replace(/^#/, '') } } : {}),
       ...(blocked.length ? { authorId: { notIn: blocked } } : {}),
+      // Private accounts: only the owner and accepted followers see their posts.
+      author: { ...(q.author ? { username: q.author } : {}), OR: [{ isPrivate: false }, ...(viewerId ? [{ id: viewerId }, { followers: { some: { followerId: viewerId } } }] : [])] },
       OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
     };
     const [rows, total] = await this.prisma.$transaction([

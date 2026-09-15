@@ -123,6 +123,17 @@ export class AuthService {
     await this.prisma.refreshSession.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
   }
 
+  /** Signed-in password change (ASVS 2.1.5): re-verify the current password, then revoke every other session. */
+  async changePassword(userId: string, currentPassword: string, newPassword: string, keepRefreshToken?: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { passwordHash: true } });
+    if (!(await argon2.verify(user.passwordHash, currentPassword))) throw unauthorized('Incorrect current password');
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: userId }, data: { passwordHash: await argon2.hash(newPassword, ARGON), passwordChangedAt: new Date() } }),
+      this.prisma.refreshSession.updateMany({ where: { userId, revokedAt: null, ...(keepRefreshToken ? { NOT: { tokenHash: sha256(keepRefreshToken) } } : {}) }, data: { revokedAt: new Date() } }),
+    ]);
+    await this.audit.log('auth.password_changed', { userId });
+  }
+
   /** ASVS 3.3: users can see and end their own device sessions. */
   async sessions(userId: string, currentRefreshToken?: string) {
     const currentHash = currentRefreshToken ? sha256(currentRefreshToken) : null;

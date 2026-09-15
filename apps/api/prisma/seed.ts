@@ -32,7 +32,7 @@ export async function seed() {
     { id: 'u_admin', email: 'admin@ezyify.test', username: 'admin', name: 'Ezyify Admin', avatarUrl: null, verified: true, role: 'admin' as const },
   ];
   for (const u of users) {
-    await prisma.user.upsert({ where: { id: u.id }, create: { ...u, passwordHash, emailVerified: true, wallet: { create: { balance: u.id === 'u_buyer' ? 50_000 : 0 } }, cart: { create: {} } }, update: { ...u, failedLogins: 0, lockedUntil: null, wallet: { upsert: { create: { balance: u.id === 'u_buyer' ? 50_000 : 0 }, update: { balance: u.id === 'u_buyer' ? 50_000 : 0, pending: 0 } } } } });
+    await prisma.user.upsert({ where: { id: u.id }, create: { ...u, passwordHash, emailVerified: true, wallet: { create: { balance: u.id === 'u_buyer' ? 50_000 : 0 } }, cart: { create: {} } }, update: { ...u, passwordHash, isPrivate: false, deletedAt: null, deletionReason: null, failedLogins: 0, lockedUntil: null, wallet: { upsert: { create: { balance: u.id === 'u_buyer' ? 50_000 : 0 }, update: { balance: u.id === 'u_buyer' ? 50_000 : 0, pending: 0 } } } } });
   }
   await prisma.address.upsert({ where: { id: 'addr_buyer_home' }, create: { id: 'addr_buyer_home', userId: 'u_buyer', label: 'Home', recipient: 'Test Buyer', phone: '+6281234567890', line1: 'Jl. Sudirman No. 21', city: 'Jakarta', postal: '10220', country: 'ID', isDefault: true }, update: {} });
 

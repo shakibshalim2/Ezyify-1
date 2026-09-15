@@ -66,6 +66,8 @@ import {
   TransactionSchema,
   UpdateProfileRequestSchema,
   NotificationPreferencesSchema,
+  AccountDetailsSchema,
+  ChangePasswordRequestSchema,
   RefundRequestBodySchema,
   DeclineRefundRequestSchema,
   DisputeRequestSchema,
@@ -111,6 +113,7 @@ import {
   type UpdateProfileRequest,
   type UpdateNotificationPreferencesRequest,
   type DeclineRefundRequest,
+  type ChangePasswordRequest,
   type DisputeRequest,
   type ResolveDisputeRequest,
   type SubmitKycRequest,
@@ -141,6 +144,7 @@ export function createEndpoints(api: ApiClient) {
       refresh: (refreshToken?: string) => api.post('/auth/refresh', refreshToken ? { refreshToken } : {}, RefreshResponseSchema, { auth: false }),
       logout: (refreshToken?: string) => api.post('/auth/logout', refreshToken ? { refreshToken } : {}, Ok),
       logoutAll: () => api.post('/auth/logout-all', {}, Ok),
+      changePassword: (body: ChangePasswordRequest) => api.post('/auth/change-password', ChangePasswordRequestSchema.parse(body), Ok),
       sessions: () => api.get('/auth/sessions', z.array(DeviceSessionSchema)),
       revokeSession: (id: string) => api.delete(`/auth/sessions/${enc(id)}`, Ok),
       mfa: {
@@ -154,6 +158,7 @@ export function createEndpoints(api: ApiClient) {
     },
     users: {
       me: () => api.get('/users/me', UserProfileSchema),
+      account: () => api.get('/users/me/account', AccountDetailsSchema),
       updateMe: (body: UpdateProfileRequest) => api.patch('/users/me', UpdateProfileRequestSchema.parse(body), UserProfileSchema),
       profile: (username: string) => api.get(`/users/${enc(username)}`, UserProfileSchema),
       followers: (username: string) => api.get(`/users/${enc(username)}/followers`, z.array(UserSummarySchema)),

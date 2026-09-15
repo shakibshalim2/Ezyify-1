@@ -1,5 +1,5 @@
 import type { Address, Cart, CartItem, Comment, Conversation, LiveSession, Message, Notification, Order, PayoutMethod, Post, ProductDetail, Review, SellerCustomer, SellerProduct, SellerProductDetail, SellerReview, UserProfile } from '../schemas/index.js';
-import { DeclineRefundRequestSchema, DisputeRequestSchema, RefundRequestBodySchema, ResolveDisputeRequestSchema, ReviewKycRequestSchema, SubmitKycRequestSchema, UpdateNotificationPreferencesRequestSchema, UpdateProfileRequestSchema, UpsertProductRequestSchema, UpdateProductRequestSchema, resolveNotificationPreferences, type KycSubmission, type NotificationPreferences } from '../schemas/index.js';
+import { ChangePasswordRequestSchema, DeclineRefundRequestSchema, DisputeRequestSchema, RefundRequestBodySchema, ResolveDisputeRequestSchema, ReviewKycRequestSchema, SubmitKycRequestSchema, UpdateNotificationPreferencesRequestSchema, UpdateProfileRequestSchema, UpsertProductRequestSchema, UpdateProductRequestSchema, resolveNotificationPreferences, type KycSubmission, type NotificationPreferences } from '../schemas/index.js';
 import { sellerProductStatus } from '../schemas/index.js';
 import * as fx from './fixtures.js';
 
@@ -155,10 +155,14 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
     ...p,
     engagement: { ...p.engagement, isLiked: !!viewer && set(state.likes, viewer.id).has(p.id), isSaved: !!viewer && set(state.saves, viewer.id).has(p.id) },
   });
+  /** Private accounts: posts / followers / following are only visible to the owner and accepted followers. */
+  const canSeeContent = (target: fx.SeedUser, viewer: fx.SeedUser | null) => !target.isPrivate || (!!viewer && (viewer.id === target.id || viewer.role === 'admin' || set(state.follows, viewer.id).has(target.id)));
+  const assertVisible = (target: fx.SeedUser, viewer: fx.SeedUser | null) => { if (!canSeeContent(target, viewer)) throw forbidden('This account is private'); };
   const visiblePosts = (viewer: fx.SeedUser | null, kind?: string) =>
     state.posts
       .filter(p => (kind ? p.kind === kind : p.kind !== 'story'))
       .filter(p => !viewer || !set(state.blocks, viewer.id).has(p.author.id))
+      .filter(p => { const a = state.users.find(u => u.id === p.author.id); return !a || canSeeContent(a, viewer); })
       .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
       .map(p => viewerPost(p, viewer));
   /** Status an order had before its current refund request, so a withdrawal can resume fulfilment. */
@@ -367,6 +371,14 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       state.revoked.add(c.params.id);
       return { ok: true };
     }],
+    ['POST', '/auth/change-password', c => {
+      const u = requireUser(c);
+      const parsed = ChangePasswordRequestSchema.safeParse(c.body);
+      if (!parsed.success) throw validation(Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.') || '_', i.message])));
+      if (state.passwords.get(u.id) !== parsed.data.currentPassword) throw new MockApiError(401, 'UNAUTHORIZED', 'Incorrect current password');
+      state.passwords.set(u.id, parsed.data.newPassword);
+      return { ok: true };
+    }],
     ['POST', '/auth/forgot-password', () => ({ ok: true })],
     ['POST', '/auth/reset-password', () => ({ ok: true })],
 
@@ -377,8 +389,12 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       if (typeof c.body.username === 'string' && state.users.some(x => x.username === c.body.username && x.id !== u.id)) throw new MockApiError(409, 'CONFLICT', 'That username is taken');
       const parsed = UpdateProfileRequestSchema.safeParse(c.body);
       if (!parsed.success) throw validation(Object.fromEntries(parsed.error.issues.map(i => [i.path.join('.') || '_', i.message])));
-      for (const k of ['name', 'username', 'bio', 'location', 'avatarUrl', 'coverUrl', 'website'] as const) if (k in parsed.data) (u as unknown as Record<string, unknown>)[k] = parsed.data[k];
+      for (const k of ['name', 'username', 'bio', 'location', 'avatarUrl', 'coverUrl', 'website', 'isPrivate'] as const) if (k in parsed.data) (u as unknown as Record<string, unknown>)[k] = parsed.data[k];
       return profileOf(u, u);
+    }],
+    ['GET', '/users/me/account', c => {
+      const u = requireUser(c);
+      return { email: u.email, emailVerified: true, phone: u.phone ?? (u.id === 'u_buyer' ? '+62 812-3456-7890' : null), role: u.role, createdAt: fx.ago(24 * 400), deletionScheduledAt: null };
     }],
     ['GET', '/users/me/blocked', c => [...set(state.blocks, requireUser(c).id)].map(id => fx.byId(id)).filter(Boolean).map(u => ({ id: u!.id, username: u!.username, name: u!.name, avatarUrl: u!.avatarUrl }))],
     ['GET', '/users/:username', c => {
@@ -389,11 +405,13 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
     ['GET', '/users/:username/followers', c => {
       const t = state.users.find(u => u.username === c.params.username);
       if (!t) throw notFound('User');
+      assertVisible(t, c.user);
       return state.users.filter(u => set(state.follows, u.id).has(t.id)).map(fx.summary);
     }],
     ['GET', '/users/:username/following', c => {
       const t = state.users.find(u => u.username === c.params.username);
       if (!t) throw notFound('User');
+      assertVisible(t, c.user);
       return [...set(state.follows, t.id)].map(id => state.users.find(u => u.id === id)).filter(Boolean).map(u => fx.summary(u!));
     }],
     ['POST', '/users/:username/follow', c => {
@@ -1256,7 +1274,7 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       let list = visiblePosts(c.user, c.query.get('kind') ?? 'post');
       const author = c.query.get('author');
       const tag = c.query.get('hashtag')?.replace(/^#/, '').toLowerCase();
-      if (author) list = list.filter(p => p.author.username === author);
+      if (author) { const t = state.users.find(u => u.username === author); if (t) assertVisible(t, c.user); list = list.filter(p => p.author.username === author); }
       if (tag) list = list.filter(p => p.hashtags.some(h => h.toLowerCase() === tag));
       return paginate(list, c.query);
     }],
@@ -1264,7 +1282,7 @@ export function createMockFetch(options: MockServerOptions = {}, initialState?: 
       let list = visiblePosts(c.user, 'loop');
       const author = c.query.get('author');
       const tag = c.query.get('hashtag')?.replace(/^#/, '').toLowerCase();
-      if (author) list = list.filter(p => p.author.username === author);
+      if (author) { const t = state.users.find(u => u.username === author); if (t) assertVisible(t, c.user); list = list.filter(p => p.author.username === author); }
       if (tag) list = list.filter(p => p.hashtags.some(h => h.toLowerCase() === tag));
       return paginate(list, c.query);
     }],

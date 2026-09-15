@@ -68,6 +68,36 @@ describe('users', () => {
     expect(json(await inject('POST', '/users/fashionista_maya/follow', { token: buyer })).data.ok).toBe(true);
   });
 
+  it('account details, private accounts gate posts/followers, and change-password re-auths + revokes other sessions', async () => {
+    const alex = await login('alex@ezyify.test');
+    const acct = json(await inject('GET', '/users/me/account', { token: alex })).data;
+    expect(acct).toMatchObject({ email: 'alex@ezyify.test', emailVerified: true, role: 'creator', deletionScheduledAt: null });
+    expect(JSON.stringify(json(await inject('GET', '/users/tech_reviews_pro')).data)).not.toContain('alex@ezyify.test');
+    // Go private: anonymous + non-followers lose posts/followers/following; the owner and followers keep them.
+    expect(json(await inject('PATCH', '/users/me', { token: alex, body: { isPrivate: true } })).data.isPrivate).toBe(true);
+    expect((await inject('GET', '/users/tech_reviews_pro/followers')).statusCode).toBe(403);
+    expect((await inject('GET', '/users/tech_reviews_pro/following', { token: seller })).statusCode).toBe(403);
+    expect((await inject('GET', '/users/tech_reviews_pro/followers', { token: alex })).statusCode).toBe(200);
+    expect(json(await inject('GET', '/feed?author=tech_reviews_pro')).data.items).toHaveLength(0);
+    expect(json(await inject('GET', '/users/tech_reviews_pro')).data.isPrivate).toBe(true); // profile card stays discoverable
+    await inject('POST', '/users/tech_reviews_pro/follow', { token: seller });
+    expect((await inject('GET', '/users/tech_reviews_pro/followers', { token: seller })).statusCode).toBe(200);
+    await inject('DELETE', '/users/tech_reviews_pro/follow', { token: seller });
+    await inject('PATCH', '/users/me', { token: alex, body: { isPrivate: false } });
+    expect((await inject('GET', '/users/tech_reviews_pro/followers')).statusCode).toBe(200);
+    // Change password: wrong current → 401; weak → 422; success → old password refused, other sessions revoked.
+    const other = await login('alex@ezyify.test');
+    expect((await inject('POST', '/auth/change-password', { token: alex, body: { currentPassword: 'Wrong1234', newPassword: 'Newpass123' } })).statusCode).toBe(401);
+    expect((await inject('POST', '/auth/change-password', { token: alex, body: { currentPassword: 'Password1', newPassword: 'short' } })).statusCode).toBe(422);
+    expect(json(await inject('POST', '/auth/change-password', { token: alex, body: { currentPassword: 'Password1', newPassword: 'Newpass123' } })).data.ok).toBe(true);
+    expect((await inject('POST', '/auth/login', { body: { identifier: 'alex@ezyify.test', password: 'Password1' } })).statusCode).toBe(401);
+    // Access tokens outlive the change, but every refresh session was revoked (the test client has no cookie to keep).
+    expect(json(await inject('GET', '/auth/sessions', { token: other })).data).toHaveLength(0);
+    // Restore the seed password for later suites.
+    const fresh = json(await inject('POST', '/auth/login', { body: { identifier: 'alex@ezyify.test', password: 'Newpass123' } })).data.accessToken;
+    expect(json(await inject('POST', '/auth/change-password', { token: fresh, body: { currentPassword: 'Newpass123', newPassword: 'Password1' } })).data.ok).toBe(true);
+  });
+
   it('notification preferences default from core, patch per category/channel, and gate push delivery', async () => {
     expect((await inject('GET', '/users/me/notification-preferences')).statusCode).toBe(401);
     const initial = json(await inject('GET', '/users/me/notification-preferences', { token: buyer })).data;

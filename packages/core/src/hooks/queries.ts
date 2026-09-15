@@ -325,6 +325,12 @@ export function useCreatePost() {
 
 // ---------- Users ----------
 
+export function useAccount() {
+  const api = useApi();
+  const authed = useAuthed();
+  return useQuery({ queryKey: ['users', 'me', 'account'] as const, queryFn: () => api.users.account(), enabled: authed, staleTime: 60_000 });
+}
+
 export function useMe(options: Pick<UseQueryOptions<UserProfile>, 'staleTime'> = {}) {
   const api = useApi();
   const authed = useAuthed();
@@ -425,6 +431,12 @@ export function useAddresses() {
   const api = useApi();
   const authed = useAuthed();
   return useQuery({ queryKey: queryKeys.addresses, queryFn: () => api.addresses.list(), enabled: authed });
+}
+
+export function useDeleteAddress() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => api.addresses.remove(id), onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.addresses }) });
 }
 
 export function useCreateAddress() {

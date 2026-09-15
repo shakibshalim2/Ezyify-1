@@ -162,6 +162,8 @@ model User {
   mfaRecoveryCodes String[] @default([])
   // Per-category push/email opt-ins; unset keys fall back to the shared defaults in @ezyify/core.
   notificationPrefs Json?
+  /// Private accounts hide posts / followers / following from non-followers.
+  isPrivate     Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

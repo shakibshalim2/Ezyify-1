@@ -8,6 +8,7 @@ export type AuditEvent =
   | 'auth.logout'
   | 'auth.refresh_reuse'
   | 'auth.password_reset'
+  | 'auth.password_changed'
   | 'auth.session_revoked'
   | 'auth.mfa_enabled'
   | 'auth.mfa_disabled'

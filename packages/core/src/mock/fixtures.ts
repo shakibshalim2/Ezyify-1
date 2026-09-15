@@ -31,6 +31,8 @@ export interface SeedUser extends UserSummary {
   /** Set by `PATCH /users/me` in demo mode; unset users fall back to the role-based fixture value. */
   coverUrl?: string | null;
   website?: string | null;
+  isPrivate?: boolean;
+  phone?: string | null;
 }
 
 export const users: SeedUser[] = [
@@ -148,6 +150,7 @@ export const buyerFollows = ['u_maya', 'u_alex', 'u_sara'];
 
 export const profile = (user: SeedUser, isFollowing?: boolean): UserProfile => ({
   ...summary(user),
+  isPrivate: user.isPrivate ?? false,
   bio: user.bio,
   coverUrl: user.role === 'user' ? null : img('photo-1557682250-33bd709cbe85', 1080),
   website: user.role === 'seller' ? `https://ezyify.app/store/${user.username}` : null,
